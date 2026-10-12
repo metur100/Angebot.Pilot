@@ -1,0 +1,19 @@
+/* AngebotPilot design tokens – mirrors tokens.ts */
+:root {
+  --ap-brand-50: #EEF2FF; --ap-brand-100: #E0E7FF; --ap-brand-200: #C7D2FE; --ap-brand-300: #A5B4FC; --ap-brand-400: #7C8CF8;
+  --ap-brand-500: #4F63F0; --ap-brand-600: #2F45D8; --ap-brand-700: #2537B0; --ap-brand-800: #1F2E8A; --ap-brand-900: #1C296E;
+  --ap-neutral-0: #FFFFFF; --ap-neutral-25: #FBFCFD; --ap-neutral-50: #F6F7F9; --ap-neutral-100: #EEF0F3; --ap-neutral-200: #E2E5EA;
+  --ap-neutral-300: #CDD2DA; --ap-neutral-400: #9AA3B2; --ap-neutral-500: #6B7485; --ap-neutral-600: #4D5566; --ap-neutral-700: #363D4B;
+  --ap-neutral-800: #232833; --ap-neutral-900: #141821;
+  --ap-success-bg: #ECFDF3; --ap-success-border: #ABEFC6; --ap-success-text: #067647; --ap-success-solid: #12B76A;
+  --ap-warning-bg: #FFFAEB; --ap-warning-border: #FEDF89; --ap-warning-text: #B54708; --ap-warning-solid: #F79009;
+  --ap-danger-bg: #FEF3F2; --ap-danger-border: #FECDCA; --ap-danger-text: #B42318; --ap-danger-solid: #F04438;
+  --ap-info-bg: #EEF2FF; --ap-info-border: #C7D2FE; --ap-info-text: #2537B0; --ap-info-solid: #2F45D8;
+  --ap-muted-bg: #F2F4F7; --ap-muted-border: #E2E5EA; --ap-muted-text: #4D5566; --ap-muted-solid: #98A2B3;
+  --ap-font: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --ap-radius-sm: 6px; --ap-radius-md: 8px; --ap-radius-lg: 12px; --ap-radius-xl: 16px;
+  --ap-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --ap-shadow-md: 0 2px 4px -2px rgba(16, 24, 40, 0.06), 0 4px 8px -2px rgba(16, 24, 40, 0.10);
+  --ap-shadow-lg: 0 12px 16px -4px rgba(16, 24, 40, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.03);
+  --ap-focus: 0 0 0 3px rgba(79, 99, 240, 0.45);
+}

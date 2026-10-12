@@ -1,0 +1,64 @@
+# Dependencies & builds
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+*.tsbuildinfo
+bin/
+obj/
+TestResults/
+publish/
+artifacts/
+
+# Expo / React Native
+.expo/
+.expo-shared/
+apps/mobile/android/
+apps/mobile/ios/
+*.apk
+*.aab
+*.ipa
+web-build/
+
+# Secrets and local config – never commit
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+appsettings.Production.json
+*.jks
+*.keystore
+*.p12
+*.p8
+*.mobileprovision
+*.pem
+*.key
+credentials/
+credentials.json
+google-services.json
+GoogleService-Info.plist
+secrets/
+
+# Local runtime data
+apps/api/src/AngebotPilot.Api/App_Data/
+.data/
+*.mdf
+*.ldf
+playwright-report/
+test-results/
+blob-report/
+
+# IDE / OS
+.vs/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.user
+.DS_Store
+Thumbs.db
+
+# Owner-provided credentials (publish profiles, connection strings) – never commit
+input/
+*.publishSettings
+*.pubxml.user

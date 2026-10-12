@@ -1,0 +1,15 @@
+{
+  "name": "@angebotpilot/brand",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AngebotPilot design tokens and logo assets shared by web, mobile, landing site, PDFs and store artwork.",
+  "type": "module",
+  "main": "tokens.ts",
+  "types": "tokens.ts",
+  "react-native": "tokens.ts",
+  "exports": {
+    ".": "./tokens.ts",
+    "./tokens.css": "./tokens.css",
+    "./assets/*": "./assets/*"
+  }
+}

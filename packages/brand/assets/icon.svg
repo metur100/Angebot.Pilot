@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="AngebotPilot">
+  <rect width="1024" height="1024" rx="224" fill="#2F45D8"/>
+  <path d="M236 500 L800 262 L640 790 L506 616 Z" fill="#FFFFFF"/>
+  <path d="M506 616 L800 262 L560 700 Z" fill="#C7D2FE"/>
+  <path d="M506 616 L560 700 L520 760 Z" fill="#A5B4FC"/>
+</svg>

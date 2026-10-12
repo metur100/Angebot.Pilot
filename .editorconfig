@@ -1,0 +1,38 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+
+[*.cs]
+indent_size = 4
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_using_directive_placement = outside_namespace
+dotnet_sort_system_directives_first = true
+csharp_style_var_for_built_in_types = true
+csharp_style_var_when_type_is_apparent = true
+csharp_prefer_braces = when_multiline
+dotnet_diagnostic.IDE0005.severity = none
+
+[*.{csproj,props,targets,xml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[**/Migrations/*.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none
+
+[tests/**.cs]
+# Test naming convention uses underscores; disposal/perf rules are not meaningful in tests.
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA2000.severity = none
+dotnet_diagnostic.CA1001.severity = none
+dotnet_diagnostic.CA2234.severity = none
+dotnet_diagnostic.CA1063.severity = none
+dotnet_diagnostic.CA1816.severity = none
