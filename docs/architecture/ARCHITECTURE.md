@@ -50,7 +50,7 @@ flowchart LR
 | Application layer | `apps/api/src/AngebotPilot.Application` | Services per feature, FluentValidation validators, email templates, job runner. |
 | Domain layer | `apps/api/src/AngebotPilot.Domain` | Entities, state machines, calculator, follow-up planner, plan catalogue. No infrastructure dependencies. |
 | Infrastructure | `apps/api/src/AngebotPilot.Infrastructure` | EF Core `AppDbContext`, migrations, SQL Server application lock, storage providers, email senders, QuestPDF renderer, mock billing provider. |
-| Web app | `apps/web` | React 19, React Router 7 (`createHashRouter`), TanStack Query, Tailwind 4, Vite 8. Built as static files for GitHub Pages. Status of individual screens: to be confirmed (another workstream is finishing it). |
+| Web app | `apps/web` | React 19, React Router 7 (`createHashRouter`), TanStack Query, Tailwind 4, Vite 8. Built as static files for GitHub Pages. Status of individual screens: to be confirmed (another workstream is finishing it). UI in German or English (see [Web app: language and theme](#web-app-language-and-theme)); light/dark theme. |
 | Mobile app | `apps/mobile` | Expo SDK 57, React Native 0.86.3, Expo Router, `expo-secure-store`, `expo-camera` (QR scanning). App id `com.certidevelopment.angebotpilot`. Feature completeness: to be confirmed. |
 | Shared contracts | `packages/api-contracts` | TypeScript API types, fetch client, zod schemas, decimal money helpers (`big.js`). |
 | Brand | `packages/brand` | Design tokens (`tokens.ts`, `tokens.css`) and SVG logo/icon. |
@@ -63,6 +63,24 @@ flowchart LR
 `IAppDbContext`, `IFileStorageService`, `IEmailSender`, `IQuotationPdfRenderer`, `IBillingProvider`,
 `IDistributedLock`). The Application layer references EF Core (`DbSet<T>` is exposed through `IAppDbContext`), so it
 is not persistence-ignorant; this is a deliberate pragmatic choice.
+
+### Web app: language and theme
+
+- **Language (de/en).** UI texts are inline `tr('Deutsch', 'English')` pairs (`apps/web/src/lib/i18n.tsx`); the current
+  locale is module state in `@angebotpilot/api-contracts` (`locale.ts`), so status labels, money/date formatting,
+  number input parsing (`parseNumberInput`), zod messages and API error texts follow it, and the API client sends
+  `Accept-Language`. `LocaleProvider` picks the start language (remembered choice `localStorage['ap.locale']`, else the
+  browser languages, German fallback) and sets `<html lang>`; `LocaleBoundary` re-mounts the router subtree on a switch
+  (auth state, router state and the query cache are kept). Signed in, the user's stored `MeDto.language` wins; switching
+  in the user menu or under Settings → Account PATCHes `/me`. Logged-out pages (login, registration, public quotation
+  page) have their own switch. Documents for customers – PDFs, e-invoices, customer emails, the HTML document preview
+  and the email texts prefilled in send/reminder dialogs – stay German.
+- **Theme (system/light/dark).** `apps/web/src/lib/theme.ts` stores the preference in `localStorage['ap.theme']` (default
+  system, follows `prefers-color-scheme` live) and sets `<html data-theme>`, `color-scheme` and `<meta name="theme-color">`;
+  a small inline script in `index.html` applies it before the first paint (allowed by a CSP hash computed at build time).
+  `data-theme="dark"` swaps every `--ap-*` token (`packages/brand/tokens.css`); Tailwind's `white` is the surface colour,
+  text on filled brand colours uses `on-brand`, and paper-like content (document preview, PDF pages, QR codes) is marked
+  `data-theme="light"` to stay white.
 
 ---
 
@@ -158,7 +176,29 @@ trace:
 | client abort | 499 | `cancelled` |
 | anything else | 500 | `internal_error` (logged with exception) |
 
-User-facing `title`/`detail` texts are German.
+User-facing `title`/`detail` texts are German by default and English for English requests (see 2.6).
+
+### 2.6 Message language (de/en)
+
+- `RequestLanguageMiddleware` (registered before the exception handler) reads `Accept-Language`: the first supported
+  language by quality (`en…` → English, `de…` → German), German when none is supported or the header is missing. It sets
+  **only `CultureInfo.CurrentUICulture`** and the `Content-Language` response header; the formatting culture is never
+  touched, and `Program.cs` pins the default UI culture to `de-DE` (background jobs, missing header).
+- Texts are inline pairs: `Loc.T("Deutsch", "English")` (`AngebotPilot.Domain/Loc.cs`), used for validation messages
+  (`WithText(de, en)`, resolved per validation), domain/business/auth errors, problem `title`/`detail`, invoice
+  `IssueProblems`/`CompanyProblems`, dashboard activity labels and the conversion-rate definition, plan name "Testphase".
+  FluentValidation's built-in messages follow the UI culture as well.
+- System texts persisted in German at creation time (event `details`, follow-up `statusReason`, delivery `lastError`,
+  notification `title`/`body`, quotation cancellation reason "Ersetzt durch …", activity summaries) are translated at
+  read time by `StoredText` (exact phrases and strict patterns only; user-entered text is never altered), so historic
+  rows are covered too.
+- `Users.Language` (`de`/`en`, `MeDto.language`, set via register and `PATCH /me`) selects the language of account
+  emails: email verification, password reset, decision notification (the sending user's language, not the customer's)
+  and invitations (the invitee's language if they have an account, otherwise the inviter's). It is passed explicitly to
+  `EmailTemplates`, never taken from the request culture.
+- Always German, whatever the request language: quotation/invoice PDFs, e-invoice XML, CSV exports, emails to customers
+  (quotation, reminders, invoice, payment reminder), data shown on the public customer page, company default texts
+  and seeded tax-rate names. `LocalizationTests` (unit and integration) assert that these are identical under `en`.
 
 ---
 

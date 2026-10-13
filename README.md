@@ -54,7 +54,7 @@ Details: [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md).
 | `apps/api/src/AngebotPilot.Application` | Services, validators, email templates, job runner |
 | `apps/api/src/AngebotPilot.Infrastructure` | EF Core, migrations, storage, email, PDF, mock billing |
 | `apps/api/src/AngebotPilot.Api` | Minimal API endpoints, auth, rate limiting, hosted scheduler, demo seeder |
-| `apps/web` | React 19 + Vite web app (hash routing) |
+| `apps/web` | React 19 + Vite web app (hash routing; German/English UI, light/dark theme) |
 | `apps/mobile` | Expo SDK 57 / React Native app |
 | `packages/api-contracts` | Shared TypeScript API types, client, schemas, money helpers |
 | `packages/brand` | Design tokens and logo/icon sources |
