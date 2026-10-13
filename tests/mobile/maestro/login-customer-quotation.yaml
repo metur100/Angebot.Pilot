@@ -1,0 +1,125 @@
+# AngebotPilot – end-to-end smoke flow on Android/iOS:
+# login → create customer → create quotation (2 line items, German decimals) → save draft → view detail.
+#
+# Run against a local API with an account that already has a company (NOT the demo account – this flow creates data):
+#   maestro test -e EMAIL=e2e@example.com -e PASSWORD=Geheim12345 tests/mobile/maestro/login-customer-quotation.yaml
+# Selectors use React Native testIDs (Android resource-id / iOS accessibilityIdentifier).
+appId: com.certidevelopment.angebotpilot
+env:
+  CUSTOMER: Maestro Testkunde GmbH
+  TITLE: Maestro Testangebot
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- extendedWaitUntil:
+    visible:
+      id: login-email
+    timeout: 20000
+
+# --- Login ---
+- tapOn:
+    id: login-email
+- inputText: ${EMAIL}
+- tapOn:
+    id: login-password
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: login-submit
+- extendedWaitUntil:
+    visible:
+      id: kpi-sent
+    timeout: 20000
+
+# --- Create customer ---
+- tapOn: Kunden
+- tapOn:
+    id: fab-new-customer
+- tapOn:
+    id: customer-companyName
+- inputText: ${CUSTOMER}
+- tapOn:
+    id: customer-email
+- inputText: einkauf@maestro.example
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: customer-submit
+- tapOn:
+    id: customer-submit
+- extendedWaitUntil:
+    visible:
+      id: customer-new-quotation
+    timeout: 15000
+
+# --- Create quotation for that customer ---
+- tapOn:
+    id: customer-new-quotation
+- extendedWaitUntil:
+    visible:
+      id: selected-customer
+    timeout: 15000
+- assertVisible: ${CUSTOMER}
+- tapOn:
+    id: step-next
+- tapOn:
+    id: editor-title
+- inputText: ${TITLE}
+- hideKeyboard
+- tapOn:
+    id: step-next
+
+# line 1: 4 × 120,00 €
+- tapOn:
+    id: add-line
+- tapOn:
+    id: line-title
+- inputText: LED-Panel
+- tapOn:
+    id: line-quantity
+- eraseText
+- inputText: "4"
+- tapOn:
+    id: line-price
+- inputText: "120"
+- hideKeyboard
+- tapOn:
+    id: line-save
+
+# line 2: 2,5 × 1.000,00 € − 10 %
+- tapOn:
+    id: add-line
+- tapOn:
+    id: line-title
+- inputText: Montage
+- tapOn:
+    id: line-quantity
+- eraseText
+- inputText: "2,5"
+- tapOn:
+    id: line-price
+- inputText: "1.000,00"
+- tapOn:
+    id: line-discount
+- inputText: "10"
+- hideKeyboard
+- tapOn:
+    id: line-save
+
+# 480 + 2.250 = 2.730 net → 3.248,70 € gross (19 %)
+- assertVisible:
+    id: totals-gross
+    text: ".*3\\.248,70.*"
+- tapOn:
+    id: editor-save-header
+
+# --- Detail ---
+- extendedWaitUntil:
+    visible:
+      id: detail-gross
+    timeout: 20000
+- assertVisible: ${TITLE}
+- assertVisible: "Status: Entwurf"
+- assertVisible:
+    id: action-send

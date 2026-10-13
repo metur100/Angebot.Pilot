@@ -67,11 +67,25 @@ public class AuthTests(ApiFactory api)
         var rotated = (await first.Content.ReadFromJsonAsync<AuthResponse>(ApiFactory.Json))!.RefreshToken!;
         Assert.NotEqual(user.RefreshToken, rotated);
 
-        // Replaying the old token (e.g. stolen) revokes every token of the session.
+        // Replaying the old token after the grace window (e.g. stolen) revokes every token of the session.
+        api.Clock.Advance(Application.Auth.AuthService.RotationGracePeriod + TimeSpan.FromSeconds(1));
         var replay = await client.PostAsJsonAsync("/api/v1/auth/refresh", new RefreshRequest(user.RefreshToken), ApiFactory.Json);
         Assert.Equal(HttpStatusCode.Unauthorized, replay.StatusCode);
         var afterReuse = await client.PostAsJsonAsync("/api/v1/auth/refresh", new RefreshRequest(rotated), ApiFactory.Json);
         Assert.Equal(HttpStatusCode.Unauthorized, afterReuse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Parallel_tab_refresh_within_grace_window_does_not_log_out()
+    {
+        var user = await api.RegisterAsync(verify: false);
+        var client = api.CreateClient();
+        var first = await client.PostAsJsonAsync("/api/v1/auth/refresh", new RefreshRequest(user.RefreshToken), ApiFactory.Json);
+        var rotated = (await first.Content.ReadFromJsonAsync<AuthResponse>(ApiFactory.Json))!.RefreshToken!;
+
+        // A second tab still holds the old token: rejected, but the session survives.
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/v1/auth/refresh", new RefreshRequest(user.RefreshToken), ApiFactory.Json)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/v1/auth/refresh", new RefreshRequest(rotated), ApiFactory.Json)).StatusCode);
     }
 
     [Fact]
@@ -196,6 +210,31 @@ public class CompanyAndTeamTests(ApiFactory api)
         await ProblemAssert.HasAsync(await employee.RawGetAsync($"{employee.C}/customers"), HttpStatusCode.NotFound);
         await owner.PostAsync<MemberDto>($"{owner.C}/members/{membership.MembershipId}/reactivate");
         Assert.Equal(HttpStatusCode.OK, (await employee.RawGetAsync($"{employee.C}/customers")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Undefined_or_numeric_roles_are_rejected()
+    {
+        var owner = await api.RegisterAsync();
+        await owner.CreateCompanyAsync();
+        var admin = await api.RegisterAsync();
+        await owner.PostAsync<InvitationDto>($"{owner.C}/invitations", new CreateInvitationRequest(admin.Email, MembershipRole.Admin));
+        await api.RunJobsAsync();
+        var token = ApiFactory.ExtractToken(ApiFactory.EmailsTo(admin.Email).Last(m => m.Subject.StartsWith("Einladung", StringComparison.Ordinal)).BodyText, "invite?token=");
+        var me = await admin.PostAsync<MeDto>("/api/v1/invitations/accept", new AcceptInvitationRequest(token));
+        admin.UseCompany(me.Companies.Single().CompanyId);
+        var self = (await admin.GetAsync<List<MemberDto>>($"{admin.C}/members")).Single(m => m.UserId == admin.UserId);
+
+        // Privilege escalation attempts: numeric enum values and undefined names.
+        foreach (var body in new[] { "{\"role\":3}", "{\"role\":99}", "{\"role\":\"SuperOwner\"}" })
+        {
+            using var content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+            var response = await admin.Client.PatchAsync($"{admin.C}/members/{self.MembershipId}", content);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        Assert.Equal(MembershipRole.Admin, (await admin.GetAsync<List<MemberDto>>($"{admin.C}/members")).Single(m => m.UserId == admin.UserId).Role);
+        await ProblemAssert.HasAsync(await admin.RawGetAsync($"{admin.C}/export"), HttpStatusCode.Forbidden);
     }
 
     [Fact]

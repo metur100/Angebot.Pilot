@@ -85,7 +85,7 @@ public sealed class QuotationService(
             {
                 ActorType.Customer => "Kunde",
                 ActorType.System => "System",
-                _ => e.ActorUserId is { } uid ? names.GetValueOrDefault(uid, "GelÃ¶schter Benutzer") : null,
+                _ => e.ActorUserId is { } uid ? names.GetValueOrDefault(uid, "Gelöschter Benutzer") : null,
             },
             e.Details)).ToList();
     }
@@ -121,7 +121,7 @@ public sealed class QuotationService(
         var hash = SecureTokens.Hash(token);
         // The tenant filter restricts the lookup to the caller's company.
         var id = await db.PublicQuotationAccesses.Where(a => a.TokenHash == hash).Select(a => (Guid?)a.QuotationId).FirstOrDefaultAsync(ct);
-        return id is null ? throw new NotFoundException("Kein Angebot Ihrer Firma gehÃ¶rt zu diesem Code.") : new LookupByTokenResponse(id.Value);
+        return id is null ? throw new NotFoundException("Kein Angebot Ihrer Firma gehört zu diesem Code.") : new LookupByTokenResponse(id.Value);
     }
 
     // ---------- Commands ----------
@@ -131,7 +131,7 @@ public sealed class QuotationService(
         var customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == request.CustomerId, ct) ?? throw NotFoundCustomer();
         if (customer.ArchivedAt is not null)
         {
-            throw new ConflictException("customer_archived", "FÃ¼r archivierte Kunden kÃ¶nnen keine neuen Angebote erstellt werden.");
+            throw new ConflictException("customer_archived", "Für archivierte Kunden können keine neuen Angebote erstellt werden.");
         }
 
         var (company, settings) = await CompanyAsync(member.CompanyId, ct);
@@ -182,7 +182,7 @@ public sealed class QuotationService(
         };
         QuotationMapping.SnapshotRecipient(quotation, customer);
         quotation.ReplaceLineItems(lineItems);
-        quotation.AddEvent(QuotationEventType.Created, now, ActorType.User, member.UserId, template is null ? null : $"Aus Vorlage â€ž{template.Name}â€œ");
+        quotation.AddEvent(QuotationEventType.Created, now, ActorType.User, member.UserId, template is null ? null : $"Aus Vorlage „{template.Name}“");
         db.Quotations.Add(quotation);
         audit.Record(member.CompanyId, member.UserId, "quotation.created", "Quotation", quotation.Id, quotation.Number);
         await db.SaveChangesAsync(ct);
@@ -222,7 +222,7 @@ public sealed class QuotationService(
         var q = await LoadAsync(id, ct);
         if (!q.IsDraft)
         {
-            throw new ConflictException("quotation_not_deletable", "Nur EntwÃ¼rfe kÃ¶nnen gelÃ¶scht werden. Versendete Angebote kÃ¶nnen storniert werden.");
+            throw new ConflictException("quotation_not_deletable", "Nur Entwürfe können gelöscht werden. Versendete Angebote können storniert werden.");
         }
 
         q.DeletedAt = clock.GetUtcNow();
@@ -252,7 +252,7 @@ public sealed class QuotationService(
         copy.AddEvent(QuotationEventType.Created, now, ActorType.User, member.UserId, $"Kopie von {source.Number}");
         source.AddEvent(QuotationEventType.Duplicated, now, ActorType.User, member.UserId, $"Kopiert nach {copy.Number}");
         db.Quotations.Add(copy);
-        audit.Record(member.CompanyId, member.UserId, "quotation.duplicated", "Quotation", copy.Id, $"{source.Number} â†’ {copy.Number}");
+        audit.Record(member.CompanyId, member.UserId, "quotation.duplicated", "Quotation", copy.Id, $"{source.Number} → {copy.Number}");
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return await GetAsync(copy.Id, ct);
@@ -264,7 +264,7 @@ public sealed class QuotationService(
         var source = await LoadAsync(id, ct);
         if (!source.CanBeRevised)
         {
-            throw new ConflictException("quotation_not_revisable", "Nur versendete, abgelehnte oder abgelaufene Angebote kÃ¶nnen Ã¼berarbeitet werden.");
+            throw new ConflictException("quotation_not_revisable", "Nur versendete, abgelehnte oder abgelaufene Angebote können überarbeitet werden.");
         }
 
         var rootId = source.RootQuotationId ?? source.Id;
@@ -284,7 +284,7 @@ public sealed class QuotationService(
         revision.AddEvent(QuotationEventType.Created, now, ActorType.User, member.UserId, $"Revision {nextRevision} von {source.Number}");
         source.AddEvent(QuotationEventType.RevisionCreated, now, ActorType.User, member.UserId, revision.Number);
         db.Quotations.Add(revision);
-        audit.Record(member.CompanyId, member.UserId, "quotation.revised", "Quotation", revision.Id, $"{source.Number} â†’ {revision.Number}");
+        audit.Record(member.CompanyId, member.UserId, "quotation.revised", "Quotation", revision.Id, $"{source.Number} → {revision.Number}");
         await db.SaveChangesAsync(ct);
         return await GetAsync(revision.Id, ct);
     }
@@ -307,11 +307,11 @@ public sealed class QuotationService(
         {
             if (sender.EmailVerifiedAt is null)
             {
-                throw new ConflictException("email_not_verified", "Bitte bestÃ¤tigen Sie zuerst Ihre E-Mail-Adresse. Erst danach kÃ¶nnen Angebote per E-Mail versendet werden.");
+                throw new ConflictException("email_not_verified", "Bitte bestätigen Sie zuerst Ihre E-Mail-Adresse. Erst danach können Angebote per E-Mail versendet werden.");
             }
 
             recipient = Text.Clean(request.RecipientEmail) ?? customer.Email
-                ?? throw new FluentValidation.ValidationException([new FluentValidation.Results.ValidationFailure("recipientEmail", "FÃ¼r diesen Kunden ist keine E-Mail-Adresse hinterlegt.")]);
+                ?? throw new FluentValidation.ValidationException([new FluentValidation.Results.ValidationFailure("recipientEmail", "Für diesen Kunden ist keine E-Mail-Adresse hinterlegt.")]);
             await billing.EnsureEmailQuotaAsync(member.CompanyId, ct);
         }
 
@@ -374,7 +374,7 @@ public sealed class QuotationService(
         }
         else
         {
-            q.AddEvent(QuotationEventType.MarkedAsSent, now, ActorType.User, member.UserId, "Ohne E-Mail durch den Anbieter Ã¼bermittelt");
+            q.AddEvent(QuotationEventType.MarkedAsSent, now, ActorType.User, member.UserId, "Ohne E-Mail durch den Anbieter übermittelt");
         }
 
         if (firstSend)
@@ -453,13 +453,13 @@ public sealed class QuotationService(
         var q = await LoadAsync(id, ct);
         if (q.Status is QuotationStatus.Draft or QuotationStatus.Cancelled)
         {
-            throw new ConflictException("public_link_unavailable", "Ein Kundenlink ist erst nach dem Versand und nicht fÃ¼r stornierte Angebote verfÃ¼gbar.");
+            throw new ConflictException("public_link_unavailable", "Ein Kundenlink ist erst nach dem Versand und nicht für stornierte Angebote verfügbar.");
         }
 
         var now = clock.GetUtcNow();
         await publicLinks.RevokeAllAsync(q.Id, ct);
         var (token, access) = publicLinks.Create(q);
-        q.AddEvent(QuotationEventType.PublicLinkCreated, now, ActorType.User, member.UserId, "Neuer Link, frÃ¼here Links widerrufen");
+        q.AddEvent(QuotationEventType.PublicLinkCreated, now, ActorType.User, member.UserId, "Neuer Link, frühere Links widerrufen");
         audit.Record(member.CompanyId, member.UserId, "quotation.public_link_created", "Quotation", q.Id, q.Number);
         await db.SaveChangesAsync(ct);
         return new PublicLinkResponse(publicLinks.Url(token), access.ExpiresAt);
@@ -482,7 +482,7 @@ public sealed class QuotationService(
         var q = await LoadAsync(id, ct);
         if (q.Status != QuotationStatus.Accepted)
         {
-            throw new ConflictException("quotation_not_accepted", "Nur angenommene Angebote kÃ¶nnen in einen Auftrag umgewandelt werden.");
+            throw new ConflictException("quotation_not_accepted", "Nur angenommene Angebote können in einen Auftrag umgewandelt werden.");
         }
 
         if (request.AssignedUserId is { } assignee && !await db.Memberships.AnyAsync(m => m.CompanyId == member.CompanyId && m.UserId == assignee && m.Status == MembershipStatus.Active, ct))
@@ -577,7 +577,7 @@ public sealed class QuotationService(
         audit.Record(member.CompanyId, member.UserId, "quotation.exported", "Quotation", null, $"{rows.Count} Angebote");
         await db.SaveChangesAsync(ct);
         return Csv.Write(
-            ["Nummer", "Betreff", "Status", "Kunde", "Angebotsdatum", "GÃ¼ltig bis", "Netto (EUR)", "USt. (EUR)", "Brutto (EUR)", "Versendet am", "Entschieden am"],
+            ["Nummer", "Betreff", "Status", "Kunde", "Angebotsdatum", "Gültig bis", "Netto (EUR)", "USt. (EUR)", "Brutto (EUR)", "Versendet am", "Entschieden am"],
             rows.Select(r => new[]
             {
                 r.Number, r.Title, QuotationTransitions.StatusLabel(r.Status), r.Customer, Csv.Date(r.IssueDate), Csv.Date(r.ValidUntil),

@@ -91,6 +91,12 @@ public sealed class Customer : Entity, ICompanyOwned
         Email = null;
         Phone = null;
         BillingStreet = null;
+        if (Type == CustomerType.Private)
+        {
+            BillingPostalCode = null;
+            BillingCity = null;
+        }
+
         ServiceStreet = null;
         ServicePostalCode = null;
         ServiceCity = null;

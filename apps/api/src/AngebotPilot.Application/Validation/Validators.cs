@@ -395,3 +395,19 @@ public sealed class DeleteCompanyRequestValidator : AbstractValidator<DeleteComp
 {
     public DeleteCompanyRequestValidator() => RuleFor(x => x.ConfirmName).NotEmpty();
 }
+
+public sealed class UpdateMemberRequestValidator : AbstractValidator<UpdateMemberRequest>
+{
+    public UpdateMemberRequestValidator() => RuleFor(x => x.Role).IsInEnum().WithMessage("Unbekannte Rolle.");
+}
+
+public sealed class ChangePlanRequestValidator : AbstractValidator<ChangePlanRequest>
+{
+    public ChangePlanRequestValidator() =>
+        RuleFor(x => x.Plan).IsInEnum().NotEqual(SubscriptionPlan.Trial).WithMessage("Bitte einen gültigen Tarif wählen.");
+}
+
+public sealed class ChangeJobStatusRequestValidator : AbstractValidator<ChangeJobStatusRequest>
+{
+    public ChangeJobStatusRequestValidator() => RuleFor(x => x.Status).IsInEnum().WithMessage("Unbekannter Status.");
+}

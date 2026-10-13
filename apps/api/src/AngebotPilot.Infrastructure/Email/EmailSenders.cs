@@ -157,3 +157,10 @@ public sealed class CaptureEmailSender(EmailOptions options, TimeProvider clock)
         return new EmailSendResult(EmailSendOutcome.HandedOff, message.MessageId, null);
     }
 }
+
+/// <summary>Used in production when no SMTP provider is configured: every email fails permanently with a clear reason.</summary>
+public sealed class DisabledEmailSender : IEmailSender
+{
+    public Task<EmailSendResult> SendAsync(OutgoingEmail email, CancellationToken cancellationToken) =>
+        Task.FromResult(new EmailSendResult(EmailSendOutcome.PermanentFailure, null, "Kein E-Mail-Versanddienst konfiguriert."));
+}

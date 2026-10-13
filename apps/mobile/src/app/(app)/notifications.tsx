@@ -1,0 +1,121 @@
+import { errorMessage, formatDateTime, type NotificationDto } from '@angebotpilot/api-contracts';
+import { Ionicons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
+import { Stack, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+
+import { Button } from '@/components/Button';
+import { Screen } from '@/components/Layout';
+import { EmptyState, ErrorState, ListSkeleton } from '@/components/States';
+import { Text } from '@/components/Text';
+import { flattenPages, keys, useNotifications } from '@/lib/queries';
+import { api, useCompanyId } from '@/lib/session';
+import { colors, radius, space } from '@/theme';
+
+function targetFor(n: NotificationDto): string | null {
+  if (!n.entityId) return null;
+  if (n.entityType === 'Quotation') return `/quotation/${n.entityId}`;
+  if (n.entityType === 'Job') return `/job/${n.entityId}`;
+  if (n.entityType === 'Customer') return `/customer/${n.entityId}`;
+  return null;
+}
+
+export default function NotificationsScreen() {
+  const companyId = useCompanyId();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const query = useNotifications();
+  const [markingAll, setMarkingAll] = useState(false);
+  const items = flattenPages(query.data);
+  const unread = items.filter((n) => !n.isRead).length;
+
+  const invalidate = () => void queryClient.invalidateQueries({ queryKey: keys.notifications(companyId) });
+
+  const open = async (n: NotificationDto) => {
+    if (!n.isRead) {
+      try {
+        await api.notifications.markRead(companyId, n.id);
+        invalidate();
+      } catch (e) {
+        Alert.alert('Fehler', errorMessage(e));
+      }
+    }
+    const target = targetFor(n);
+    if (target) router.push(target as never);
+  };
+
+  const markAll = async () => {
+    setMarkingAll(true);
+    try {
+      await api.notifications.markAllRead(companyId);
+      invalidate();
+    } catch (e) {
+      Alert.alert('Fehler', errorMessage(e));
+    } finally {
+      setMarkingAll(false);
+    }
+  };
+
+  return (
+    <Screen>
+      <Stack.Screen
+        options={{
+          headerRight: () =>
+            unread > 0 ? (
+              <Button label="Alle gelesen" variant="ghost" size="sm" fullWidth={false} onPress={() => void markAll()} loading={markingAll} testID="mark-all-read" />
+            ) : null,
+        }}
+      />
+      {query.isPending ? (
+        <ListSkeleton />
+      ) : query.isError && items.length === 0 ? (
+        <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(n) => n.id}
+          contentContainerStyle={styles.list}
+          ItemSeparatorComponent={() => <View style={{ height: space[2] }} />}
+          onEndReached={() => {
+            if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
+          }}
+          refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => void query.refetch()} colors={[colors.brand]} tintColor={colors.brand} />}
+          ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator color={colors.brand} style={{ margin: space[4] }} /> : null}
+          renderItem={({ item }) => (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${item.isRead ? '' : 'Ungelesen: '}${item.title}${item.body ? `. ${item.body}` : ''}`}
+              accessibilityHint={item.isRead ? undefined : 'Markiert als gelesen'}
+              onPress={() => void open(item)}
+              style={({ pressed }) => [styles.item, !item.isRead ? styles.unread : null, pressed ? styles.pressed : null]}
+              testID={`notification-${item.id}`}
+            >
+              <Ionicons name={item.isRead ? 'notifications-outline' : 'notifications'} size={22} color={item.isRead ? colors.textMuted : colors.brand} />
+              <View style={styles.flex}>
+                <Text variant={item.isRead ? 'body' : 'bodyStrong'}>{item.title}</Text>
+                {item.body ? <Text variant="caption" tone="secondary">{item.body}</Text> : null}
+                <Text variant="small" tone="muted">
+                  {formatDateTime(item.createdAt)}
+                  {item.isRead ? '' : ' · ungelesen'}
+                </Text>
+              </View>
+            </Pressable>
+          )}
+          ListEmptyComponent={<EmptyState icon="notifications-off-outline" title="Keine Benachrichtigungen" message="Hier erscheinen z. B. Annahmen und Ablehnungen Ihrer Kunden." />}
+        />
+      )}
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  list: { padding: space[4], flexGrow: 1 },
+  flex: { flex: 1 },
+  item: {
+    flexDirection: 'row', gap: space[3], padding: space[4], borderRadius: radius.xl, backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
+  },
+  unread: { borderColor: colors.brandBorder, backgroundColor: colors.brandSoft },
+  pressed: { opacity: 0.85 },
+});

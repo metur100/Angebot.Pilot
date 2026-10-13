@@ -250,6 +250,11 @@ public sealed class CompanyService(
 
     public async Task<MemberDto> UpdateMemberRoleAsync(CurrentMember member, Guid membershipId, MembershipRole role, CancellationToken ct)
     {
+        if (!Enum.IsDefined(role))
+        {
+            throw new ForbiddenException("Unbekannte Rolle.");
+        }
+
         member.Require(MembershipRole.Admin);
         var target = await LoadMemberAsync(member, membershipId, ct);
         if (role == MembershipRole.Owner || target.Role == MembershipRole.Owner)
@@ -425,6 +430,8 @@ public sealed class CompanyService(
     /// <summary>Removes all rows and stored objects of a company. Audit events are kept without company reference.</summary>
     public async Task DeleteCompanyDataAsync(Guid companyId, CancellationToken ct)
     {
+        // Atomic unless the caller already opened a transaction.
+        await using var tx = db.Database.CurrentTransaction is null ? await db.Database.BeginTransactionAsync(ct) : null;
         var fileIds = await db.Files.IgnoreQueryFilters().Where(f => f.CompanyId == companyId && f.Status != FileStatus.Deleted).Select(f => f.Id).ToListAsync(ct);
         foreach (var id in fileIds)
         {
@@ -451,6 +458,10 @@ public sealed class CompanyService(
         await db.CompanySettings.Where(x => x.CompanyId == companyId).ExecuteDeleteAsync(ct);
         await db.AuditEvents.Where(x => x.CompanyId == companyId).ExecuteUpdateAsync(s => s.SetProperty(a => a.CompanyId, (Guid?)null), ct);
         await db.Companies.Where(x => x.Id == companyId).ExecuteDeleteAsync(ct);
+        if (tx is not null)
+        {
+            await tx.CommitAsync(ct);
+        }
     }
 
     /// <summary>Full export of company data as structured JSON (GDPR Art. 20 / customer data return).</summary>

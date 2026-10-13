@@ -53,6 +53,9 @@ public sealed class AuthService(
     IOptions<AppOptions> appOptions,
     ILogger<AuthService> logger)
 {
+    /// <summary>Reuse of a just-rotated refresh token within this window is treated as a race, not as theft.</summary>
+    public static readonly TimeSpan RotationGracePeriod = TimeSpan.FromSeconds(30);
+
     private readonly AuthOptions _auth = authOptions.Value;
     private readonly AppOptions _app = appOptions.Value;
 
@@ -61,7 +64,7 @@ public sealed class AuthService(
         var normalized = User.Normalize(request.Email);
         if (await db.Users.AnyAsync(u => u.NormalizedEmail == normalized, ct))
         {
-            throw new ConflictException("email_taken", "FÃ¼r diese E-Mail-Adresse besteht bereits ein Konto. Bitte melden Sie sich an oder setzen Sie Ihr Passwort zurÃ¼ck.");
+            throw new ConflictException("email_taken", "Für diese E-Mail-Adresse besteht bereits ein Konto. Bitte melden Sie sich an oder setzen Sie Ihr Passwort zurück.");
         }
 
         var now = clock.GetUtcNow();
@@ -148,8 +151,10 @@ public sealed class AuthService(
 
         if (stored.RevokedAt is not null)
         {
-            // A rotated token was presented again: possible theft. Revoke the whole family.
-            if (stored.ReplacedByTokenId is not null)
+            // A rotated token was presented again: possible theft. Revoke the whole family – except within a short grace
+            // window after rotation, which happens legitimately when two browser tabs refresh at the same moment.
+            var withinGrace = stored.RevokedReason == "rotated" && stored.RevokedAt > now - RotationGracePeriod;
+            if (stored.ReplacedByTokenId is not null && !withinGrace)
             {
                 await RevokeFamilyAsync(stored.FamilyId, now, "reuse_detected", ct);
                 audit.Record(null, stored.UserId, "auth.refresh_token_reuse", "User", stored.UserId, null);
@@ -225,7 +230,7 @@ public sealed class AuthService(
     public async Task ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct)
     {
         var token = await ConsumeTokenAsync(request.Token, UserTokenPurpose.PasswordReset, ct)
-            ?? throw new GoneException("Der Link ist ungÃ¼ltig oder abgelaufen. Bitte fordern Sie einen neuen an.");
+            ?? throw new GoneException("Der Link ist ungültig oder abgelaufen. Bitte fordern Sie einen neuen an.");
         var user = await db.Users.FirstAsync(u => u.Id == token.UserId, ct);
         var now = clock.GetUtcNow();
         user.PasswordHash = hasher.HashPassword(user, request.NewPassword);
@@ -242,7 +247,7 @@ public sealed class AuthService(
     public async Task VerifyEmailAsync(VerifyEmailRequest request, CancellationToken ct)
     {
         var token = await ConsumeTokenAsync(request.Token, UserTokenPurpose.EmailVerification, ct)
-            ?? throw new GoneException("Der BestÃ¤tigungslink ist ungÃ¼ltig oder abgelaufen.");
+            ?? throw new GoneException("Der Bestätigungslink ist ungültig oder abgelaufen.");
         var user = await db.Users.FirstAsync(u => u.Id == token.UserId, ct);
         user.EmailVerifiedAt ??= clock.GetUtcNow();
         audit.Record(null, user.Id, "user.email_verified", "User", user.Id, null);
@@ -261,7 +266,7 @@ public sealed class AuthService(
         var recent = await db.UserTokens.CountAsync(t => t.UserId == userId && t.Purpose == UserTokenPurpose.EmailVerification && t.CreatedAt > now.AddHours(-1), ct);
         if (recent >= 3)
         {
-            throw new ConflictException("too_many_requests", "Bitte warten Sie etwas, bevor Sie eine weitere BestÃ¤tigungs-E-Mail anfordern.");
+            throw new ConflictException("too_many_requests", "Bitte warten Sie etwas, bevor Sie eine weitere Bestätigungs-E-Mail anfordern.");
         }
 
         await QueueVerificationEmailAsync(user, ct);
@@ -326,7 +331,7 @@ public sealed class AuthService(
             Memberships = memberships,
             Sessions = sessions,
             Activity = auditEvents,
-            Note = "Firmendaten (Kunden, Angebote, AuftrÃ¤ge) exportieren Inhaber:innen Ã¼ber Einstellungen â†’ Firma â†’ Daten exportieren.",
+            Note = "Firmendaten (Kunden, Angebote, Aufträge) exportieren Inhaber:innen über Einstellungen → Firma → Daten exportieren.",
         };
     }
 
@@ -354,7 +359,7 @@ public sealed class AuthService(
             }
             else if (m.Role == MembershipRole.Owner && !otherActive.Contains(MembershipRole.Owner))
             {
-                throw new ConflictException("sole_owner", "Sie sind die einzige Inhaberin bzw. der einzige Inhaber einer Firma mit weiteren Mitgliedern. Ãœbertragen Sie zuerst die Inhaberrolle an ein anderes Mitglied.");
+                throw new ConflictException("sole_owner", "Sie sind die einzige Inhaberin bzw. der einzige Inhaber einer Firma mit weiteren Mitgliedern. Übertragen Sie zuerst die Inhaberrolle an ein anderes Mitglied.");
             }
         }
 
@@ -371,7 +376,7 @@ public sealed class AuthService(
         await db.Invitations.IgnoreQueryFilters().Where(i => i.NormalizedEmail == user.NormalizedEmail).ExecuteDeleteAsync(ct);
         db.ChangeTracker.Clear();
         await db.Users.Where(u => u.Id == userId).ExecuteDeleteAsync(ct);
-        audit.Record(null, null, "user.deleted", "User", userId, $"Konto gelÃ¶scht am {now:yyyy-MM-dd}");
+        audit.Record(null, null, "user.deleted", "User", userId, $"Konto gelöscht am {now:yyyy-MM-dd}");
         await db.SaveChangesAsync(ct);
     }
 

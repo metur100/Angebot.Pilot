@@ -119,7 +119,7 @@ public static class MemberExtensions
 {
     public static void Require(this CurrentMember member, MembershipRole minimum, string? message = null)
     {
-        if (member.Role < minimum)
+        if (!Enum.IsDefined(member.Role) || member.Role < minimum)
         {
             throw new ForbiddenException(message ?? minimum switch
             {

@@ -60,12 +60,12 @@ public static class DependencyInjection
         {
             if (environment.IsProduction())
             {
-                // Production without SMTP keeps working, but nothing is delivered; logged loudly.
+                // Production without SMTP: emails are reported as failed (never as "handed off"), so nobody is misled.
                 services.AddSingleton<IEmailSender>(sp =>
                 {
                     sp.GetRequiredService<ILoggerFactory>().CreateLogger("Email").LogWarning(
-                        "Email:Provider is not 'Smtp' in Production. Emails are captured in memory only and NOT delivered.");
-                    return new CaptureEmailSender(email, sp.GetRequiredService<TimeProvider>());
+                        "Email:Provider is not 'Smtp' in Production. Outgoing emails are NOT sent and are marked as failed.");
+                    return new DisabledEmailSender();
                 });
             }
             else

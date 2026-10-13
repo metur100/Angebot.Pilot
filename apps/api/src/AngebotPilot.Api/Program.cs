@@ -49,7 +49,8 @@ if (jobsOptions.EnableHostedScheduler)
 
 builder.Services.ConfigureHttpJsonOptions(o =>
 {
-    o.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    // Enums only as names: numeric values could smuggle undefined enum values (e.g. roles) past checks.
+    o.SerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false));
     o.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.Never;
 });
 
@@ -95,7 +96,7 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("public", h => RateLimitPartition.GetSlidingWindowLimiter(Ip(h), _ => new SlidingWindowRateLimiterOptions { PermitLimit = 60 * scale, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6 }));
     o.AddPolicy("send", h => RateLimitPartition.GetFixedWindowLimiter(h.User.FindFirst("sub")?.Value ?? Ip(h), _ => new FixedWindowRateLimiterOptions { PermitLimit = 30 * scale, Window = TimeSpan.FromMinutes(10) }));
     o.AddPolicy("upload", h => RateLimitPartition.GetFixedWindowLimiter(h.User.FindFirst("sub")?.Value ?? Ip(h), _ => new FixedWindowRateLimiterOptions { PermitLimit = 20 * scale, Window = TimeSpan.FromMinutes(10) }));
-    o.AddPolicy("jobs", _ => RateLimitPartition.GetFixedWindowLimiter("jobs", _ => new FixedWindowRateLimiterOptions { PermitLimit = 12 * scale, Window = TimeSpan.FromMinutes(1) }));
+    o.AddPolicy("jobs", h => RateLimitPartition.GetFixedWindowLimiter(Ip(h), _ => new FixedWindowRateLimiterOptions { PermitLimit = 6 * scale, Window = TimeSpan.FromMinutes(1) }));
     o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(h =>
         RateLimitPartition.GetSlidingWindowLimiter(h.User.FindFirst("sub")?.Value ?? Ip(h), _ => new SlidingWindowRateLimiterOptions { PermitLimit = 600 * scale, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6 }));
 });
@@ -128,7 +129,7 @@ if (args.Contains("migrate") || args.Contains("seed-demo"))
 
     if (args.Contains("seed-demo"))
     {
-        if (app.Environment.IsProduction() && !args.Contains("--allow-production-demo"))
+        if (app.Environment.IsProduction())
         {
             Log.Error("Refusing to seed demo data in Production");
             return 1;
@@ -142,7 +143,7 @@ if (args.Contains("migrate") || args.Contains("seed-demo"))
 
 if (config.GetValue("Database:MigrateOnStartup", false))
 {
-    // Only additive migrations are applied automatically (see docs/architecture/DATABASE.md).
+    // Development/test convenience only. Production keeps this off and migrates explicitly via scripts/migrate-database.ps1.
     await using var scope = app.Services.CreateAsyncScope();
     await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
 }

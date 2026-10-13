@@ -177,7 +177,7 @@ public sealed record BillingCheckout(Uri? RedirectUrl, bool ActivatedImmediately
 
 public sealed record BillingWebhook(string ProviderEventId, string EventType, Guid CompanyId, SubscriptionPlan? Plan, SubscriptionStatus? Status, DateTimeOffset? CurrentPeriodEnd, string? ProviderCustomerId, string? ProviderSubscriptionId);
 
-/// <summary>Abstraction over a payment provider (Stripe, Paddle, â€¦). Only a clearly labelled mock exists until a provider is configured.</summary>
+/// <summary>Abstraction over a payment provider (Stripe, Paddle, …). Only a clearly labelled mock exists until a provider is configured.</summary>
 public interface IBillingProvider
 {
     string Name { get; }

@@ -1,0 +1,11 @@
+node_modules/
+.expo/
+dist/
+dist-check/
+android/
+ios/
+coverage/
+*.apk
+*.aab
+expo-env.d.ts
+*.log

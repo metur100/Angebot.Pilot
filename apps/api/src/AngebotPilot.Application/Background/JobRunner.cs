@@ -213,6 +213,7 @@ public sealed class JobRunner(
                     delivery.HandedOffAt = attemptAt;
                     delivery.ProviderMessageId = result.ProviderMessageId;
                     delivery.LastError = null;
+                    Scrub(delivery);
                     if (delivery.Kind is not EmailKind.DecisionNotification)
                     {
                         quotation?.AddEvent(QuotationEventType.EmailHandedOff, attemptAt, ActorType.System, null, $"{KindLabel(delivery.Kind)} an {delivery.ToAddress}");
@@ -229,6 +230,7 @@ public sealed class JobRunner(
                 default:
                     delivery.Status = EmailStatus.Failed;
                     delivery.LastError = Truncate(result.Error);
+                    Scrub(delivery);
                     if (quotation is not null)
                     {
                         quotation.AddEvent(QuotationEventType.EmailFailed, attemptAt, ActorType.System, null, $"{KindLabel(delivery.Kind)} an {delivery.ToAddress}");
@@ -334,6 +336,16 @@ public sealed class JobRunner(
         EmailKind.ExpiryReminder => "Erinnerung vor Ablauf",
         _ => "E-Mail",
     };
+
+    /// <summary>
+    /// Once an email reached a final state its body is no longer needed. Bodies can contain one-time links
+    /// (password reset, invitation, customer link) whose tokens are otherwise only stored as hashes.
+    /// </summary>
+    private static void Scrub(EmailDelivery delivery)
+    {
+        delivery.BodyText = "[Inhalt nach dem Versand entfernt]";
+        delivery.BodyHtml = null;
+    }
 
     private static string? Truncate(string? value) => value is { Length: > 300 } ? value[..300] : value;
 }

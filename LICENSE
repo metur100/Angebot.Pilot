@@ -1,0 +1,18 @@
+Copyright (c) 2026 Medin Turkes. All rights reserved.
+
+AngebotPilot is proprietary software of Medin Turkes (Certi Development).
+
+No part of this software, including its source code, documentation, designs and assets, may be copied, modified,
+distributed, sublicensed, published, sold or used to create derivative works, in whole or in part, without the
+prior written permission of the copyright holder. Access to this repository does not grant any licence or other
+right except as expressly agreed in writing.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. TO THE EXTENT PERMITTED BY
+APPLICABLE LAW, IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+Third-party components are used under their own licences (MIT, Apache-2.0, ISC, SIL OFL 1.1 and the QuestPDF
+Community License, among others). See docs/architecture/ARCHITECTURE.md, section "Dependencies and licences", and the
+licence files shipped with each package (e.g. apps/api/src/AngebotPilot.Infrastructure/Pdf/Fonts/OFL-Inter-LICENSE.txt).
+
+Contact: certidevelopment@gmail.com

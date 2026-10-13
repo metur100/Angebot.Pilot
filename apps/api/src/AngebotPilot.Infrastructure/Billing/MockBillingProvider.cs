@@ -49,7 +49,8 @@ public sealed class MockBillingProvider(BillingOptions options, TimeProvider clo
 
     public BillingWebhook? VerifyAndParseWebhook(string payload, IReadOnlyDictionary<string, string> headers)
     {
-        if (string.IsNullOrEmpty(options.WebhookSecret) || !headers.TryGetValue(SignatureHeader, out var signature))
+        // The mock provider never accepts external webhooks unless self-service is explicitly enabled (development/tests).
+        if (!options.MockAllowsSelfService || string.IsNullOrEmpty(options.WebhookSecret) || !headers.TryGetValue(SignatureHeader, out var signature))
         {
             return null;
         }

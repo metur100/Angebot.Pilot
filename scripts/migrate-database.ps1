@@ -26,7 +26,7 @@ $script = Join-Path $root 'artifacts\migrations-idempotent.sql'
 dotnet tool restore | Out-Null
 dotnet ef migrations script --idempotent --project $infra --startup-project $api -o $script
 if ($LASTEXITCODE -ne 0) { throw 'Generating the migration script failed' }
-$destructive = Select-String -Path $script -Pattern 'DROP TABLE|DROP COLUMN|ALTER COLUMN' -SimpleMatch:$false
+$destructive = Select-String -Path $script -Pattern 'DROP (TABLE|COLUMN|INDEX|CONSTRAINT|SCHEMA)|ALTER COLUMN|TRUNCATE|DELETE FROM' -SimpleMatch:$false
 if ($destructive -and -not $AllowDestructive) {
     $destructive | Select-Object -First 10 | ForEach-Object { Write-Warning $_.Line }
     throw 'The migration contains potentially destructive statements. Review artifacts/migrations-idempotent.sql, take a backup, then re-run with -AllowDestructive.'
@@ -44,5 +44,5 @@ try {
     dotnet (Join-Path $out 'AngebotPilot.Api.dll') migrate
     if ($LASTEXITCODE -ne 0) { throw 'Migration failed' }
 } finally {
-    Remove-Item Env:ConnectionStrings__Default, Env:Jwt__SigningKey, Env:Jobs__EnableHostedScheduler -ErrorAction SilentlyContinue
+    Remove-Item Env:ConnectionStrings__Default, Env:Jwt__SigningKey, Env:Jobs__EnableHostedScheduler, Env:ASPNETCORE_ENVIRONMENT -ErrorAction SilentlyContinue
 }

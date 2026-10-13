@@ -184,7 +184,8 @@ public static class Endpoints
         c.MapPut("/tax-rates/{id:guid}", (Guid id, UpsertTaxRateRequest r, HttpContext h, CompanyService s, CancellationToken ct) => s.UpsertTaxRateAsync(h.Member(), id, r, ct)).Validate<UpsertTaxRateRequest>();
 
         c.MapGet("/members", (HttpContext h, CompanyService s, CancellationToken ct) => s.MembersAsync(h.Member(), ct));
-        c.MapPatch("/members/{id:guid}", (Guid id, UpdateMemberRequest r, HttpContext h, CompanyService s, CancellationToken ct) => s.UpdateMemberRoleAsync(h.Member(), id, r.Role, ct));
+        c.MapPatch("/members/{id:guid}", (Guid id, UpdateMemberRequest r, HttpContext h, CompanyService s, CancellationToken ct) => s.UpdateMemberRoleAsync(h.Member(), id, r.Role, ct))
+            .Validate<UpdateMemberRequest>();
         c.MapPost("/members/{id:guid}/deactivate", (Guid id, HttpContext h, CompanyService s, CancellationToken ct) => s.SetMemberActiveAsync(h.Member(), id, false, ct));
         c.MapPost("/members/{id:guid}/reactivate", (Guid id, HttpContext h, CompanyService s, CancellationToken ct) => s.SetMemberActiveAsync(h.Member(), id, true, ct));
         c.MapGet("/invitations", (HttpContext h, CompanyService s, CancellationToken ct) => s.InvitationsAsync(h.Member(), ct));
@@ -201,7 +202,7 @@ public static class Endpoints
         {
             var me = await auth.MeAsync(h.UserId(), ct);
             return await s.ChangePlanAsync(h.Member(), r.Plan, me.Email, ct);
-        });
+        }).Validate<ChangePlanRequest>();
         c.MapGet("/dashboard", (DateOnly? from, DateOnly? to, HttpContext h, DashboardService s, CancellationToken ct) => s.GetAsync(h.Member(), from, to, ct));
         c.MapGet("/activity", (int? page, int? pageSize, HttpContext h, DashboardService s, CancellationToken ct) => s.ActivityAsync(h.Member(), page ?? 1, pageSize ?? 25, ct));
 
@@ -289,7 +290,7 @@ public static class Endpoints
         c.MapGet("/jobs/export.csv", async (HttpContext h, JobService s, CancellationToken ct) => CsvFile(await s.ExportCsvAsync(h.Member(), ct), "auftraege"));
         c.MapGet("/jobs/{id:guid}", (Guid id, JobService s, CancellationToken ct) => s.GetAsync(id, ct));
         c.MapPut("/jobs/{id:guid}", (Guid id, UpdateJobRequest r, HttpContext h, JobService s, CancellationToken ct) => s.UpdateAsync(h.Member(), id, r, ct)).Validate<UpdateJobRequest>();
-        c.MapPost("/jobs/{id:guid}/status", (Guid id, ChangeJobStatusRequest r, HttpContext h, JobService s, CancellationToken ct) => s.ChangeStatusAsync(h.Member(), id, r.Status, ct));
+        c.MapPost("/jobs/{id:guid}/status", (Guid id, ChangeJobStatusRequest r, HttpContext h, JobService s, CancellationToken ct) => s.ChangeStatusAsync(h.Member(), id, r.Status, ct)).Validate<ChangeJobStatusRequest>();
 
         // Notifications
         c.MapGet("/notifications", (bool? unreadOnly, int? page, int? pageSize, HttpContext h, NotificationService s, CancellationToken ct) =>

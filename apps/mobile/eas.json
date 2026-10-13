@@ -1,0 +1,32 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": false,
+      "distribution": "internal",
+      "env": { "EXPO_PUBLIC_API_BASE_URL": "http://10.0.2.2:5080" },
+      "android": { "buildType": "apk" },
+      "ios": { "simulator": true }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": { "EXPO_PUBLIC_API_BASE_URL": "https://angebotpilot.runasp.net" },
+      "android": { "buildType": "apk", "credentialsSource": "local" },
+      "ios": { "credentialsSource": "remote" }
+    },
+    "production": {
+      "env": { "EXPO_PUBLIC_API_BASE_URL": "https://angebotpilot.runasp.net" },
+      "android": { "buildType": "app-bundle", "credentialsSource": "local" },
+      "ios": { "credentialsSource": "remote" }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": { "track": "internal", "releaseStatus": "draft" },
+      "ios": {}
+    }
+  }
+}

@@ -80,7 +80,8 @@ export const lineItemSchema = z.object({
 
 export const quotationSchema = z
   .object({
-    customerId: z.string().uuid('Bitte Kunden auswählen.'),
+    // z.guid(): the API issues SQL Server sequential GUIDs, which are not RFC 4122 variants (z.uuid() would reject them).
+    customerId: z.guid('Bitte Kunden auswählen.'),
     title: z.string().trim().min(1, 'Bitte Betreff angeben.').max(200),
     issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ungültiges Datum.'),
     validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ungültiges Datum.'),
