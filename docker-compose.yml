@@ -1,0 +1,27 @@
+# Optional local infrastructure (alternative to SQL Server LocalDB on Windows).
+#   cp .env.example .env   # set MSSQL_SA_PASSWORD (min. 8 chars, upper/lower/digit/symbol)
+#   docker compose up -d
+# SQL Server Developer edition is free for development/testing only (not for production use).
+# Requires ~2 GB RAM for the SQL Server container. Mailpit captures SMTP mail at http://localhost:8025.
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      retries: 10
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+volumes:
+  sqlserver-data:

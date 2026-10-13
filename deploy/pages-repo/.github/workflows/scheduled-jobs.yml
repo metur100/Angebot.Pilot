@@ -1,0 +1,29 @@
+# Lives in the PUBLIC GitHub Pages repository (Angebot.Pilot.App), where Actions minutes are free.
+# Calls the authenticated scheduled-job endpoint of the API so reminders, expiry and email retries run
+# even when the free host has unloaded the application. The endpoint takes no parameters and cannot be
+# used to send arbitrary emails. Requires the repository secret JOBS_TRIGGER_SECRET (same value as the
+# API setting Jobs:TriggerSecret). Note: GitHub may delay scheduled runs, and disables schedules after
+# 60 days without repository activity.
+name: Scheduled API jobs
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Run AngebotPilot jobs
+        env:
+          SECRET: ${{ secrets.JOBS_TRIGGER_SECRET }}
+        run: |
+          status=$(curl -s -o result.json -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer $SECRET" \
+            --max-time 120 https://angebotpilot.runasp.net/api/internal/jobs/run)
+          echo "HTTP $status"; cat result.json; echo
+          test "$status" = "200"

@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API – build, unit & SQL Server integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Start SQL Server (ephemeral, random password)
+        run: |
+          PASSWORD="Ci-$(openssl rand -hex 12)!A1"
+          echo "::add-mask::$PASSWORD"
+          docker run -d --name mssql -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e "MSSQL_SA_PASSWORD=$PASSWORD" -p 1433:1433 mcr.microsoft.com/mssql/server:2022-latest
+          for i in $(seq 1 30); do docker exec mssql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$PASSWORD" -Q "SELECT 1" >/dev/null 2>&1 && break; sleep 3; done
+          echo "TEST_SQLSERVER_CONNECTION=Server=localhost,1433;User Id=sa;Password=$PASSWORD;TrustServerCertificate=True" >> "$GITHUB_ENV"
+      - run: dotnet restore AngebotPilot.sln
+      - run: dotnet build AngebotPilot.sln -c Release --no-restore
+      - run: dotnet format AngebotPilot.sln --verify-no-changes --no-restore --severity error
+      - run: dotnet test tests/api-unit -c Release --no-build --logger trx --results-directory TestResults
+      - run: dotnet test tests/api-integration -c Release --no-build --logger trx --results-directory TestResults
+      - name: Vulnerable NuGet packages
+        run: dotnet list AngebotPilot.sln package --vulnerable --include-transitive 2>&1 | tee vuln.txt; ! grep -q "has the following vulnerable packages" vuln.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-test-results
+          path: TestResults
+
+  web:
+    name: Web + contracts – typecheck, lint, unit tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npx -y npm@11 ci
+      - run: npm run test --workspace packages/api-contracts
+      - run: npm run typecheck --workspace apps/web
+      - run: npm run lint --workspace apps/web
+      - run: npm run test --workspace apps/web
+      - run: npm run build --workspace apps/web
+        env:
+          VITE_API_BASE_URL: https://angebotpilot.runasp.net
+          VITE_BASE_PATH: /Angebot.Pilot.App/
+      - run: npx -y npm@11 audit --omit=dev --audit-level=high
+
+  mobile:
+    name: Mobile – typecheck, lint, tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx -y npm@11 ci
+        working-directory: .
+      - run: npx -y npm@11 ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test -- --ci
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

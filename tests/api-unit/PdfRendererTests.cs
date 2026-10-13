@@ -53,7 +53,12 @@ public class PdfRendererTests
         q.RecipientName = "Kunde";
         q.ReplaceLineItems(Enumerable.Range(1, 80).Select(i => new QuotationLineItem
         {
-            Title = $"Position {i}", Description = "Ausführliche Beschreibung der Leistung mit Material und Montage.", Quantity = i, Unit = "Std.", UnitPriceNet = 10m, TaxRatePercent = 19,
+            Title = $"Position {i}",
+            Description = "Ausführliche Beschreibung der Leistung mit Material und Montage.",
+            Quantity = i,
+            Unit = "Std.",
+            UnitPriceNet = 10m,
+            TaxRatePercent = 19,
         }));
 
         var pdf = new QuotationPdfRenderer().Render(new PdfQuotation(q, Company(), null, false));

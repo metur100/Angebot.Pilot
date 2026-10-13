@@ -62,3 +62,8 @@ Thumbs.db
 input/
 *.publishSettings
 *.pubxml.user
+
+# Mobile build byproducts
+apps/mobile/build-android.log
+apps/mobile/dist-check/
+apps/mobile/dist/
