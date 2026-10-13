@@ -71,6 +71,12 @@ public sealed class SmtpEmailSender(EmailOptions options, ILogger<SmtpEmailSende
 {
     public async Task<EmailSendResult> SendAsync(OutgoingEmail email, CancellationToken cancellationToken)
     {
+        if (ReservedDomains.IsReserved(email.To))
+        {
+            // RFC 2606/6761 names can never be delivered; sending would only produce bounces in the sender's mailbox.
+            return new EmailSendResult(EmailSendOutcome.PermanentFailure, null, "Empfängerdomain ist nicht zustellbar (reservierte Test-Domain).");
+        }
+
         MimeMessage message;
         try
         {
@@ -163,4 +169,24 @@ public sealed class DisabledEmailSender : IEmailSender
 {
     public Task<EmailSendResult> SendAsync(OutgoingEmail email, CancellationToken cancellationToken) =>
         Task.FromResult(new EmailSendResult(EmailSendOutcome.PermanentFailure, null, "Kein E-Mail-Versanddienst konfiguriert."));
+}
+
+/// <summary>Reserved, never-deliverable domains (RFC 2606, RFC 6761) used by tests and examples.</summary>
+public static class ReservedDomains
+{
+    private static readonly string[] Suffixes = [".invalid", ".example", ".test", ".localhost"];
+    private static readonly string[] Domains = ["example.com", "example.org", "example.net"];
+
+    public static bool IsReserved(string address)
+    {
+        var at = address.LastIndexOf('@');
+        if (at < 0)
+        {
+            return true;
+        }
+
+        var domain = address[(at + 1)..].Trim().TrimEnd('.').ToLowerInvariant();
+        return Domains.Any(d => domain == d || domain.EndsWith("." + d, StringComparison.Ordinal))
+            || Suffixes.Any(s => domain.EndsWith(s, StringComparison.Ordinal) || domain == s.TrimStart('.'));
+    }
 }

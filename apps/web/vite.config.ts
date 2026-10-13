@@ -23,10 +23,8 @@ function originOf(value: string | undefined): string | null {
  * Note: frame-ancestors cannot be set via <meta>; clickjacking protection would require a real header.
  */
 function contentSecurityPolicy(apiBaseUrl: string | undefined): Plugin {
-  const apiOrigins = new Set(['https://angebotpilot.runasp.net', 'http://localhost:5080']);
-  const configured = originOf(apiBaseUrl);
-  if (configured) apiOrigins.add(configured);
-  const api = [...apiOrigins].join(' ');
+  // Only the API this build talks to (production: angebotpilot.runasp.net; E2E builds: the local API).
+  const api = originOf(apiBaseUrl) ?? 'https://angebotpilot.runasp.net';
   const policy = [
     "default-src 'self'",
     `connect-src 'self' ${api}`,

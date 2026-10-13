@@ -1,55 +1,50 @@
 # Remaining tasks
 
 Living checklist for AngebotPilot. `[x]` = done and verified, `[ ]` = open. Items marked **Owner** need
-access, accounts, money or legal decisions only the owner can provide.
+access, accounts, money or legal decisions only the owner can provide. Last updated: 2026-10-13.
 
 ## Engineering
 
 ### Backend (apps/api)
 - [x] Layered .NET 10 API, EF Core + SQL Server, migrations
-- [x] Auth: register/login/refresh rotation with reuse detection, logout, lockout, password reset, email verification
-- [x] Companies, memberships, roles (Owner/Admin/Employee), invitations, deactivation
+- [x] Auth: register/login/refresh rotation (reuse detection + 30 s multi-tab grace), logout, lockout, password reset, email verification
+- [x] Companies, memberships, roles (Owner/Admin/Employee), invitations, deactivation; numeric/undefined enum values rejected
 - [x] Fail-closed tenant query filters + route-scoped membership check
-- [x] Customers (CRUD, search, archive, delete vs. anonymise, CSV)
-- [x] Quotations (decimal calculation, VAT per rate, revisions, duplicate, concurrency-safe numbering, CSV)
-- [x] PDF generation (QuestPDF, embedded Inter, QR code, frozen after sending)
-- [x] Email outbox, retries, idempotency, follow-up planning/cancellation, opt-out
-- [x] Public customer page (hashed tokens, revoke/expiry, accept/reject once, PDF)
-- [x] Jobs (conversion once, lifecycle), templates, dashboard, notifications, activity
-- [x] Billing abstraction + clearly labelled mock provider, entitlements and plan limits
-- [x] Scheduled jobs: hosted scheduler + authenticated external trigger with DB lock
-- [x] Unit tests (101) and SQL Server integration tests (42) passing locally
-- [x] Smoke test script (`scripts/smoke-test.mjs`) passing locally (13/13)
+- [x] Customers, quotations, PDFs, email outbox with retries/idempotency, follow-ups, public customer page, jobs, templates, dashboard, notifications, billing abstraction
+- [x] Stored email bodies scrubbed after the final send state (no one-time links at rest)
+- [x] Unit tests (112) and SQL Server integration tests (44) passing locally
+- [x] Smoke test script passing locally (13/13)
 
 ### Web (apps/web)
-- [ ] Finish remaining screens and visual QA (agent in progress)
-- [ ] Unit tests (Vitest + RTL) – none written yet at last check
-- [ ] Playwright E2E against the real API + accessibility checks
-- [ ] Official screenshots in `screenshots/web/`
+- [x] All screens, design system, CSP for GitHub Pages
+- [x] Vitest unit tests (56), Playwright business workflow + axe accessibility (34 passed, 2 skipped by design)
+- [x] Official screenshots in `screenshots/web/`
 
 ### Mobile (apps/mobile)
-- [ ] Finish screens, emulator verification against the real API (agent in progress)
-- [ ] Official Android screenshots in `screenshots/android/`
-- [ ] Signed release AAB with the owner's upload key (stored outside the repo)
+- [x] Expo SDK 57 app, 77 Jest tests, Maestro flow passed against the real API
+- [x] Android screenshots (`screenshots/android/`) and Play-ready store screenshots (`store-assets/android/phone-screenshots/`)
+- [x] Signed release AAB with the upload key (stored outside the repo)
 - [ ] iOS build/screenshots – **blocked**: no macOS/Xcode; EAS cloud build needs an Expo account and Apple Developer membership
 
 ### Documentation
-- [ ] Architecture, database, threat model, security checklist, deployment, store listings (in progress)
-- [ ] TEST-REPORT, SCREENSHOT-INVENTORY, RELEASE-REPORT with actual results
+- [x] Architecture, database, threat model, security checklist, deployment, store listings
+- [x] TEST-REPORT, SCREENSHOT-INVENTORY, RELEASE-REPORT with final results
 
 ## Deployment
+- [x] Landing site live: https://metur100.github.io/Angebot.Pilot.Landing/
 - [x] Production SQL Server reachable (encrypted connection verified)
-- [ ] **Owner:** remove the other application's 32 tables from database `db73174` (created 2026-10-12 22:56 by a different app; AngebotPilot will not delete them). Then: `scripts/migrate-database.ps1`
-- [ ] Deploy API with `scripts/deploy-api.ps1`, then `node scripts/smoke-test.mjs https://angebotpilot.runasp.net`
-- [ ] Create public repos `Angebot.Pilot.App` (GitHub Pages, built bundle only) and `Angebot.Pilot.Landing`; enable Pages
-- [ ] Add `JOBS_TRIGGER_SECRET` secret to `Angebot.Pilot.App` for the scheduled-jobs workflow
+- [x] SMTP (netcup, office@gentlegroup.de, port 465/TLS) authenticated successfully; configured in the git-ignored production settings
+- [x] Foreign tables removed from `db73174` on the owner's request (JSON backup kept in the git-ignored `input/` folder), migrations applied
+- [x] API deployed to https://angebotpilot.runasp.net – production smoke test 13/13
+- [x] Web app live at https://metur100.github.io/Angebot.Pilot.App/ (public repo `Angebot.Pilot.App`, built bundle only) – deployed smoke 8/8
+- [x] Scheduled jobs: GitHub Actions cron every 15 min with `JOBS_TRIGGER_SECRET` – manual run succeeded
 - [ ] Push private source repo `Angebot.Pilot` after all quality gates pass
 
 ## Owner actions before commercial launch
 - [ ] **Owner:** MonsterASP Free plan forbids commercial use → upgrade to a paid plan (Premium) before taking paying customers
-- [ ] **Owner:** choose a transactional email provider (e.g. Brevo, Resend), verify a sending domain (SPF/DKIM/DMARC) and provide SMTP credentials. Until then production uses the capture sink and **no email is delivered** (account verification and email sending of quotations are therefore not usable in production)
+- [ ] **Owner:** check SPF/DKIM/DMARC for gentlegroup.de so customer emails are not marked as spam; sign a data processing agreement (AVV) with netcup
 - [ ] **Owner:** decide on object storage (Cloudflare R2 requires a subscription checkout) or keep local storage with regular App_Data backups
 - [ ] **Owner:** fill in legal placeholders on the landing site (address, phone, VAT ID, …) and obtain legal review of Impressum, Datenschutz, AGB, AVV
-- [ ] **Owner:** sign data processing agreements with processors (hosting, email, storage)
+- [ ] **Owner:** back up the Android upload key `C:\Users\TurkesMedin\keystore\angebotpilot` and its password file to a second secure location
 - [ ] **Owner:** Google Play developer account (closed test with 12 testers for 14 days for new personal accounts), Apple Developer Program for iOS
 - [ ] **Owner:** confirm preliminary prices and choose a payment provider before enabling paid plans

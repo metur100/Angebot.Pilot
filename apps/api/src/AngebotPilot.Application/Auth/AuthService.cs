@@ -374,6 +374,9 @@ public sealed class AuthService(
         await db.Memberships.Where(m => m.UserId == userId).ExecuteDeleteAsync(ct);
         await db.Notifications.IgnoreQueryFilters().Where(n => n.UserId == userId).ExecuteDeleteAsync(ct);
         await db.Invitations.IgnoreQueryFilters().Where(i => i.NormalizedEmail == user.NormalizedEmail).ExecuteDeleteAsync(ct);
+        // Emails still waiting to be sent to the deleted account are cancelled (and their content removed).
+        await db.EmailDeliveries.Where(e => e.ToAddress == user.Email && (e.Status == EmailStatus.Pending || e.Status == EmailStatus.RetryScheduled))
+            .ExecuteUpdateAsync(s => s.SetProperty(e => e.Status, EmailStatus.Cancelled).SetProperty(e => e.BodyText, "[Konto gelöscht]").SetProperty(e => e.BodyHtml, (string?)null), ct);
         db.ChangeTracker.Clear();
         await db.Users.Where(u => u.Id == userId).ExecuteDeleteAsync(ct);
         audit.Record(null, null, "user.deleted", "User", userId, $"Konto gelöscht am {now:yyyy-MM-dd}");

@@ -22,7 +22,8 @@ jobs:
         env:
           SECRET: ${{ secrets.JOBS_TRIGGER_SECRET }}
         run: |
-          status=$(curl -s -o result.json -w "%{http_code}" -X POST \
+          # IIS rejects POST requests without Content-Length (HTTP 411), hence the explicit empty body.
+          status=$(curl -s -o result.json -w "%{http_code}" -X POST --data "" \
             -H "Authorization: Bearer $SECRET" \
             --max-time 120 https://angebotpilot.runasp.net/api/internal/jobs/run)
           echo "HTTP $status"; cat result.json; echo

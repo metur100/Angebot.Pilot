@@ -38,7 +38,9 @@ dotnet publish $api -c Release -o $out --nologo -v q
 $env:ConnectionStrings__Default = $connection
 $env:Jobs__EnableHostedScheduler = 'false'
 # The migrate command does not issue tokens; a throw-away key satisfies startup validation.
-$env:Jwt__SigningKey = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+$keyBytes = New-Object byte[] 48
+[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($keyBytes)   # works in Windows PowerShell 5.1 and PowerShell 7
+$env:Jwt__SigningKey = [Convert]::ToBase64String($keyBytes)
 $env:ASPNETCORE_ENVIRONMENT = 'Production'
 try {
     dotnet (Join-Path $out 'AngebotPilot.Api.dll') migrate

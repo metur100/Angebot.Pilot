@@ -98,7 +98,13 @@ Full guide incl. mobile emulator: [docs/deployment/LOCAL-DEVELOPMENT.md](docs/de
 
 ## Status
 
-<!-- STATUS: filled in by release process -->
+Release 1.0.0 (2026-10-13):
+
+- API: https://angebotpilot.runasp.net (MonsterASP.NET, SQL Server) – health: [/health](https://angebotpilot.runasp.net/health)
+- Web app: https://metur100.github.io/Angebot.Pilot.App/
+- Landing & legal pages: https://metur100.github.io/Angebot.Pilot.Landing/
+- Android: signed release AAB built locally (not uploaded to Google Play); iOS: configured, not built (no macOS)
+- Test results: [docs/testing/TEST-REPORT.md](docs/testing/TEST-REPORT.md) · open items: [docs/REMAINING-TASKS.md](docs/REMAINING-TASKS.md) · release: [RELEASE-REPORT.md](RELEASE-REPORT.md)
 
 ## Contact
 

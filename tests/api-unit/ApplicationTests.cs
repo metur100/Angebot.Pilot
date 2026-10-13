@@ -170,3 +170,29 @@ public class EmailTemplateTests
         Assert.Contains(expected, EmailTemplates.Reminder(kind, q, "Firma", "https://x/#/q/t", false, null, "https://x/#/q/t?abmelden=1", "#000000").Subject);
     }
 }
+
+public class ReservedDomainTests
+{
+    [Theory]
+    [InlineData("smoke@example.invalid", true)]
+    [InlineData("kunde@test.example", true)]
+    [InlineData("a@foo.test", true)]
+    [InlineData("a@localhost", true)]
+    [InlineData("a@example.com", true)]
+    [InlineData("a@mail.example.org", true)]
+    [InlineData("office@gentlegroup.de", false)]
+    [InlineData("kunde@muster-elektro.de", false)]
+    [InlineData("kein-at-zeichen", true)]
+    public void Reserved_test_domains_are_never_sent(string address, bool reserved) =>
+        Assert.Equal(reserved, AngebotPilot.Infrastructure.Email.ReservedDomains.IsReserved(address));
+
+    [Fact]
+    public async Task Smtp_sender_refuses_reserved_domains_without_connecting()
+    {
+        var sender = new AngebotPilot.Infrastructure.Email.SmtpEmailSender(
+            new AngebotPilot.Infrastructure.Email.EmailOptions { SmtpHost = "unreachable.invalid" },
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<AngebotPilot.Infrastructure.Email.SmtpEmailSender>.Instance);
+        var result = await sender.SendAsync(new AngebotPilot.Application.Abstractions.OutgoingEmail("x@example.invalid", "s", "b", null, null, null, [], "k"), default);
+        Assert.Equal(AngebotPilot.Application.Abstractions.EmailSendOutcome.PermanentFailure, result.Outcome);
+    }
+}

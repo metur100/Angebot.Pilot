@@ -3,6 +3,8 @@
 # (default: metur100/Angebot.Pilot.App). Only built files are published; the source stays in the private repo.
 # Requires git push access to the Pages repository (Git Credential Manager).
 set -euo pipefail
+# Git Bash on Windows rewrites path-like environment values (/Angebot.Pilot.App/ → C:/Program Files/Git/…).
+export MSYS2_ENV_CONV_EXCL="VITE_BASE_PATH;VITE_API_BASE_URL;VITE_LANDING_URL"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PAGES_REPO="${PAGES_REPO:-https://github.com/metur100/Angebot.Pilot.App.git}"
 export VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://angebotpilot.runasp.net}"
@@ -11,6 +13,11 @@ export VITE_LANDING_URL="${VITE_LANDING_URL:-https://metur100.github.io/Angebot.
 
 cd "$ROOT"
 npm run build --workspace apps/web
+# Guard: refuse to publish a bundle whose asset URLs do not use the expected base path.
+if ! grep -q "src=\"${VITE_BASE_PATH}assets/" apps/web/dist/index.html; then
+  echo "Built index.html does not reference ${VITE_BASE_PATH}assets/ – aborting." >&2
+  exit 1
+fi
 WORK="$(mktemp -d)"
 git clone --depth 1 "$PAGES_REPO" "$WORK/site"
 find "$WORK/site" -mindepth 1 -maxdepth 1 ! -name .git ! -name .github -exec rm -rf {} +

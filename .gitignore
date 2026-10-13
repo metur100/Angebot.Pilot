@@ -67,3 +67,4 @@ input/
 apps/mobile/build-android.log
 apps/mobile/dist-check/
 apps/mobile/dist/
+test-results-deployed/
