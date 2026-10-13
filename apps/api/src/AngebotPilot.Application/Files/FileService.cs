@@ -30,18 +30,18 @@ public sealed class FileService(IAppDbContext db, IFileStorageService storage, T
     {
         if (upload.Length <= 0)
         {
-            throw Invalid("Die Datei ist leer.");
+            throw Invalid(Loc.T("Die Datei ist leer.", "The file is empty."));
         }
 
         if (upload.Length > MaxLogoBytes)
         {
-            throw Invalid("Das Logo darf höchstens 1 MB groß sein.");
+            throw Invalid(Loc.T("Das Logo darf höchstens 1 MB groß sein.", "The logo must not be larger than 1 MB."));
         }
 
         var extension = Path.GetExtension(upload.FileName);
         if (!LogoTypes.TryGetValue(extension, out var type))
         {
-            throw Invalid("Erlaubt sind PNG- oder JPEG-Dateien.");
+            throw Invalid(Loc.T("Erlaubt sind PNG- oder JPEG-Dateien.", "Only PNG or JPEG files are allowed."));
         }
 
         using var buffer = new MemoryStream();
@@ -52,13 +52,15 @@ public sealed class FileService(IAppDbContext db, IFileStorageService storage, T
 
         if (buffer.Length > MaxLogoBytes)
         {
-            throw Invalid("Das Logo darf höchstens 1 MB groß sein.");
+            throw Invalid(Loc.T("Das Logo darf höchstens 1 MB groß sein.", "The logo must not be larger than 1 MB."));
         }
 
         var bytes = buffer.ToArray();
         if (!type.Signatures.Any(sig => bytes.AsSpan().StartsWith(sig)))
         {
-            throw Invalid("Der Dateiinhalt passt nicht zum Dateityp. Bitte laden Sie ein gültiges PNG- oder JPEG-Bild hoch.");
+            throw Invalid(Loc.T(
+                "Der Dateiinhalt passt nicht zum Dateityp. Bitte laden Sie ein gültiges PNG- oder JPEG-Bild hoch.",
+                "The file content does not match the file type. Please upload a valid PNG or JPEG image."));
         }
 
         return await StoreAsync(companyId, userId, FilePurpose.CompanyLogo, $"logo{extension.ToLowerInvariant()}", type.ContentType, bytes, ct);

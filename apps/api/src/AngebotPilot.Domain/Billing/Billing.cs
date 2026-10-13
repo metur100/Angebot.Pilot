@@ -52,7 +52,11 @@ public sealed record PlanLimits(
     int? MaxQuotationsPerMonth,
     int MaxEmailsPerDay,
     bool FollowUpAutomation,
-    bool Templates);
+    bool Templates)
+{
+    /// <summary>Plan name in the request language (only the trial has a translated name).</summary>
+    public string DisplayName => Plan == SubscriptionPlan.Trial ? Loc.T(Name, "Trial") : Name;
+}
 
 public static class PlanCatalog
 {

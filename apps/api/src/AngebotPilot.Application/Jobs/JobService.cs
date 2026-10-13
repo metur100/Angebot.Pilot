@@ -61,7 +61,7 @@ public sealed class JobService(IAppDbContext db, BillingService billing, IAuditL
     public async Task<JobDto> GetAsync(Guid id, CancellationToken ct)
     {
         var j = await db.Jobs.AsNoTracking().Include(x => x.Quotation).Include(x => x.Customer).FirstOrDefaultAsync(x => x.Id == id, ct)
-            ?? throw new NotFoundException("Der Auftrag wurde nicht gefunden.");
+            ?? throw NotFoundJob();
         var assignee = j.AssignedUserId is { } uid ? await db.Users.AsNoTracking().Where(u => u.Id == uid).Select(u => u.DisplayName).FirstOrDefaultAsync(ct) : null;
         var invoices = await db.Invoices.AsNoTracking().Where(i => i.JobId == j.Id).OrderBy(i => i.CreatedAt)
             .Select(i => new InvoiceLinkDto(i.Id, i.Number, i.Kind, i.Status, i.GrossTotal)).ToListAsync(ct);
@@ -79,7 +79,8 @@ public sealed class JobService(IAppDbContext db, BillingService billing, IAuditL
         if (request.AssignedUserId is { } assignee && assignee != job.AssignedUserId
             && !await db.Memberships.AnyAsync(m => m.CompanyId == member.CompanyId && m.UserId == assignee && m.Status == MembershipStatus.Active, ct))
         {
-            throw new FluentValidation.ValidationException([new FluentValidation.Results.ValidationFailure("assignedUserId", "Die Person ist kein aktives Mitglied der Firma.")]);
+            throw new FluentValidation.ValidationException([new FluentValidation.Results.ValidationFailure("assignedUserId",
+                Loc.T("Die Person ist kein aktives Mitglied der Firma.", "This person is not an active member of the company."))]);
         }
 
         job.Title = request.Title.Trim();
@@ -133,5 +134,7 @@ public sealed class JobService(IAppDbContext db, BillingService billing, IAuditL
             j.AssignedUserId, db.Users.Where(u => u.Id == j.AssignedUserId).Select(u => u.DisplayName).FirstOrDefault(), j.Quotation.NetTotal, j.CreatedAt));
 
     private async Task<Job> LoadAsync(Guid id, CancellationToken ct) =>
-        await db.Jobs.FirstOrDefaultAsync(j => j.Id == id, ct) ?? throw new NotFoundException("Der Auftrag wurde nicht gefunden.");
+        await db.Jobs.FirstOrDefaultAsync(j => j.Id == id, ct) ?? throw NotFoundJob();
+
+    private static NotFoundException NotFoundJob() => new(Loc.T("Der Auftrag wurde nicht gefunden.", "The job was not found."));
 }

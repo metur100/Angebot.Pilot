@@ -30,7 +30,7 @@ public sealed class BillingService(IAppDbContext db, IBillingProvider provider, 
         var limits = Entitlements.EffectiveLimits(sub);
         return new SubscriptionDto(
             sub?.Plan ?? SubscriptionPlan.Trial,
-            limits.Name,
+            limits.DisplayName,
             sub?.Status ?? SubscriptionStatus.Expired,
             sub?.TrialEndsAt,
             sub?.CurrentPeriodEnd,
@@ -42,7 +42,7 @@ public sealed class BillingService(IAppDbContext db, IBillingProvider provider, 
             members,
             quotations,
             PlanCatalog.All.Where(p => p.Plan != SubscriptionPlan.Trial)
-                .Select(p => new PlanDto(p.Plan, p.Name, p.MonthlyPriceEur, p.MaxActiveMembers, p.MaxQuotationsPerMonth, p.MaxEmailsPerDay)).ToList());
+                .Select(p => new PlanDto(p.Plan, p.DisplayName, p.MonthlyPriceEur, p.MaxActiveMembers, p.MaxQuotationsPerMonth, p.MaxEmailsPerDay)).ToList());
     }
 
     public async Task<ChangePlanResponse> ChangePlanAsync(CurrentMember member, SubscriptionPlan plan, string email, CancellationToken ct)
@@ -50,13 +50,15 @@ public sealed class BillingService(IAppDbContext db, IBillingProvider provider, 
         member.Require(MembershipRole.Owner);
         if (plan == SubscriptionPlan.Trial)
         {
-            throw new ConflictException("invalid_plan", "Die Testphase kann nicht erneut gewählt werden.");
+            throw new ConflictException("invalid_plan", Loc.T("Die Testphase kann nicht erneut gewählt werden.", "The trial cannot be chosen again."));
         }
 
         var activeMembers = await db.Memberships.CountAsync(m => m.CompanyId == member.CompanyId && m.Status == MembershipStatus.Active, ct);
         if (activeMembers > PlanCatalog.For(plan).MaxActiveMembers)
         {
-            throw new ConflictException("plan_too_small", $"Der Tarif erlaubt höchstens {PlanCatalog.For(plan).MaxActiveMembers} aktive Mitglieder. Deaktivieren Sie zuerst Mitglieder.");
+            throw new ConflictException("plan_too_small", Loc.T(
+                $"Der Tarif erlaubt höchstens {PlanCatalog.For(plan).MaxActiveMembers} aktive Mitglieder. Deaktivieren Sie zuerst Mitglieder.",
+                $"The plan allows at most {PlanCatalog.For(plan).MaxActiveMembers} active members. Deactivate members first."));
         }
 
         // The provider either returns a checkout URL, or (mock provider only) delivers a signed webhook immediately.
@@ -121,7 +123,9 @@ public sealed class BillingService(IAppDbContext db, IBillingProvider provider, 
         var sub = await db.Subscriptions.AsNoTracking().FirstOrDefaultAsync(s => s.CompanyId == companyId, ct);
         if (Entitlements.Evaluate(sub, clock.GetUtcNow()) != EntitlementState.Full)
         {
-            throw new EntitlementException("subscription_inactive", "Ihre Testphase bzw. Ihr Abonnement ist abgelaufen. Ihre Daten bleiben lesbar; zum Bearbeiten wählen Sie bitte einen Tarif.");
+            throw new EntitlementException("subscription_inactive", Loc.T(
+                "Ihre Testphase bzw. Ihr Abonnement ist abgelaufen. Ihre Daten bleiben lesbar; zum Bearbeiten wählen Sie bitte einen Tarif.",
+                "Your trial or subscription has expired. Your data stays readable; to make changes, please choose a plan."));
         }
     }
 
@@ -135,7 +139,9 @@ public sealed class BillingService(IAppDbContext db, IBillingProvider provider, 
         var openInvites = await db.Invitations.CountAsync(i => i.CompanyId == companyId && i.AcceptedAt == null && i.RevokedAt == null && i.ExpiresAt > now, ct);
         if (active + openInvites >= limits.MaxActiveMembers)
         {
-            throw new EntitlementException("member_limit", $"Ihr Tarif „{limits.Name}“ erlaubt höchstens {limits.MaxActiveMembers} aktive Mitglieder (inkl. offener Einladungen).");
+            throw new EntitlementException("member_limit", Loc.T(
+                $"Ihr Tarif „{limits.Name}“ erlaubt höchstens {limits.MaxActiveMembers} aktive Mitglieder (inkl. offener Einladungen).",
+                $"Your “{limits.DisplayName}” plan allows at most {limits.MaxActiveMembers} active members (including open invitations)."));
         }
     }
 
@@ -154,7 +160,9 @@ public sealed class BillingService(IAppDbContext db, IBillingProvider provider, 
         var count = await db.Quotations.IgnoreQueryFilters().CountAsync(q => q.CompanyId == companyId && q.CreatedAt >= monthStart && q.RevisionNumber == 0, ct);
         if (count >= limits.MaxQuotationsPerMonth)
         {
-            throw new EntitlementException("quotation_limit", $"Ihr Tarif „{limits.Name}“ erlaubt {limits.MaxQuotationsPerMonth} neue Angebote pro Monat.");
+            throw new EntitlementException("quotation_limit", Loc.T(
+                $"Ihr Tarif „{limits.Name}“ erlaubt {limits.MaxQuotationsPerMonth} neue Angebote pro Monat.",
+                $"Your “{limits.DisplayName}” plan allows {limits.MaxQuotationsPerMonth} new quotations per month."));
         }
     }
 
@@ -166,7 +174,9 @@ public sealed class BillingService(IAppDbContext db, IBillingProvider provider, 
         var count = await db.EmailDeliveries.CountAsync(e => e.CompanyId == companyId && e.CreatedAt > since, ct);
         if (count >= limits.MaxEmailsPerDay)
         {
-            throw new EntitlementException("email_limit", $"Das tägliche E-Mail-Limit Ihres Tarifs ({limits.MaxEmailsPerDay}) ist erreicht. Bitte versuchen Sie es später erneut.");
+            throw new EntitlementException("email_limit", Loc.T(
+                $"Das tägliche E-Mail-Limit Ihres Tarifs ({limits.MaxEmailsPerDay}) ist erreicht. Bitte versuchen Sie es später erneut.",
+                $"Your plan's daily email limit ({limits.MaxEmailsPerDay}) has been reached. Please try again later."));
         }
     }
 }

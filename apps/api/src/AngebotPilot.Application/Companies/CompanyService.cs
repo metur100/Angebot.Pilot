@@ -26,7 +26,7 @@ public sealed class CompanyAccess(IAppDbContext db, ITenantContext tenant)
         // 404 instead of 403 so foreign company ids cannot be probed.
         if (member is null)
         {
-            throw new NotFoundException("Die Firma wurde nicht gefunden oder Sie haben keinen Zugriff.");
+            throw new NotFoundException(Loc.T("Die Firma wurde nicht gefunden oder Sie haben keinen Zugriff.", "The company was not found or you do not have access."));
         }
 
         tenant.Set(companyId);
@@ -51,7 +51,7 @@ public sealed class CompanyService(
         var ownedCompanies = await db.Memberships.CountAsync(m => m.UserId == userId && m.Role == MembershipRole.Owner, ct);
         if (ownedCompanies >= 5)
         {
-            throw new ConflictException("company_limit", "Sie können höchstens 5 Firmen anlegen.");
+            throw new ConflictException("company_limit", Loc.T("Sie können höchstens 5 Firmen anlegen.", "You can create at most 5 companies."));
         }
 
         var now = clock.GetUtcNow();
@@ -277,7 +277,7 @@ public sealed class CompanyService(
         var target = await LoadMemberAsync(member, membershipId, ct);
         if (role == MembershipRole.Owner || target.Role == MembershipRole.Owner)
         {
-            member.Require(MembershipRole.Owner, "Nur Inhaber:innen können die Inhaberrolle vergeben oder entziehen.");
+            member.Require(MembershipRole.Owner, Loc.T("Nur Inhaber:innen können die Inhaberrolle vergeben oder entziehen.", "Only owners can grant or revoke the owner role."));
         }
 
         if (target.Role == MembershipRole.Owner && role != MembershipRole.Owner)
@@ -304,7 +304,7 @@ public sealed class CompanyService(
         {
             if (target.UserId == member.UserId)
             {
-                throw new ConflictException("cannot_deactivate_self", "Sie können sich nicht selbst deaktivieren.");
+                throw new ConflictException("cannot_deactivate_self", Loc.T("Sie können sich nicht selbst deaktivieren.", "You cannot deactivate yourself."));
             }
 
             if (target.Role == MembershipRole.Owner)
@@ -352,7 +352,7 @@ public sealed class CompanyService(
         var now = clock.GetUtcNow();
         if (await db.Memberships.AnyAsync(m => m.CompanyId == member.CompanyId && m.User!.NormalizedEmail == normalized, ct))
         {
-            throw new ConflictException("already_member", "Diese Person ist bereits Mitglied der Firma.");
+            throw new ConflictException("already_member", Loc.T("Diese Person ist bereits Mitglied der Firma.", "This person is already a member of the company."));
         }
 
         // Re-inviting replaces an open invitation.
@@ -375,9 +375,10 @@ public sealed class CompanyService(
         };
         db.Invitations.Add(invitation);
         var company = await db.Companies.AsNoTracking().FirstAsync(c => c.Id == member.CompanyId, ct);
-        var inviter = await db.Users.AsNoTracking().Where(u => u.Id == member.UserId).Select(u => u.DisplayName).FirstAsync(ct);
-        var roleLabel = request.Role == MembershipRole.Admin ? "Administrator:in" : "Mitarbeiter:in";
-        var content = EmailTemplates.Invitation(company.Name, inviter, roleLabel, _app.WebUrl($"invite?token={token}"), _app.ProductName);
+        var inviter = await db.Users.AsNoTracking().Where(u => u.Id == member.UserId).Select(u => new { u.DisplayName, u.Language }).FirstAsync(ct);
+        // Existing accounts get their own language; otherwise the inviter's language is the best guess.
+        var language = await db.Users.AsNoTracking().Where(u => u.NormalizedEmail == normalized).Select(u => u.Language).FirstOrDefaultAsync(ct) ?? inviter.Language;
+        var content = EmailTemplates.Invitation(company.Name, inviter.DisplayName, request.Role, _app.WebUrl($"invite?token={token}"), _app.ProductName, language);
         await outbox.EnqueueAsync(new EnqueueEmail(member.CompanyId, null, EmailKind.Invitation, $"invitation:{invitation.Id:N}", invitation.Email, content, CreatedByUserId: member.UserId), ct);
         audit.Record(member.CompanyId, member.UserId, "member.invited", "Invitation", invitation.Id, $"{invitation.Email} als {request.Role}");
         await db.SaveChangesAsync(ct);
@@ -407,7 +408,9 @@ public sealed class CompanyService(
         var user = await db.Users.FirstAsync(u => u.Id == userId, ct);
         if (user.NormalizedEmail != invitation.NormalizedEmail)
         {
-            throw new ForbiddenException("Diese Einladung wurde an eine andere E-Mail-Adresse gesendet. Bitte melden Sie sich mit dieser Adresse an.");
+            throw new ForbiddenException(Loc.T(
+                "Diese Einladung wurde an eine andere E-Mail-Adresse gesendet. Bitte melden Sie sich mit dieser Adresse an.",
+                "This invitation was sent to a different email address. Please sign in with that address."));
         }
 
         var now = clock.GetUtcNow();
@@ -437,7 +440,8 @@ public sealed class CompanyService(
         var company = await db.Companies.AsNoTracking().FirstAsync(c => c.Id == member.CompanyId, ct);
         if (!string.Equals(company.Name.Trim(), confirmName.Trim(), StringComparison.Ordinal))
         {
-            throw new FluentValidation.ValidationException([new FluentValidation.Results.ValidationFailure("confirmName", "Der eingegebene Name stimmt nicht mit dem Firmennamen überein.")]);
+            throw new FluentValidation.ValidationException([new FluentValidation.Results.ValidationFailure("confirmName",
+                Loc.T("Der eingegebene Name stimmt nicht mit dem Firmennamen überein.", "The name entered does not match the company name."))]);
         }
 
         await DeleteCompanyDataAsync(member.CompanyId, ct);
@@ -528,7 +532,7 @@ public sealed class CompanyService(
         var others = await db.Memberships.CountAsync(m => m.CompanyId == companyId && m.Id != exceptMembershipId && m.Role == MembershipRole.Owner && m.Status == MembershipStatus.Active, ct);
         if (others == 0)
         {
-            throw new ConflictException("last_owner", "Eine Firma braucht mindestens eine aktive Inhaberin bzw. einen aktiven Inhaber.");
+            throw new ConflictException("last_owner", Loc.T("Eine Firma braucht mindestens eine aktive Inhaberin bzw. einen aktiven Inhaber.", "A company needs at least one active owner."));
         }
     }
 
@@ -540,14 +544,14 @@ public sealed class CompanyService(
     {
         if (!SecureTokens.LooksValid(token))
         {
-            throw new GoneException("Die Einladung ist ungültig oder abgelaufen.");
+            throw new GoneException(Loc.T("Die Einladung ist ungültig oder abgelaufen.", "The invitation is invalid or has expired."));
         }
 
         var hash = SecureTokens.Hash(token);
         var invitation = await db.Invitations.IgnoreQueryFilters().FirstOrDefaultAsync(i => i.TokenHash == hash, ct);
         if (invitation is null || !invitation.IsOpen(clock.GetUtcNow()))
         {
-            throw new GoneException("Die Einladung ist ungültig oder abgelaufen.");
+            throw new GoneException(Loc.T("Die Einladung ist ungültig oder abgelaufen.", "The invitation is invalid or has expired."));
         }
 
         return invitation;

@@ -120,6 +120,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
             e.Property(x => x.NormalizedEmail).HasMaxLength(254);
             e.Property(x => x.DisplayName).HasMaxLength(100);
             e.Property(x => x.PasswordHash).HasMaxLength(500);
+            e.Property(x => x.Language).HasMaxLength(2);
         });
 
         b.Entity<RefreshToken>(e =>

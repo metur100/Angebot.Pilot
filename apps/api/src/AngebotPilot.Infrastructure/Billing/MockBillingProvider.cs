@@ -38,7 +38,9 @@ public sealed class MockBillingProvider(BillingOptions options, TimeProvider clo
     {
         if (!options.MockAllowsSelfService)
         {
-            throw new ConflictException("billing_unavailable", "Die Online-Bezahlung ist noch nicht verfügbar. Während der Pilotphase richten wir Tarife auf Anfrage ein.");
+            throw new ConflictException("billing_unavailable", Loc.T(
+                "Die Online-Bezahlung ist noch nicht verfügbar. Während der Pilotphase richten wir Tarife auf Anfrage ein.",
+                "Online payment is not available yet. During the pilot phase we set up plans on request."));
         }
 
         var payload = JsonSerializer.Serialize(new MockEvent(

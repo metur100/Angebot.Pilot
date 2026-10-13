@@ -69,7 +69,7 @@ public sealed class QuotationService(
     public async Task<QuotationDto> GetAsync(Guid id, CancellationToken ct)
     {
         var q = await db.Quotations.AsNoTracking().Include(x => x.LineItems).Include(x => x.Customer).FirstOrDefaultAsync(x => x.Id == id, ct)
-            ?? throw new NotFoundException("Das Angebot wurde nicht gefunden.");
+            ?? throw NotFoundQuotation();
         return await ToDtoAsync(q, ct);
     }
 
@@ -83,11 +83,11 @@ public sealed class QuotationService(
             e.Id, e.Type, e.OccurredAt, e.ActorType,
             e.ActorType switch
             {
-                ActorType.Customer => "Kunde",
+                ActorType.Customer => Loc.T("Kunde", "Customer"),
                 ActorType.System => "System",
-                _ => e.ActorUserId is { } uid ? names.GetValueOrDefault(uid, "Gelöschter Benutzer") : null,
+                _ => e.ActorUserId is { } uid ? names.GetValueOrDefault(uid, Loc.T("Gelöschter Benutzer", "Deleted user")) : null,
             },
-            e.Details)).ToList();
+            StoredText.Localize(e.Details))).ToList();
     }
 
     public async Task<IReadOnlyList<EmailDeliveryDto>> DeliveriesAsync(CurrentMember member, Guid id, CancellationToken ct)
@@ -96,7 +96,7 @@ public sealed class QuotationService(
         return await db.EmailDeliveries.AsNoTracking().Where(e => e.QuotationId == id && e.CompanyId == member.CompanyId)
             .OrderByDescending(e => e.CreatedAt)
             .Select(e => new EmailDeliveryDto(e.Id, e.Kind, e.ToAddress, e.Subject, e.Status, e.Attempts, e.CreatedAt, e.HandedOffAt,
-                e.Status == EmailStatus.Pending || e.Status == EmailStatus.RetryScheduled ? e.NextAttemptAt : null, e.LastError))
+                e.Status == EmailStatus.Pending || e.Status == EmailStatus.RetryScheduled ? e.NextAttemptAt : null, StoredText.Localize(e.LastError)))
             .ToListAsync(ct);
     }
 
@@ -104,7 +104,7 @@ public sealed class QuotationService(
     {
         await EnsureExistsAsync(id, ct);
         return await db.FollowUpSchedules.AsNoTracking().Where(f => f.QuotationId == id).OrderBy(f => f.DueAt)
-            .Select(f => new FollowUpDto(f.Id, f.Kind, f.DueAt, f.Status, f.StatusReason, f.ProcessedAt)).ToListAsync(ct);
+            .Select(f => new FollowUpDto(f.Id, f.Kind, f.DueAt, f.Status, StoredText.Localize(f.StatusReason), f.ProcessedAt)).ToListAsync(ct);
     }
 
     public TotalsDto Calculate(CalculateRequest request) =>
@@ -121,7 +121,9 @@ public sealed class QuotationService(
         var hash = SecureTokens.Hash(token);
         // The tenant filter restricts the lookup to the caller's company.
         var id = await db.PublicQuotationAccesses.Where(a => a.TokenHash == hash).Select(a => (Guid?)a.QuotationId).FirstOrDefaultAsync(ct);
-        return id is null ? throw new NotFoundException("Kein Angebot Ihrer Firma gehört zu diesem Code.") : new LookupByTokenResponse(id.Value);
+        return id is null
+            ? throw new NotFoundException(Loc.T("Kein Angebot Ihrer Firma gehört zu diesem Code.", "No quotation of your company belongs to this code."))
+            : new LookupByTokenResponse(id.Value);
     }
 
     // ---------- Commands ----------
@@ -131,7 +133,7 @@ public sealed class QuotationService(
         var customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == request.CustomerId, ct) ?? throw NotFoundCustomer();
         if (customer.ArchivedAt is not null)
         {
-            throw new ConflictException("customer_archived", "Für archivierte Kunden können keine neuen Angebote erstellt werden.");
+            throw new ConflictException("customer_archived", Loc.T("Für archivierte Kunden können keine neuen Angebote erstellt werden.", "New quotations cannot be created for archived customers."));
         }
 
         var (company, settings) = await CompanyAsync(member.CompanyId, ct);
@@ -141,7 +143,7 @@ public sealed class QuotationService(
         if (request.TemplateId is { } templateId)
         {
             template = await db.Templates.Include(t => t.LineItems).FirstOrDefaultAsync(t => t.Id == templateId && t.ArchivedAt == null, ct)
-                ?? throw new NotFoundException("Die Vorlage wurde nicht gefunden.");
+                ?? throw new NotFoundException(Loc.T("Die Vorlage wurde nicht gefunden.", "The template was not found."));
         }
 
         var defaultTaxRate = await db.TaxRates.Where(t => t.IsDefault && !t.IsArchived).Select(t => (decimal?)t.RatePercent).FirstOrDefaultAsync(ct) ?? 19m;
@@ -222,7 +224,9 @@ public sealed class QuotationService(
         var q = await LoadAsync(id, ct);
         if (!q.IsDraft)
         {
-            throw new ConflictException("quotation_not_deletable", "Nur Entwürfe können gelöscht werden. Versendete Angebote können storniert werden.");
+            throw new ConflictException("quotation_not_deletable", Loc.T(
+                "Nur Entwürfe können gelöscht werden. Versendete Angebote können storniert werden.",
+                "Only drafts can be deleted. Sent quotations can be cancelled."));
         }
 
         q.DeletedAt = clock.GetUtcNow();
@@ -264,7 +268,9 @@ public sealed class QuotationService(
         var source = await LoadAsync(id, ct);
         if (!source.CanBeRevised)
         {
-            throw new ConflictException("quotation_not_revisable", "Nur versendete, abgelehnte oder abgelaufene Angebote können überarbeitet werden.");
+            throw new ConflictException("quotation_not_revisable", Loc.T(
+                "Nur versendete, abgelehnte oder abgelaufene Angebote können überarbeitet werden.",
+                "Only sent, rejected or expired quotations can be revised."));
         }
 
         var rootId = source.RootQuotationId ?? source.Id;
@@ -295,7 +301,7 @@ public sealed class QuotationService(
         var q = await LoadAsync(id, ct);
         if (q.Status is not (QuotationStatus.Draft or QuotationStatus.Sent))
         {
-            throw new ConflictException("invalid_status_transition", "Dieses Angebot kann nicht mehr versendet werden.");
+            throw new ConflictException("invalid_status_transition", Loc.T("Dieses Angebot kann nicht mehr versendet werden.", "This quotation can no longer be sent."));
         }
 
         var customer = await db.Customers.FirstAsync(c => c.Id == q.CustomerId, ct);
@@ -307,11 +313,14 @@ public sealed class QuotationService(
         {
             if (sender.EmailVerifiedAt is null)
             {
-                throw new ConflictException("email_not_verified", "Bitte bestätigen Sie zuerst Ihre E-Mail-Adresse. Erst danach können Angebote per E-Mail versendet werden.");
+                throw new ConflictException("email_not_verified", Loc.T(
+                    "Bitte bestätigen Sie zuerst Ihre E-Mail-Adresse. Erst danach können Angebote per E-Mail versendet werden.",
+                    "Please confirm your email address first. Only then can quotations be sent by email."));
             }
 
             recipient = Text.Clean(request.RecipientEmail) ?? customer.Email
-                ?? throw new FluentValidation.ValidationException([new FluentValidation.Results.ValidationFailure("recipientEmail", "Für diesen Kunden ist keine E-Mail-Adresse hinterlegt.")]);
+                ?? throw new FluentValidation.ValidationException([new FluentValidation.Results.ValidationFailure("recipientEmail",
+                    Loc.T("Für diesen Kunden ist keine E-Mail-Adresse hinterlegt.", "There is no email address on file for this customer."))]);
             await billing.EnsureEmailQuotaAsync(member.CompanyId, ct);
         }
 
@@ -438,7 +447,7 @@ public sealed class QuotationService(
 
     public async Task<(byte[] Content, string FileName)> PdfAsync(CurrentMember member, Guid id, CancellationToken ct)
     {
-        var q = await db.Quotations.Include(x => x.LineItems).FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new NotFoundException("Das Angebot wurde nicht gefunden.");
+        var q = await db.Quotations.Include(x => x.LineItems).FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw NotFoundQuotation();
         if (q.SentPdfFileId is { } fileId && await files.ReadAllAsync(member.CompanyId, fileId, ct) is { } stored)
         {
             return (stored, QuotationPdfFactory.FileName(q));
@@ -453,7 +462,9 @@ public sealed class QuotationService(
         var q = await LoadAsync(id, ct);
         if (q.Status is QuotationStatus.Draft or QuotationStatus.Cancelled)
         {
-            throw new ConflictException("public_link_unavailable", "Ein Kundenlink ist erst nach dem Versand und nicht für stornierte Angebote verfügbar.");
+            throw new ConflictException("public_link_unavailable", Loc.T(
+                "Ein Kundenlink ist erst nach dem Versand und nicht für stornierte Angebote verfügbar.",
+                "A customer link is only available after sending and not for cancelled quotations."));
         }
 
         var now = clock.GetUtcNow();
@@ -482,12 +493,13 @@ public sealed class QuotationService(
         var q = await LoadAsync(id, ct);
         if (q.Status != QuotationStatus.Accepted)
         {
-            throw new ConflictException("quotation_not_accepted", "Nur angenommene Angebote können in einen Auftrag umgewandelt werden.");
+            throw new ConflictException("quotation_not_accepted", Loc.T("Nur angenommene Angebote können in einen Auftrag umgewandelt werden.", "Only accepted quotations can be converted into a job."));
         }
 
         if (request.AssignedUserId is { } assignee && !await db.Memberships.AnyAsync(m => m.CompanyId == member.CompanyId && m.UserId == assignee && m.Status == MembershipStatus.Active, ct))
         {
-            throw new FluentValidation.ValidationException([new FluentValidation.Results.ValidationFailure("assignedUserId", "Die Person ist kein aktives Mitglied der Firma.")]);
+            throw new FluentValidation.ValidationException([new FluentValidation.Results.ValidationFailure("assignedUserId",
+                Loc.T("Die Person ist kein aktives Mitglied der Firma.", "This person is not an active member of the company."))]);
         }
 
         var (company, settings) = await CompanyAsync(member.CompanyId, ct);
@@ -495,7 +507,7 @@ public sealed class QuotationService(
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         if (await db.Jobs.AnyAsync(j => j.QuotationId == q.Id, ct))
         {
-            throw new ConflictException("already_converted", "Dieses Angebot wurde bereits in einen Auftrag umgewandelt.");
+            throw new ConflictException("already_converted", Loc.T("Dieses Angebot wurde bereits in einen Auftrag umgewandelt.", "This quotation has already been converted into a job."));
         }
 
         var job = new Job
@@ -526,7 +538,7 @@ public sealed class QuotationService(
         catch (DbUpdateException)
         {
             // The unique index on Jobs.QuotationId is the final guard against concurrent conversions.
-            throw new ConflictException("already_converted", "Dieses Angebot wurde bereits in einen Auftrag umgewandelt.");
+            throw new ConflictException("already_converted", Loc.T("Dieses Angebot wurde bereits in einen Auftrag umgewandelt.", "This quotation has already been converted into a job."));
         }
 
         return await jobs.GetAsync(job.Id, ct);
@@ -695,20 +707,20 @@ public sealed class QuotationService(
             q.LineItems.OrderBy(i => i.Position).Select(QuotationMapping.ToDto).ToList(),
             QuotationMapping.ToDto(q.CalculateTotals()),
             q.RevisionNumber, q.RootQuotationId, q.PreviousRevisionId, revisions.Count > 1 ? revisions : [],
-            q.CreatedAt, q.UpdatedAt, q.SentAt, q.DecidedAt, q.DecidedByActor, q.DecisionName, q.DecisionNote, q.ExpiredAt, q.CancelledAt, q.CancellationReason,
+            q.CreatedAt, q.UpdatedAt, q.SentAt, q.DecidedAt, q.DecidedByActor, q.DecisionName, q.DecisionNote, q.ExpiredAt, q.CancelledAt, StoredText.Localize(q.CancellationReason),
             jobId, link?.Active ?? false, link?.LastOpened, QuotationMapping.AllowedActions(q, jobId is not null), RowVersions.Encode(q.RowVersion),
             await db.Invoices.AsNoTracking().Where(i => i.QuotationId == q.Id).OrderBy(i => i.CreatedAt)
                 .Select(i => new InvoiceLinkDto(i.Id, i.Number, i.Kind, i.Status, i.GrossTotal)).ToListAsync(ct));
     }
 
     private async Task<Quotation> LoadAsync(Guid id, CancellationToken ct) =>
-        await db.Quotations.Include(x => x.LineItems).FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new NotFoundException("Das Angebot wurde nicht gefunden.");
+        await db.Quotations.Include(x => x.LineItems).FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw NotFoundQuotation();
 
     private async Task EnsureExistsAsync(Guid id, CancellationToken ct)
     {
         if (!await db.Quotations.AnyAsync(x => x.Id == id, ct))
         {
-            throw new NotFoundException("Das Angebot wurde nicht gefunden.");
+            throw NotFoundQuotation();
         }
     }
 
@@ -718,5 +730,7 @@ public sealed class QuotationService(
         return (company, company.Settings!);
     }
 
-    private static NotFoundException NotFoundCustomer() => new("Der Kunde wurde nicht gefunden.");
+    private static NotFoundException NotFoundCustomer() => new(Loc.T("Der Kunde wurde nicht gefunden.", "The customer was not found."));
+
+    private static NotFoundException NotFoundQuotation() => new(Loc.T("Das Angebot wurde nicht gefunden.", "The quotation was not found."));
 }

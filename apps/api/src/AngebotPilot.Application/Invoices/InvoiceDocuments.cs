@@ -53,17 +53,17 @@ public sealed class InvoiceDocuments(IAppDbContext db, FileService files, IInvoi
         var problems = new List<string>();
         if (string.IsNullOrWhiteSpace(company.AddressLine1) || string.IsNullOrWhiteSpace(company.PostalCode) || string.IsNullOrWhiteSpace(company.City))
         {
-            problems.Add("Bitte die vollständige Anschrift Ihrer Firma hinterlegen (Einstellungen → Firma).");
+            problems.Add(Loc.T("Bitte die vollständige Anschrift Ihrer Firma hinterlegen (Einstellungen → Firma).", "Please enter your company's full address (Settings → Company)."));
         }
 
         if (string.IsNullOrWhiteSpace(company.TaxNumber) && string.IsNullOrWhiteSpace(company.VatId))
         {
-            problems.Add("Bitte Steuernummer oder USt-IdNr. Ihrer Firma hinterlegen (Einstellungen → Firma).");
+            problems.Add(Loc.T("Bitte Steuernummer oder USt-IdNr. Ihrer Firma hinterlegen (Einstellungen → Firma).", "Please enter your company's tax number or VAT ID (Settings → Company)."));
         }
 
         if (taxMode == TaxMode.ReverseCharge && string.IsNullOrWhiteSpace(company.VatId))
         {
-            problems.Add("Für § 13b UStG ist die USt-IdNr. Ihrer Firma erforderlich.");
+            problems.Add(Loc.T("Für § 13b UStG ist die USt-IdNr. Ihrer Firma erforderlich.", "§ 13b UStG requires your company's VAT ID."));
         }
 
         return problems;

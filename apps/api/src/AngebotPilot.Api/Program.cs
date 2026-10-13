@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using AngebotPilot.Api.Endpoints;
@@ -7,6 +8,7 @@ using AngebotPilot.Application.Abstractions;
 using AngebotPilot.Application.Auth;
 using AngebotPilot.Application.Common;
 using AngebotPilot.Application.Emails;
+using AngebotPilot.Domain;
 using AngebotPilot.Infrastructure;
 using AngebotPilot.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -16,6 +18,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Serilog.Events;
+
+// Messages default to German (also in background jobs); requests may switch to English via Accept-Language.
+// Only the UI culture: number/date formatting is explicit in all documents and unaffected.
+CultureInfo.DefaultThreadCurrentUICulture = Loc.GermanCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -86,8 +92,13 @@ builder.Services.AddRateLimiter(o =>
     o.OnRejected = async (ctx, ct) =>
     {
         ctx.HttpContext.Response.ContentType = "application/problem+json";
-        await ctx.HttpContext.Response.WriteAsJsonAsync(
-            new { status = 429, code = "rate_limited", title = "Zu viele Anfragen", detail = "Bitte warten Sie einen Moment und versuchen Sie es erneut." }, ct);
+        await ctx.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            status = 429,
+            code = "rate_limited",
+            title = Loc.T("Zu viele Anfragen", "Too many requests"),
+            detail = Loc.T("Bitte warten Sie einen Moment und versuchen Sie es erneut.", "Please wait a moment and try again."),
+        }, ct);
     };
     var scale = config.GetValue("RateLimits:Scale", 1);
     static string Ip(HttpContext h) => h.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -154,6 +165,7 @@ if (config.GetValue("Network:TrustForwardedHeaders", false))
     app.UseForwardedHeaders();
 }
 
+app.UseMiddleware<RequestLanguageMiddleware>();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))

@@ -64,7 +64,9 @@ public sealed class AuthService(
         var normalized = User.Normalize(request.Email);
         if (await db.Users.AnyAsync(u => u.NormalizedEmail == normalized, ct))
         {
-            throw new ConflictException("email_taken", "Für diese E-Mail-Adresse besteht bereits ein Konto. Bitte melden Sie sich an oder setzen Sie Ihr Passwort zurück.");
+            throw new ConflictException("email_taken", Loc.T(
+                "Für diese E-Mail-Adresse besteht bereits ein Konto. Bitte melden Sie sich an oder setzen Sie Ihr Passwort zurück.",
+                "An account already exists for this email address. Please sign in or reset your password."));
         }
 
         var now = clock.GetUtcNow();
@@ -73,6 +75,7 @@ public sealed class AuthService(
             Email = request.Email.Trim(),
             NormalizedEmail = normalized,
             DisplayName = request.DisplayName.Trim(),
+            Language = Loc.Normalize(request.Language),
             CreatedAt = now,
         };
         user.PasswordHash = hasher.HashPassword(user, request.Password);
@@ -91,7 +94,7 @@ public sealed class AuthService(
         var normalized = User.Normalize(request.Email);
         var user = await db.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == normalized, ct);
         var now = clock.GetUtcNow();
-        const string invalid = "E-Mail-Adresse oder Passwort ist falsch.";
+        var invalid = Loc.T("E-Mail-Adresse oder Passwort ist falsch.", "Email address or password is incorrect.");
 
         if (user is null || user.IsDisabled)
         {
@@ -103,7 +106,9 @@ public sealed class AuthService(
 
         if (user.LockedUntil > now)
         {
-            throw new AuthenticationFailedException("Zu viele fehlgeschlagene Anmeldeversuche. Bitte versuchen Sie es in einigen Minuten erneut.");
+            throw new AuthenticationFailedException(Loc.T(
+                "Zu viele fehlgeschlagene Anmeldeversuche. Bitte versuchen Sie es in einigen Minuten erneut.",
+                "Too many failed sign-in attempts. Please try again in a few minutes."));
         }
 
         var verification = hasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
@@ -138,7 +143,7 @@ public sealed class AuthService(
     {
         if (!SecureTokens.LooksValid(refreshToken))
         {
-            throw new AuthenticationFailedException("Sitzung abgelaufen. Bitte melden Sie sich erneut an.");
+            throw SessionExpired();
         }
 
         var hash = SecureTokens.Hash(refreshToken!);
@@ -146,7 +151,7 @@ public sealed class AuthService(
         var now = clock.GetUtcNow();
         if (stored?.User is null)
         {
-            throw new AuthenticationFailedException("Sitzung abgelaufen. Bitte melden Sie sich erneut an.");
+            throw SessionExpired();
         }
 
         if (stored.RevokedAt is not null)
@@ -162,12 +167,12 @@ public sealed class AuthService(
                 logger.LogWarning("Refresh token reuse detected for user {UserId}; token family revoked", stored.UserId);
             }
 
-            throw new AuthenticationFailedException("Sitzung abgelaufen. Bitte melden Sie sich erneut an.");
+            throw SessionExpired();
         }
 
         if (stored.ExpiresAt <= now || stored.User.IsDisabled || stored.SecurityStamp != stored.User.SecurityStamp)
         {
-            throw new AuthenticationFailedException("Sitzung abgelaufen. Bitte melden Sie sich erneut an.");
+            throw SessionExpired();
         }
 
         var result = IssueTokens(stored.User, client, stored.FamilyId, now);
@@ -221,7 +226,7 @@ public sealed class AuthService(
             ExpiresAt = now.AddMinutes(60),
         };
         db.UserTokens.Add(userToken);
-        var content = EmailTemplates.PasswordReset(user.DisplayName, _app.WebUrl($"reset-password?token={token}"), _app.ProductName);
+        var content = EmailTemplates.PasswordReset(user.DisplayName, _app.WebUrl($"reset-password?token={token}"), _app.ProductName, user.Language);
         await outbox.EnqueueAsync(new EnqueueEmail(null, null, EmailKind.PasswordReset, $"password-reset:{userToken.Id:N}:{SecureTokens.Hash(token)[..12]}", user.Email, content), ct);
         await db.SaveChangesAsync(ct);
         dispatchSignal.Notify();
@@ -230,7 +235,7 @@ public sealed class AuthService(
     public async Task ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct)
     {
         var token = await ConsumeTokenAsync(request.Token, UserTokenPurpose.PasswordReset, ct)
-            ?? throw new GoneException("Der Link ist ungültig oder abgelaufen. Bitte fordern Sie einen neuen an.");
+            ?? throw new GoneException(Loc.T("Der Link ist ungültig oder abgelaufen. Bitte fordern Sie einen neuen an.", "The link is invalid or has expired. Please request a new one."));
         var user = await db.Users.FirstAsync(u => u.Id == token.UserId, ct);
         var now = clock.GetUtcNow();
         user.PasswordHash = hasher.HashPassword(user, request.NewPassword);
@@ -247,7 +252,7 @@ public sealed class AuthService(
     public async Task VerifyEmailAsync(VerifyEmailRequest request, CancellationToken ct)
     {
         var token = await ConsumeTokenAsync(request.Token, UserTokenPurpose.EmailVerification, ct)
-            ?? throw new GoneException("Der Bestätigungslink ist ungültig oder abgelaufen.");
+            ?? throw new GoneException(Loc.T("Der Bestätigungslink ist ungültig oder abgelaufen.", "The confirmation link is invalid or has expired."));
         var user = await db.Users.FirstAsync(u => u.Id == token.UserId, ct);
         user.EmailVerifiedAt ??= clock.GetUtcNow();
         audit.Record(null, user.Id, "user.email_verified", "User", user.Id, null);
@@ -266,7 +271,9 @@ public sealed class AuthService(
         var recent = await db.UserTokens.CountAsync(t => t.UserId == userId && t.Purpose == UserTokenPurpose.EmailVerification && t.CreatedAt > now.AddHours(-1), ct);
         if (recent >= 3)
         {
-            throw new ConflictException("too_many_requests", "Bitte warten Sie etwas, bevor Sie eine weitere Bestätigungs-E-Mail anfordern.");
+            throw new ConflictException("too_many_requests", Loc.T(
+                "Bitte warten Sie etwas, bevor Sie eine weitere Bestätigungs-E-Mail anfordern.",
+                "Please wait a little before requesting another confirmation email."));
         }
 
         await QueueVerificationEmailAsync(user, ct);
@@ -282,13 +289,18 @@ public sealed class AuthService(
             .OrderBy(m => m.Company!.Name)
             .Select(m => new MembershipDto(m.CompanyId, m.Company!.Name, m.Role, m.Id, m.Company.IsDemo))
             .ToListAsync(ct);
-        return new MeDto(user.Id, user.Email, user.DisplayName, user.EmailVerifiedAt is not null, memberships);
+        return new MeDto(user.Id, user.Email, user.DisplayName, user.EmailVerifiedAt is not null, Loc.Normalize(user.Language), memberships);
     }
 
     public async Task<MeDto> UpdateProfileAsync(Guid userId, UpdateProfileRequest request, CancellationToken ct)
     {
         var user = await db.Users.FirstAsync(u => u.Id == userId, ct);
         user.DisplayName = request.DisplayName.Trim();
+        if (request.Language is not null)
+        {
+            user.Language = Loc.Normalize(request.Language);
+        }
+
         await db.SaveChangesAsync(ct);
         return await MeAsync(userId, ct);
     }
@@ -298,7 +310,7 @@ public sealed class AuthService(
         var user = await db.Users.FirstAsync(u => u.Id == userId, ct);
         if (hasher.VerifyHashedPassword(user, user.PasswordHash, request.CurrentPassword) == PasswordVerificationResult.Failed)
         {
-            throw new FluentValidation.ValidationException([new FluentValidation.Results.ValidationFailure("currentPassword", "Das aktuelle Passwort ist falsch.")]);
+            throw new FluentValidation.ValidationException([new FluentValidation.Results.ValidationFailure("currentPassword", Loc.T("Das aktuelle Passwort ist falsch.", "The current password is incorrect."))]);
         }
 
         var now = clock.GetUtcNow();
@@ -327,11 +339,13 @@ public sealed class AuthService(
         return new
         {
             ExportedAt = clock.GetUtcNow(),
-            Account = new { user.Id, user.Email, user.DisplayName, user.CreatedAt, user.EmailVerifiedAt, user.LastLoginAt },
+            Account = new { user.Id, user.Email, user.DisplayName, user.Language, user.CreatedAt, user.EmailVerifiedAt, user.LastLoginAt },
             Memberships = memberships,
             Sessions = sessions,
             Activity = auditEvents,
-            Note = "Firmendaten (Kunden, Angebote, Aufträge) exportieren Inhaber:innen über Einstellungen → Firma → Daten exportieren.",
+            Note = Loc.T(
+                "Firmendaten (Kunden, Angebote, Aufträge) exportieren Inhaber:innen über Einstellungen → Firma → Daten exportieren.",
+                "Owners export company data (customers, quotations, jobs) via Settings → Company → Export data."),
         };
     }
 
@@ -344,7 +358,7 @@ public sealed class AuthService(
         var user = await db.Users.FirstAsync(u => u.Id == userId, ct);
         if (hasher.VerifyHashedPassword(user, user.PasswordHash, password) == PasswordVerificationResult.Failed)
         {
-            throw new FluentValidation.ValidationException([new FluentValidation.Results.ValidationFailure("password", "Das Passwort ist falsch.")]);
+            throw new FluentValidation.ValidationException([new FluentValidation.Results.ValidationFailure("password", Loc.T("Das Passwort ist falsch.", "The password is incorrect."))]);
         }
 
         var ownMemberships = await db.Memberships.Where(m => m.UserId == userId).ToListAsync(ct);
@@ -359,7 +373,9 @@ public sealed class AuthService(
             }
             else if (m.Role == MembershipRole.Owner && !otherActive.Contains(MembershipRole.Owner))
             {
-                throw new ConflictException("sole_owner", "Sie sind die einzige Inhaberin bzw. der einzige Inhaber einer Firma mit weiteren Mitgliedern. Übertragen Sie zuerst die Inhaberrolle an ein anderes Mitglied.");
+                throw new ConflictException("sole_owner", Loc.T(
+                    "Sie sind die einzige Inhaberin bzw. der einzige Inhaber einer Firma mit weiteren Mitgliedern. Übertragen Sie zuerst die Inhaberrolle an ein anderes Mitglied.",
+                    "You are the only owner of a company with other members. Transfer the owner role to another member first."));
             }
         }
 
@@ -396,7 +412,7 @@ public sealed class AuthService(
             ExpiresAt = now.AddHours(48),
         };
         db.UserTokens.Add(userToken);
-        var content = EmailTemplates.EmailVerification(user.DisplayName, _app.WebUrl($"verify-email?token={token}"), _app.ProductName);
+        var content = EmailTemplates.EmailVerification(user.DisplayName, _app.WebUrl($"verify-email?token={token}"), _app.ProductName, user.Language);
         await outbox.EnqueueAsync(new EnqueueEmail(null, null, EmailKind.EmailVerification, $"verify:{userToken.TokenHash[..32]}", user.Email, content), ct);
     }
 
@@ -436,9 +452,13 @@ public sealed class AuthService(
         };
         db.RefreshTokens.Add(refresh);
         var bodyToken = client == ClientKind.Web && _auth.UseCookieTransport ? null : raw;
-        var response = new AuthResponse(access.Token, access.ExpiresAt, bodyToken, refresh.ExpiresAt, new MeDto(user.Id, user.Email, user.DisplayName, user.EmailVerifiedAt is not null, []));
+        var response = new AuthResponse(access.Token, access.ExpiresAt, bodyToken, refresh.ExpiresAt,
+            new MeDto(user.Id, user.Email, user.DisplayName, user.EmailVerifiedAt is not null, Loc.Normalize(user.Language), []));
         return new AuthResult(response, raw, refresh.ExpiresAt, refresh.Id);
     }
+
+    private static AuthenticationFailedException SessionExpired() =>
+        new(Loc.T("Sitzung abgelaufen. Bitte melden Sie sich erneut an.", "Session expired. Please sign in again."));
 
     private Task<int> RevokeFamilyAsync(Guid familyId, DateTimeOffset now, string reason, CancellationToken ct) =>
         db.RefreshTokens.Where(t => t.FamilyId == familyId && t.RevokedAt == null)

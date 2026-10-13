@@ -111,7 +111,9 @@ public sealed class Quotation : Entity, ICompanyOwned
     {
         if (Status != QuotationStatus.Draft)
         {
-            throw new DomainException("quotation_not_editable", "Nur Entwürfe können bearbeitet werden. Erstellen Sie eine Revision, um ein versendetes Angebot zu ändern.");
+            throw new DomainException("quotation_not_editable", Loc.T(
+                "Nur Entwürfe können bearbeitet werden. Erstellen Sie eine Revision, um ein versendetes Angebot zu ändern.",
+                "Only drafts can be edited. Create a revision to change a sent quotation."));
         }
     }
 
@@ -121,7 +123,9 @@ public sealed class Quotation : Entity, ICompanyOwned
         var list = items.ToList();
         if (list.Count > QuotationCalculator.MaxLineItems)
         {
-            throw new DomainException("too_many_line_items", $"Ein Angebot darf höchstens {QuotationCalculator.MaxLineItems} Positionen enthalten.");
+            throw new DomainException("too_many_line_items", Loc.T(
+                $"Ein Angebot darf höchstens {QuotationCalculator.MaxLineItems} Positionen enthalten.",
+                $"A quotation may contain at most {QuotationCalculator.MaxLineItems} line items."));
         }
 
         LineItems.Clear();
@@ -171,12 +175,12 @@ public sealed class Quotation : Entity, ICompanyOwned
         QuotationTransitions.Ensure(Status, QuotationStatus.Sent);
         if (LineItems.Count == 0)
         {
-            throw new DomainException("quotation_empty", "Ein Angebot ohne Positionen kann nicht versendet werden.");
+            throw new DomainException("quotation_empty", Loc.T("Ein Angebot ohne Positionen kann nicht versendet werden.", "A quotation without line items cannot be sent."));
         }
 
         if (ValidUntil < today)
         {
-            throw new DomainException("quotation_validity_in_past", "Das Gültigkeitsdatum liegt in der Vergangenheit.");
+            throw new DomainException("quotation_validity_in_past", Loc.T("Das Gültigkeitsdatum liegt in der Vergangenheit.", "The validity date is in the past."));
         }
 
         Status = QuotationStatus.Sent;
@@ -190,7 +194,7 @@ public sealed class Quotation : Entity, ICompanyOwned
     {
         if (actor == ActorType.Customer && Status == QuotationStatus.Sent && ValidUntil < today)
         {
-            throw new DomainException("quotation_expired", "Dieses Angebot ist abgelaufen und kann nicht mehr angenommen werden.");
+            throw new DomainException("quotation_expired", Loc.T("Dieses Angebot ist abgelaufen und kann nicht mehr angenommen werden.", "This quotation has expired and can no longer be accepted."));
         }
 
         // A user may record a late acceptance (e.g. by phone) on an expired quotation; customers may not.
@@ -326,7 +330,9 @@ public static class QuotationTransitions
         {
             throw new DomainException(
                 "invalid_status_transition",
-                $"Der Status kann nicht von „{StatusLabel(from)}“ zu „{StatusLabel(to)}“ geändert werden.");
+                Loc.T(
+                    $"Der Status kann nicht von „{StatusLabel(from)}“ zu „{StatusLabel(to)}“ geändert werden.",
+                    $"The status cannot be changed from “{EnglishStatusLabel(from)}” to “{EnglishStatusLabel(to)}”."));
         }
     }
 
@@ -338,6 +344,17 @@ public static class QuotationTransitions
         QuotationStatus.Rejected => "Abgelehnt",
         QuotationStatus.Expired => "Abgelaufen",
         QuotationStatus.Cancelled => "Storniert",
+        _ => status.ToString(),
+    };
+
+    private static string EnglishStatusLabel(QuotationStatus status) => status switch
+    {
+        QuotationStatus.Draft => "Draft",
+        QuotationStatus.Sent => "Sent",
+        QuotationStatus.Accepted => "Accepted",
+        QuotationStatus.Rejected => "Rejected",
+        QuotationStatus.Expired => "Expired",
+        QuotationStatus.Cancelled => "Cancelled",
         _ => status.ToString(),
     };
 }

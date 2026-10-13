@@ -82,7 +82,7 @@ public sealed class CustomerService(IAppDbContext db, BillingService billing, IA
         var customer = await LoadAsync(id, ct);
         if (customer.AnonymizedAt is not null)
         {
-            throw new ConflictException("customer_anonymized", "Anonymisierte Kunden können nicht bearbeitet werden.");
+            throw new ConflictException("customer_anonymized", Loc.T("Anonymisierte Kunden können nicht bearbeitet werden.", "Anonymised customers cannot be edited."));
         }
 
         if (request.RowVersion is not null)
@@ -171,7 +171,7 @@ public sealed class CustomerService(IAppDbContext db, BillingService billing, IA
     private async Task<Customer> LoadAsync(Guid id, CancellationToken ct, bool tracking = true)
     {
         var q = tracking ? db.Customers : db.Customers.AsNoTracking();
-        return await q.FirstOrDefaultAsync(c => c.Id == id, ct) ?? throw new NotFoundException("Der Kunde wurde nicht gefunden.");
+        return await q.FirstOrDefaultAsync(c => c.Id == id, ct) ?? throw new NotFoundException(Loc.T("Der Kunde wurde nicht gefunden.", "The customer was not found."));
     }
 
     private static void Apply(Customer c, UpsertCustomerRequest r, DateTimeOffset now)

@@ -130,7 +130,8 @@ public sealed class NotificationService(IAppDbContext db, TimeProvider clock)
         var total = await q.CountAsync(ct);
         var items = await q.OrderByDescending(n => n.CreatedAt).Skip((p - 1) * size).Take(size)
             .Select(n => new NotificationDto(n.Id, n.Type, n.Title, n.Body, n.EntityType, n.EntityId, n.CreatedAt, n.ReadAt != null)).ToListAsync(ct);
-        return new PagedResult<NotificationDto>(items, p, size, total);
+        // Stored in German; translated for English requests.
+        return new PagedResult<NotificationDto>(items.Select(n => n with { Title = StoredText.Localize(n.Title)!, Body = StoredText.Localize(n.Body) }).ToList(), p, size, total);
     }
 
     public Task<int> UnreadCountAsync(CurrentMember member, CancellationToken ct) =>

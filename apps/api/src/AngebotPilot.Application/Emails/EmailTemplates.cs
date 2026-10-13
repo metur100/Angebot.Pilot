@@ -11,8 +11,11 @@ namespace AngebotPilot.Application.Emails;
 public sealed record ComposedEmail(string Subject, string BodyText, string BodyHtml);
 
 /// <summary>
-/// German email templates. Every customer-facing quotation email names the sender company, the quotation
+/// Email templates. Every customer-facing quotation email names the sender company, the quotation
 /// number, a clear next step and an opt-out link for reminders. No tracking pixels are added.
+/// Emails to customers are always German; account emails to AngebotPilot users (verification, password reset,
+/// invitation, decision notification) use the recipient's language ("de"/"en"), passed explicitly because
+/// background jobs and customer requests have no culture of the recipient.
 /// </summary>
 public static class EmailTemplates
 {
@@ -21,6 +24,10 @@ public static class EmailTemplates
     public static string Eur(decimal value) => value.ToString("#,##0.00", De) + " €";
 
     public static string Date(DateOnly value) => value.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
+
+    /// <summary>Amount for an account email: German format, or "€1,234.56" in English.</summary>
+    private static string Money(decimal value, string language) =>
+        Loc.Normalize(language) == Loc.English ? "€" + value.ToString("#,##0.00", CultureInfo.InvariantCulture) : Eur(value);
 
     public static string DefaultSubject(Quotation q, string companyName) => $"Ihr Angebot {q.Number} von {companyName}";
 
@@ -114,66 +121,89 @@ public static class EmailTemplates
             signature ?? $"Mit freundlichen Grüßen\n{companyName}", companyName, null, brandColor);
     }
 
-    public static ComposedEmail DecisionNotification(Quotation q, bool accepted, string? decisionName, string? note, string detailUrl, string productName)
+    public static ComposedEmail DecisionNotification(Quotation q, bool accepted, string? decisionName, string? note, string detailUrl, string productName, string language = Loc.German)
     {
-        var verb = accepted ? "angenommen" : "abgelehnt";
+        string L(string de, string en) => Loc.For(language, de, en);
+        var verb = accepted ? L("angenommen", "accepted") : L("abgelehnt", "rejected");
         var lines = new List<string>
         {
-            $"{q.RecipientName} hat das Angebot {q.Number} „{q.Title}“ über den Kundenlink {verb}.",
-            $"Name laut Eingabe: {decisionName ?? "–"}",
-            $"Angebotssumme: {Eur(q.GrossTotal)} brutto ({Eur(q.NetTotal)} netto)",
+            L($"{q.RecipientName} hat das Angebot {q.Number} „{q.Title}“ über den Kundenlink {verb}.", $"{q.RecipientName} has {verb} quotation {q.Number} “{q.Title}” via the customer link."),
+            L($"Name laut Eingabe: {decisionName ?? "–"}", $"Name entered: {decisionName ?? "–"}"),
+            L($"Angebotssumme: {Eur(q.GrossTotal)} brutto ({Eur(q.NetTotal)} netto)", $"Quotation total: {Money(q.GrossTotal, language)} gross ({Money(q.NetTotal, language)} net)"),
         };
         if (!string.IsNullOrWhiteSpace(note))
         {
-            lines.Add($"Nachricht: {note}");
+            lines.Add(L($"Nachricht: {note}", $"Message: {note}"));
         }
 
         if (accepted)
         {
-            lines.Add("Automatische Erinnerungen wurden beendet. Sie können das Angebot jetzt in einen Auftrag umwandeln.");
+            lines.Add(L("Automatische Erinnerungen wurden beendet. Sie können das Angebot jetzt in einen Auftrag umwandeln.",
+                "Automatic reminders have been stopped. You can now convert the quotation into a job."));
         }
 
-        return Compose($"Angebot {q.Number} wurde {verb}", "Hallo,", lines, detailUrl, "Angebot öffnen", null, $"Ihr {productName}", productName, null, "#2F45D8");
+        return Compose(L($"Angebot {q.Number} wurde {verb}", $"Quotation {q.Number} was {verb}"), L("Hallo,", "Hello,"), lines, detailUrl, L("Angebot öffnen", "Open quotation"), null,
+            L($"Ihr {productName}", $"Your {productName} team"), productName, null, "#2F45D8", language);
     }
 
-    public static ComposedEmail Invitation(string companyName, string inviterName, string roleLabel, string acceptUrl, string productName) =>
-        Compose(
-            $"Einladung zu {companyName} bei {productName}",
-            "Hallo,",
-            [$"{inviterName} hat Sie eingeladen, dem Team von {companyName} bei {productName} als {roleLabel} beizutreten.", "Die Einladung ist 7 Tage gültig."],
+    /// <summary>The invitee may not have an account yet, so the inviter's language is used.</summary>
+    public static ComposedEmail Invitation(string companyName, string inviterName, MembershipRole role, string acceptUrl, string productName, string language = Loc.German)
+    {
+        string L(string de, string en) => Loc.For(language, de, en);
+        var roleLabel = role == MembershipRole.Admin ? L("Administrator:in", "administrator") : L("Mitarbeiter:in", "team member");
+        return Compose(
+            L($"Einladung zu {companyName} bei {productName}", $"Invitation to {companyName} on {productName}"),
+            L("Hallo,", "Hello,"),
+            [
+                L($"{inviterName} hat Sie eingeladen, dem Team von {companyName} bei {productName} als {roleLabel} beizutreten.",
+                    $"{inviterName} has invited you to join the {companyName} team on {productName} as {roleLabel}."),
+                L("Die Einladung ist 7 Tage gültig.", "The invitation is valid for 7 days."),
+            ],
             acceptUrl,
-            "Einladung annehmen",
-            "Falls Sie diese Einladung nicht erwartet haben, können Sie diese E-Mail ignorieren.",
-            $"Ihr {productName}",
+            L("Einladung annehmen", "Accept invitation"),
+            L("Falls Sie diese Einladung nicht erwartet haben, können Sie diese E-Mail ignorieren.", "If you were not expecting this invitation, you can ignore this email."),
+            L($"Ihr {productName}", $"Your {productName} team"),
             productName,
             null,
-            "#2F45D8");
+            "#2F45D8",
+            language);
+    }
 
-    public static ComposedEmail PasswordReset(string displayName, string resetUrl, string productName) =>
-        Compose(
-            $"Passwort zurücksetzen – {productName}",
-            $"Hallo {displayName},",
-            ["Sie haben angefordert, Ihr Passwort zurückzusetzen. Der Link ist 60 Minuten gültig und kann nur einmal verwendet werden."],
+    public static ComposedEmail PasswordReset(string displayName, string resetUrl, string productName, string language = Loc.German)
+    {
+        string L(string de, string en) => Loc.For(language, de, en);
+        return Compose(
+            L($"Passwort zurücksetzen – {productName}", $"Reset your password – {productName}"),
+            L($"Hallo {displayName},", $"Hello {displayName},"),
+            [L("Sie haben angefordert, Ihr Passwort zurückzusetzen. Der Link ist 60 Minuten gültig und kann nur einmal verwendet werden.",
+                "You asked to reset your password. The link is valid for 60 minutes and can only be used once.")],
             resetUrl,
-            "Neues Passwort festlegen",
-            "Falls Sie das nicht waren, ignorieren Sie diese E-Mail. Ihr Passwort bleibt unverändert.",
-            $"Ihr {productName}",
+            L("Neues Passwort festlegen", "Set a new password"),
+            L("Falls Sie das nicht waren, ignorieren Sie diese E-Mail. Ihr Passwort bleibt unverändert.", "If this wasn't you, please ignore this email. Your password stays unchanged."),
+            L($"Ihr {productName}", $"Your {productName} team"),
             productName,
             null,
-            "#2F45D8");
+            "#2F45D8",
+            language);
+    }
 
-    public static ComposedEmail EmailVerification(string displayName, string verifyUrl, string productName) =>
-        Compose(
-            $"Bitte bestätigen Sie Ihre E-Mail-Adresse – {productName}",
-            $"Hallo {displayName},",
-            ["willkommen bei " + productName + "! Bitte bestätigen Sie Ihre E-Mail-Adresse. Erst danach können Angebote per E-Mail an Kunden versendet werden."],
+    public static ComposedEmail EmailVerification(string displayName, string verifyUrl, string productName, string language = Loc.German)
+    {
+        string L(string de, string en) => Loc.For(language, de, en);
+        return Compose(
+            L($"Bitte bestätigen Sie Ihre E-Mail-Adresse – {productName}", $"Please confirm your email address – {productName}"),
+            L($"Hallo {displayName},", $"Hello {displayName},"),
+            [L("willkommen bei " + productName + "! Bitte bestätigen Sie Ihre E-Mail-Adresse. Erst danach können Angebote per E-Mail an Kunden versendet werden.",
+                "welcome to " + productName + "! Please confirm your email address. Only then can quotations be sent to customers by email.")],
             verifyUrl,
-            "E-Mail-Adresse bestätigen",
-            "Der Link ist 48 Stunden gültig.",
-            $"Ihr {productName}",
+            L("E-Mail-Adresse bestätigen", "Confirm email address"),
+            L("Der Link ist 48 Stunden gültig.", "The link is valid for 48 hours."),
+            L($"Ihr {productName}", $"Your {productName} team"),
             productName,
             null,
-            "#2F45D8");
+            "#2F45D8",
+            language);
+    }
 
     private static string Summary(Quotation q) =>
         $"Angebotsnummer: {q.Number}\nGesamtbetrag: {Eur(q.GrossTotal)}{(q.TaxMode == TaxMode.Standard ? " inkl. USt." : string.Empty)}\nGültig bis: {Date(q.ValidUntil)}";
@@ -189,7 +219,7 @@ public static class EmailTemplates
         return $"{source} Das Angebot ist bis zum {Date(validUntil)} gültig.";
     }
 
-    private static ComposedEmail Compose(string subject, string greeting, IEnumerable<string> paragraphs, string? actionUrl, string? actionLabel, string? afterAction, string signature, string footerName, string? optOutUrl, string brandColor)
+    private static ComposedEmail Compose(string subject, string greeting, IEnumerable<string> paragraphs, string? actionUrl, string? actionLabel, string? afterAction, string signature, string footerName, string? optOutUrl, string brandColor, string language = Loc.German)
     {
         var paragraphList = paragraphs.ToList();
         var text = new StringBuilder();
@@ -217,7 +247,7 @@ public static class EmailTemplates
 
         var color = WebUtility.HtmlEncode(brandColor);
         var html = new StringBuilder();
-        html.Append("<!DOCTYPE html><html lang=\"de\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>")
+        html.Append("<!DOCTYPE html><html lang=\"").Append(Loc.Normalize(language)).Append("\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>")
             .Append(Enc(subject)).Append("</title></head>")
             .Append("<body style=\"margin:0;padding:0;background:#F6F7F9;font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#141821;\">")
             .Append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F7F9;padding:24px 12px;\"><tr><td align=\"center\">")
@@ -235,7 +265,7 @@ public static class EmailTemplates
             html.Append("<p style=\"margin:24px 0;\"><a href=\"").Append(Enc(actionUrl))
                 .Append("\" style=\"display:inline-block;background:").Append(color)
                 .Append(";color:#FFFFFF;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:8px;\">")
-                .Append(Enc(actionLabel ?? "Öffnen")).Append("</a></p>");
+                .Append(Enc(actionLabel ?? Loc.For(language, "Öffnen", "Open"))).Append("</a></p>");
         }
 
         if (afterAction is not null)

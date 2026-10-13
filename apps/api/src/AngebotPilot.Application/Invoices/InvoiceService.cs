@@ -44,7 +44,9 @@ public sealed class InvoiceService(
     IAuditLog audit,
     TimeProvider clock)
 {
-    private const string AdminOnly = "Rechnungen stellen, versenden, Zahlungen erfassen und stornieren dürfen nur Inhaber:innen und Admins.";
+    private static string AdminOnly => Loc.T(
+        "Rechnungen stellen, versenden, Zahlungen erfassen und stornieren dürfen nur Inhaber:innen und Admins.",
+        "Only owners and admins may issue, send, record payments for and cancel invoices.");
 
     // ---------- Queries ----------
     public async Task<PagedResult<InvoiceListItemDto>> ListAsync(CurrentMember member, InvoiceListQuery query, CancellationToken ct)
@@ -91,11 +93,11 @@ public sealed class InvoiceService(
         return events.Select(e => new InvoiceEventDto(e.Id, e.Type, e.OccurredAt, e.ActorType,
             e.ActorType switch
             {
-                ActorType.Customer => "Kunde",
+                ActorType.Customer => Loc.T("Kunde", "Customer"),
                 ActorType.System => "System",
-                _ => e.ActorUserId is { } uid ? names.GetValueOrDefault(uid, "Gelöschter Benutzer") : null,
+                _ => e.ActorUserId is { } uid ? names.GetValueOrDefault(uid, Loc.T("Gelöschter Benutzer", "Deleted user")) : null,
             },
-            e.Details)).ToList();
+            StoredText.Localize(e.Details))).ToList();
     }
 
     public async Task<IReadOnlyList<EmailDeliveryDto>> DeliveriesAsync(CurrentMember member, Guid id, CancellationToken ct)
@@ -104,7 +106,7 @@ public sealed class InvoiceService(
         return await db.EmailDeliveries.AsNoTracking().Where(e => e.InvoiceId == id && e.CompanyId == member.CompanyId)
             .OrderByDescending(e => e.CreatedAt)
             .Select(e => new EmailDeliveryDto(e.Id, e.Kind, e.ToAddress, e.Subject, e.Status, e.Attempts, e.CreatedAt, e.HandedOffAt,
-                e.Status == EmailStatus.Pending || e.Status == EmailStatus.RetryScheduled ? e.NextAttemptAt : null, e.LastError))
+                e.Status == EmailStatus.Pending || e.Status == EmailStatus.RetryScheduled ? e.NextAttemptAt : null, StoredText.Localize(e.LastError)))
             .ToListAsync(ct);
     }
 
@@ -115,7 +117,7 @@ public sealed class InvoiceService(
         var customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == request.CustomerId, ct) ?? throw NotFoundCustomer();
         if (customer.ArchivedAt is not null)
         {
-            throw new ConflictException("customer_archived", "Für archivierte Kunden können keine neuen Rechnungen erstellt werden.");
+            throw new ConflictException("customer_archived", Loc.T("Für archivierte Kunden können keine neuen Rechnungen erstellt werden.", "New invoices cannot be created for archived customers."));
         }
 
         var (company, settings) = await CompanyAsync(member.CompanyId, ct);
@@ -145,9 +147,9 @@ public sealed class InvoiceService(
     public async Task<InvoiceDto> CreateFromJobAsync(CurrentMember member, Guid jobId, CancellationToken ct)
     {
         await billing.EnsureWritableAsync(member.CompanyId, ct);
-        var job = await db.Jobs.FirstOrDefaultAsync(j => j.Id == jobId, ct) ?? throw new NotFoundException("Der Auftrag wurde nicht gefunden.");
+        var job = await db.Jobs.FirstOrDefaultAsync(j => j.Id == jobId, ct) ?? throw new NotFoundException(Loc.T("Der Auftrag wurde nicht gefunden.", "The job was not found."));
         var quotation = await db.Quotations.Include(q => q.LineItems).FirstOrDefaultAsync(q => q.Id == job.QuotationId, ct)
-            ?? throw new NotFoundException("Das Angebot zum Auftrag wurde nicht gefunden.");
+            ?? throw new NotFoundException(Loc.T("Das Angebot zum Auftrag wurde nicht gefunden.", "The quotation of this job was not found."));
         var (company, _) = await CompanyAsync(member.CompanyId, ct);
         var serviceDate = job.CompletedAt is { } completed ? CompanyTime.Today(completed, company.TimeZone) : (DateOnly?)null;
         var invoice = await FromQuotationAsync(member, quotation, job.Title, serviceDate, ct);
@@ -164,10 +166,10 @@ public sealed class InvoiceService(
     {
         await billing.EnsureWritableAsync(member.CompanyId, ct);
         var quotation = await db.Quotations.Include(q => q.LineItems).FirstOrDefaultAsync(q => q.Id == quotationId, ct)
-            ?? throw new NotFoundException("Das Angebot wurde nicht gefunden.");
+            ?? throw new NotFoundException(Loc.T("Das Angebot wurde nicht gefunden.", "The quotation was not found."));
         if (quotation.Status != QuotationStatus.Accepted)
         {
-            throw new ConflictException("quotation_not_accepted", "Nur angenommene Angebote können abgerechnet werden.");
+            throw new ConflictException("quotation_not_accepted", Loc.T("Nur angenommene Angebote können abgerechnet werden.", "Only accepted quotations can be invoiced."));
         }
 
         var job = await db.Jobs.AsNoTracking().Where(j => j.QuotationId == quotation.Id).Select(j => new { j.Id, j.Number }).FirstOrDefaultAsync(ct);
@@ -215,7 +217,9 @@ public sealed class InvoiceService(
         var invoice = await LoadAsync(id, ct);
         if (!invoice.IsDraft)
         {
-            throw new ConflictException("invoice_not_deletable", "Gestellte Rechnungen können nicht gelöscht werden. Stornieren Sie die Rechnung stattdessen.");
+            throw new ConflictException("invoice_not_deletable", Loc.T(
+                "Gestellte Rechnungen können nicht gelöscht werden. Stornieren Sie die Rechnung stattdessen.",
+                "Issued invoices cannot be deleted. Cancel the invoice instead."));
         }
 
         invoice.DeletedAt = clock.GetUtcNow();
@@ -229,7 +233,7 @@ public sealed class InvoiceService(
         var source = await LoadAsync(id, ct);
         if (source.IsCancellation)
         {
-            throw new ConflictException("invoice_not_duplicable", "Stornorechnungen können nicht kopiert werden.");
+            throw new ConflictException("invoice_not_duplicable", Loc.T("Stornorechnungen können nicht kopiert werden.", "Cancellation invoices cannot be copied."));
         }
 
         var customer = await db.Customers.FirstAsync(c => c.Id == source.CustomerId, ct);
@@ -287,7 +291,7 @@ public sealed class InvoiceService(
         var problems = InvoiceDocuments.CompanyProblems(company, invoice.TaxMode).Concat(invoice.IssueProblems(today)).ToList();
         if (problems.Count > 0)
         {
-            throw new ConflictException("invoice_incomplete", "Die Rechnung kann noch nicht gestellt werden: " + string.Join(" ", problems));
+            throw new ConflictException("invoice_incomplete", Loc.T("Die Rechnung kann noch nicht gestellt werden: ", "The invoice cannot be issued yet: ") + string.Join(" ", problems));
         }
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -344,7 +348,7 @@ public sealed class InvoiceService(
         var now = clock.GetUtcNow();
         if (request.PaidOn > await TodayAsync(member.CompanyId, ct))
         {
-            throw new ValidationException([new ValidationFailure("paidOn", "Das Zahlungsdatum darf nicht in der Zukunft liegen.")]);
+            throw new ValidationException([new ValidationFailure("paidOn", Loc.T("Das Zahlungsdatum darf nicht in der Zukunft liegen.", "The payment date must not be in the future."))]);
         }
 
         var payment = new InvoicePayment
@@ -377,7 +381,7 @@ public sealed class InvoiceService(
         member.Require(MembershipRole.Admin, AdminOnly);
         await billing.EnsureWritableAsync(member.CompanyId, ct);
         var invoice = await LoadAsync(id, ct);
-        var payment = invoice.Payments.FirstOrDefault(p => p.Id == paymentId) ?? throw new NotFoundException("Die Zahlung wurde nicht gefunden.");
+        var payment = invoice.Payments.FirstOrDefault(p => p.Id == paymentId) ?? throw new NotFoundException(Loc.T("Die Zahlung wurde nicht gefunden.", "The payment was not found."));
         var now = clock.GetUtcNow();
         invoice.RemovePayment(payment, now);
         db.InvoicePayments.Remove(payment);
@@ -394,7 +398,7 @@ public sealed class InvoiceService(
         var invoice = await LoadAsync(id, ct);
         if (!invoice.IsOpen)
         {
-            throw new ConflictException("invoice_not_open", "Zahlungserinnerungen sind nur für offene Rechnungen möglich.");
+            throw new ConflictException("invoice_not_open", Loc.T("Zahlungserinnerungen sind nur für offene Rechnungen möglich.", "Payment reminders are only possible for open invoices."));
         }
 
         var (company, settings) = await CompanyAsync(member.CompanyId, ct);
@@ -425,8 +429,8 @@ public sealed class InvoiceService(
         if (original.IsCancellation || original.Status is InvoiceStatus.Draft or InvoiceStatus.Cancelled)
         {
             throw new ConflictException("invoice_not_cancellable", original.IsDraft
-                ? "Entwürfe werden gelöscht, nicht storniert."
-                : "Diese Rechnung kann nicht storniert werden.");
+                ? Loc.T("Entwürfe werden gelöscht, nicht storniert.", "Drafts are deleted, not cancelled.")
+                : Loc.T("Diese Rechnung kann nicht storniert werden.", "This invoice cannot be cancelled."));
         }
 
         var (company, settings) = await CompanyAsync(member.CompanyId, ct);
@@ -494,7 +498,7 @@ public sealed class InvoiceService(
 
         if (!invoice.IsDraft)
         {
-            throw new ConflictException("document_missing", "Das gespeicherte PDF dieser Rechnung ist nicht verfügbar.");
+            throw new ConflictException("document_missing", Loc.T("Das gespeicherte PDF dieser Rechnung ist nicht verfügbar.", "The stored PDF of this invoice is not available."));
         }
 
         // Drafts are rendered on demand with an "ENTWURF" watermark and without a number.
@@ -506,11 +510,11 @@ public sealed class InvoiceService(
         var invoice = await db.Invoices.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw NotFound();
         if (invoice.XmlFileId is not { } fileId)
         {
-            throw new ConflictException("einvoice_unavailable", "Die E-Rechnung wird erst beim Stellen der Rechnung erzeugt.");
+            throw new ConflictException("einvoice_unavailable", Loc.T("Die E-Rechnung wird erst beim Stellen der Rechnung erzeugt.", "The e-invoice is only created when the invoice is issued."));
         }
 
         var xml = await files.ReadAllAsync(member.CompanyId, fileId, ct)
-            ?? throw new ConflictException("document_missing", "Die gespeicherte E-Rechnung ist nicht verfügbar.");
+            ?? throw new ConflictException("document_missing", Loc.T("Die gespeicherte E-Rechnung ist nicht verfügbar.", "The stored e-invoice is not available."));
         return (xml, InvoiceDocuments.XmlFileName(invoice));
     }
 
@@ -683,7 +687,9 @@ public sealed class InvoiceService(
         var sender = await db.Users.AsNoTracking().FirstAsync(u => u.Id == member.UserId, ct);
         if (sender.EmailVerifiedAt is null)
         {
-            throw new ConflictException("email_not_verified", "Bitte bestätigen Sie zuerst Ihre E-Mail-Adresse. Erst danach können Rechnungen per E-Mail versendet werden.");
+            throw new ConflictException("email_not_verified", Loc.T(
+                "Bitte bestätigen Sie zuerst Ihre E-Mail-Adresse. Erst danach können Rechnungen per E-Mail versendet werden.",
+                "Please confirm your email address first. Only then can invoices be sent by email."));
         }
 
         return sender.Email;
@@ -691,7 +697,7 @@ public sealed class InvoiceService(
 
     private static string RecipientOrThrow(string? requested, Invoice invoice) =>
         Text.Clean(requested) ?? invoice.RecipientEmail
-        ?? throw new ValidationException([new ValidationFailure("recipientEmail", "Für diesen Kunden ist keine E-Mail-Adresse hinterlegt.")]);
+        ?? throw new ValidationException([new ValidationFailure("recipientEmail", Loc.T("Für diesen Kunden ist keine E-Mail-Adresse hinterlegt.", "There is no email address on file for this customer."))]);
 
     private static void CopyRecipient(Invoice from, Invoice to)
     {
@@ -797,7 +803,7 @@ public sealed class InvoiceService(
             i.Payments.OrderBy(p => p.PaidOn).ThenBy(p => p.CreatedAt)
                 .Select(p => new InvoicePaymentDto(p.Id, p.Amount, p.PaidOn, p.Method, p.Note, p.CreatedAt, names.GetValueOrDefault(p.CreatedByUserId))).ToList(),
             i.QuotationId, i.QuotationNumber, i.JobId, i.JobNumber, i.CancelledInvoiceId, i.CancelledInvoiceNumber, i.CancellationInvoiceId, cancellationNumber,
-            i.CreatedAt, i.UpdatedAt, i.IssuedAt, i.SentAt, i.CancelledAt, i.CancellationReason, i.LastReminderAt, i.ReminderCount,
+            i.CreatedAt, i.UpdatedAt, i.IssuedAt, i.SentAt, i.CancelledAt, StoredText.Localize(i.CancellationReason), i.LastReminderAt, i.ReminderCount,
             i.XmlFileId is not null, problems, AllowedActions(i, member.Role), RowVersions.Encode(i.RowVersion));
     }
 
@@ -824,7 +830,7 @@ public sealed class InvoiceService(
         return (company, company.Settings!);
     }
 
-    private static NotFoundException NotFound() => new("Die Rechnung wurde nicht gefunden.");
+    private static NotFoundException NotFound() => new(Loc.T("Die Rechnung wurde nicht gefunden.", "The invoice was not found."));
 
-    private static NotFoundException NotFoundCustomer() => new("Der Kunde wurde nicht gefunden.");
+    private static NotFoundException NotFoundCustomer() => new(Loc.T("Der Kunde wurde nicht gefunden.", "The customer was not found."));
 }

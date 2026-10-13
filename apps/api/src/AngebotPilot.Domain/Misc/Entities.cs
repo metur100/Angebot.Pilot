@@ -132,7 +132,7 @@ namespace AngebotPilot.Domain.Jobs
 
             if (!CanTransition(Status, target))
             {
-                throw new DomainException("invalid_status_transition", "Dieser Statuswechsel ist für Aufträge nicht möglich.");
+                throw new DomainException("invalid_status_transition", Loc.T("Dieser Statuswechsel ist für Aufträge nicht möglich.", "This status change is not possible for jobs."));
             }
 
             Status = target;

@@ -161,7 +161,9 @@ public sealed class Invoice : Entity, ICompanyOwned
     {
         if (Status != InvoiceStatus.Draft)
         {
-            throw new DomainException("invoice_not_editable", "Gestellte Rechnungen können nicht mehr geändert werden. Stornieren Sie die Rechnung und erstellen Sie eine neue.");
+            throw new DomainException("invoice_not_editable", Loc.T(
+                "Gestellte Rechnungen können nicht mehr geändert werden. Stornieren Sie die Rechnung und erstellen Sie eine neue.",
+                "Issued invoices can no longer be changed. Cancel the invoice and create a new one."));
         }
     }
 
@@ -171,7 +173,9 @@ public sealed class Invoice : Entity, ICompanyOwned
         var list = items.ToList();
         if (list.Count > QuotationCalculator.MaxLineItems)
         {
-            throw new DomainException("too_many_line_items", $"Eine Rechnung darf höchstens {QuotationCalculator.MaxLineItems} Positionen enthalten.");
+            throw new DomainException("too_many_line_items", Loc.T(
+                $"Eine Rechnung darf höchstens {QuotationCalculator.MaxLineItems} Positionen enthalten.",
+                $"An invoice may contain at most {QuotationCalculator.MaxLineItems} line items."));
         }
 
         LineItems.Clear();
@@ -207,46 +211,48 @@ public sealed class Invoice : Entity, ICompanyOwned
         LineItems.Select(i => new LineInput(i.Quantity, i.UnitPriceNet, i.DiscountPercent, i.TaxRatePercent)),
         TaxMode);
 
-    /// <summary>Checks the document-level requirements for issuing (§ 14 UStG) and returns German messages for every gap.</summary>
+    /// <summary>Checks the document-level requirements for issuing (§ 14 UStG) and returns a message (request language) for every gap.</summary>
     public IReadOnlyList<string> IssueProblems(DateOnly today)
     {
         var problems = new List<string>();
         if (LineItems.Count == 0)
         {
-            problems.Add("Die Rechnung enthält keine Positionen.");
+            problems.Add(Loc.T("Die Rechnung enthält keine Positionen.", "The invoice has no line items."));
         }
         else if (Kind == InvoiceKind.Invoice && NetTotal <= 0)
         {
-            problems.Add("Der Rechnungsbetrag muss größer als 0 € sein.");
+            problems.Add(Loc.T("Der Rechnungsbetrag muss größer als 0 € sein.", "The invoice amount must be greater than €0."));
         }
 
         if (ServiceDateFrom is null)
         {
-            problems.Add("Bitte das Leistungsdatum bzw. den Leistungszeitraum angeben (§ 14 UStG).");
+            problems.Add(Loc.T("Bitte das Leistungsdatum bzw. den Leistungszeitraum angeben (§ 14 UStG).", "Please enter the service date or service period (§ 14 UStG)."));
         }
         else if (ServiceDateTo is { } to && to < ServiceDateFrom)
         {
-            problems.Add("Das Ende des Leistungszeitraums liegt vor dem Beginn.");
+            problems.Add(Loc.T("Das Ende des Leistungszeitraums liegt vor dem Beginn.", "The end of the service period is before its start."));
         }
 
         if (IssueDate > today)
         {
-            problems.Add("Das Rechnungsdatum darf nicht in der Zukunft liegen.");
+            problems.Add(Loc.T("Das Rechnungsdatum darf nicht in der Zukunft liegen.", "The invoice date must not be in the future."));
         }
 
         if (DueDate < IssueDate)
         {
-            problems.Add("Das Fälligkeitsdatum darf nicht vor dem Rechnungsdatum liegen.");
+            problems.Add(Loc.T("Das Fälligkeitsdatum darf nicht vor dem Rechnungsdatum liegen.", "The due date must not be before the invoice date."));
         }
 
         if (string.IsNullOrWhiteSpace(RecipientName) || string.IsNullOrWhiteSpace(RecipientStreet) || string.IsNullOrWhiteSpace(RecipientCity))
         {
-            problems.Add("Beim Kunden fehlen Name oder vollständige Rechnungsanschrift (Straße, PLZ, Ort).");
+            problems.Add(Loc.T("Beim Kunden fehlen Name oder vollständige Rechnungsanschrift (Straße, PLZ, Ort).", "The customer's name or full billing address (street, postal code, city) is missing."));
         }
 
         if (TaxMode == TaxMode.ReverseCharge && string.IsNullOrWhiteSpace(RecipientVatId))
         {
-            problems.Add("Für die Steuerschuldnerschaft des Leistungsempfängers (§ 13b UStG) ist die USt-IdNr. des Kunden erforderlich.");
+            problems.Add(Loc.T(
+                "Für die Steuerschuldnerschaft des Leistungsempfängers (§ 13b UStG) ist die USt-IdNr. des Kunden erforderlich.",
+                "The reverse charge procedure (§ 13b UStG) requires the customer's VAT ID."));
         }
 
         return problems;
@@ -273,7 +279,9 @@ public sealed class Invoice : Entity, ICompanyOwned
     {
         if (Status == InvoiceStatus.Draft)
         {
-            throw new DomainException("invoice_not_issued", "Bitte stellen Sie die Rechnung zuerst (Rechnungsnummer vergeben), bevor Sie sie versenden.");
+            throw new DomainException("invoice_not_issued", Loc.T(
+                "Bitte stellen Sie die Rechnung zuerst (Rechnungsnummer vergeben), bevor Sie sie versenden.",
+                "Please issue the invoice first (this assigns the invoice number) before sending it."));
         }
 
         SentAt ??= now;
@@ -285,18 +293,20 @@ public sealed class Invoice : Entity, ICompanyOwned
         if (!IsOpen)
         {
             throw new DomainException("invoice_not_payable", Status == InvoiceStatus.Paid
-                ? "Diese Rechnung ist bereits vollständig bezahlt."
-                : "Zahlungen können nur für gestellte, offene Rechnungen erfasst werden.");
+                ? Loc.T("Diese Rechnung ist bereits vollständig bezahlt.", "This invoice has already been paid in full.")
+                : Loc.T("Zahlungen können nur für gestellte, offene Rechnungen erfasst werden.", "Payments can only be recorded for issued, open invoices."));
         }
 
         if (payment.Amount <= 0)
         {
-            throw new DomainException("invalid_payment_amount", "Der Zahlbetrag muss größer als 0 € sein.");
+            throw new DomainException("invalid_payment_amount", Loc.T("Der Zahlbetrag muss größer als 0 € sein.", "The payment amount must be greater than €0."));
         }
 
         if (payment.Amount > OpenAmount)
         {
-            throw new DomainException("payment_exceeds_open_amount", $"Der Betrag übersteigt den offenen Betrag von {OpenAmount.ToString("#,##0.00", CultureInfo.GetCultureInfo("de-DE"))} €.");
+            throw new DomainException("payment_exceeds_open_amount", Loc.T(
+                $"Der Betrag übersteigt den offenen Betrag von {OpenAmount.ToString("#,##0.00", CultureInfo.GetCultureInfo("de-DE"))} €.",
+                $"The amount exceeds the open amount of €{OpenAmount.ToString("#,##0.00", CultureInfo.InvariantCulture)}."));
         }
 
         payment.CompanyId = CompanyId;
@@ -309,7 +319,7 @@ public sealed class Invoice : Entity, ICompanyOwned
     {
         if (Status is not (InvoiceStatus.PartiallyPaid or InvoiceStatus.Paid))
         {
-            throw new DomainException("payment_not_removable", "Zahlungen stornierter Rechnungen können nicht mehr geändert werden.");
+            throw new DomainException("payment_not_removable", Loc.T("Zahlungen stornierter Rechnungen können nicht mehr geändert werden.", "Payments of cancelled invoices can no longer be changed."));
         }
 
         Payments.Remove(payment);
@@ -322,8 +332,8 @@ public sealed class Invoice : Entity, ICompanyOwned
         if (Kind != InvoiceKind.Invoice || Status is InvoiceStatus.Draft or InvoiceStatus.Cancelled)
         {
             throw new DomainException("invoice_not_cancellable", Status == InvoiceStatus.Draft
-                ? "Entwürfe werden gelöscht, nicht storniert."
-                : "Diese Rechnung kann nicht storniert werden.");
+                ? Loc.T("Entwürfe werden gelöscht, nicht storniert.", "Drafts are deleted, not cancelled.")
+                : Loc.T("Diese Rechnung kann nicht storniert werden.", "This invoice cannot be cancelled."));
         }
 
         Status = InvoiceStatus.Cancelled;
@@ -337,7 +347,7 @@ public sealed class Invoice : Entity, ICompanyOwned
     {
         if (!IsOpen)
         {
-            throw new DomainException("invoice_not_open", "Zahlungserinnerungen sind nur für offene Rechnungen möglich.");
+            throw new DomainException("invoice_not_open", Loc.T("Zahlungserinnerungen sind nur für offene Rechnungen möglich.", "Payment reminders are only possible for open invoices."));
         }
 
         ReminderCount++;

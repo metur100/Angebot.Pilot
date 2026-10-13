@@ -13,7 +13,7 @@ public interface ICompanyOwned
 
 /// <summary>
 /// A business rule violation. The <see cref="Code"/> is a stable machine-readable identifier
-/// returned to clients; the message is German end-user text.
+/// returned to clients; the message is end-user text in the request language (see <see cref="Loc"/>).
 /// </summary>
 public sealed class DomainException : Exception
 {
@@ -22,7 +22,7 @@ public sealed class DomainException : Exception
         Code = code;
     }
 
-    public DomainException() : this("domain_error", "Die Aktion ist nicht zulässig.")
+    public DomainException() : this("domain_error", Loc.T("Die Aktion ist nicht zulässig.", "This action is not allowed."))
     {
     }
 

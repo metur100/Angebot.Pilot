@@ -1,7 +1,8 @@
 # AngebotPilot – Database
 
 SQL Server via EF Core 10 (`apps/api/src/AngebotPilot.Infrastructure/Persistence/AppDbContext.cs`). Schema created by
-the single migration `20261012202456_InitialCreate` (`Persistence/Migrations`). Production: MonsterASP MS SQL
+the migrations `20261012202456_InitialCreate`, `20261013131600_AddInvoices` and `20261013182901_AddUserLanguage`
+(`Persistence/Migrations`). Production: MonsterASP MS SQL
 (SQL Server 2025 Express per the hosting plan); development: SQL Server LocalDB or the Docker image in
 `docker-compose.yml`; CI: `mcr.microsoft.com/mssql/server:2022-latest`.
 
@@ -30,7 +31,7 @@ Related: [ARCHITECTURE.md](ARCHITECTURE.md) · [Backup & restore](../deployment/
 
 | Table | Key columns | Indexes / constraints | Relationships / delete behaviour |
 |---|---|---|---|
-| **Users** | `Email` (254), `NormalizedEmail` (254, upper-invariant), `DisplayName` (100), `PasswordHash` (500), `EmailVerifiedAt`, `FailedLoginCount`, `LockedUntil`, `SecurityStamp`, `IsDisabled`, `CreatedAt`, `LastLoginAt` | unique `IX_Users_NormalizedEmail` | – |
+| **Users** | `Email` (254), `NormalizedEmail` (254, upper-invariant), `DisplayName` (100), `PasswordHash` (500), `EmailVerifiedAt`, `FailedLoginCount`, `LockedUntil`, `SecurityStamp`, `IsDisabled`, `Language` (nvarchar(2), `de`/`en`, default `de`; UI and account-email language), `CreatedAt`, `LastLoginAt` | unique `IX_Users_NormalizedEmail` | – |
 | **RefreshTokens** | `UserId`, `TokenHash` (char(64), SHA-256 hex), `FamilyId`, `Client`, `CreatedAt`, `ExpiresAt`, `RevokedAt`, `RevokedReason` (50), `ReplacedByTokenId`, `SecurityStamp` | unique `TokenHash`; `UserId`; `FamilyId` | → Users **cascade** |
 | **UserTokens** | `UserId`, `Purpose` (EmailVerification/PasswordReset), `TokenHash` (char(64)), `CreatedAt`, `ExpiresAt`, `UsedAt` | unique `TokenHash`; `(UserId, Purpose, CreatedAt)` | → Users **cascade** |
 

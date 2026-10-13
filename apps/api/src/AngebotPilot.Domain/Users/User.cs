@@ -29,6 +29,9 @@ public sealed class User : Entity
 
     public bool IsDisabled { get; set; }
 
+    /// <summary>UI language preference ("de" or "en"); also the language of account emails and notifications.</summary>
+    public string Language { get; set; } = Loc.German;
+
     public static string Normalize(string email) => email.Trim().ToUpperInvariant();
 }
 

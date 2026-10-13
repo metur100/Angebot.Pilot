@@ -1,10 +1,12 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Security.Claims;
 using System.Text;
 using AngebotPilot.Application.Abstractions;
 using AngebotPilot.Application.Auth;
 using AngebotPilot.Application.Common;
 using AngebotPilot.Application.Companies;
+using AngebotPilot.Domain;
 using AngebotPilot.Domain.Common;
 using AngebotPilot.Domain.Users;
 using FluentValidation;
@@ -15,6 +17,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Net.Http.Headers;
 
 namespace AngebotPilot.Api.Infrastructure;
 
@@ -113,7 +116,7 @@ public sealed class ValidationFilter<T> : IEndpointFilter
         var argument = context.Arguments.OfType<T>().FirstOrDefault();
         if (argument is null)
         {
-            throw new ValidationException([new FluentValidation.Results.ValidationFailure("body", "Die Anfrage enthält keine gültigen Daten.")]);
+            throw new ValidationException([new FluentValidation.Results.ValidationFailure("body", Loc.T("Die Anfrage enthält keine gültigen Daten.", "The request contains no valid data."))]);
         }
 
         var validator = context.HttpContext.RequestServices.GetService<IValidator<T>>();
@@ -144,21 +147,25 @@ public sealed class ProblemExceptionHandler(ILogger<ProblemExceptionHandler> log
         var http = httpContext;
         var (status, code, title, detail, errors) = exception switch
         {
-            ValidationException v => (400, "validation_failed", "Ungültige Eingaben", "Bitte prüfen Sie die markierten Felder.", ToErrors(v)),
-            BadHttpRequestException => (400, "bad_request", "Ungültige Anfrage", "Die Anfrage konnte nicht gelesen werden.", null),
-            AuthenticationFailedException a => (401, "invalid_credentials", "Anmeldung fehlgeschlagen", a.Message, null),
-            UnauthorizedAccessException => (401, "unauthorized", "Nicht angemeldet", "Bitte melden Sie sich an.", null),
-            EntitlementException e => (402, e.Code, "Tarifgrenze erreicht", e.Message, null),
-            ForbiddenException f => (403, "forbidden", "Keine Berechtigung", f.Message, null),
-            NotFoundException n => (404, "not_found", "Nicht gefunden", n.Message, null),
-            ConflictException c => (c.Code == "too_many_requests" ? 429 : 409, c.Code, "Konflikt", c.Message, null),
-            DomainException d => (409, d.Code, "Aktion nicht möglich", d.Message, null),
-            DbUpdateConcurrencyException => (409, "concurrency_conflict", "Bearbeitungskonflikt", "Der Datensatz wurde zwischenzeitlich geändert. Bitte laden Sie ihn neu.", null),
-            DbUpdateException { InnerException: SqlException { Number: 2601 or 2627 } } => (409, "duplicate", "Konflikt", "Der Eintrag existiert bereits oder wurde gleichzeitig angelegt.", null),
-            SqlException { Number: 1205 } or DbUpdateException { InnerException: SqlException { Number: 1205 } } => (409, "concurrency_conflict", "Bearbeitungskonflikt", "Die Aktion kollidierte mit einer gleichzeitigen Änderung. Bitte versuchen Sie es erneut.", null),
-            GoneException g => (410, "gone", "Nicht mehr verfügbar", g.Message, null),
-            OperationCanceledException when http.RequestAborted.IsCancellationRequested => (499, "cancelled", "Abgebrochen", null, null),
-            _ => (500, "internal_error", "Serverfehler", "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.", (Dictionary<string, string[]>?)null),
+            ValidationException v => (400, "validation_failed", Loc.T("Ungültige Eingaben", "Invalid input"), Loc.T("Bitte prüfen Sie die markierten Felder.", "Please check the highlighted fields."), ToErrors(v)),
+            BadHttpRequestException => (400, "bad_request", Loc.T("Ungültige Anfrage", "Invalid request"), Loc.T("Die Anfrage konnte nicht gelesen werden.", "The request could not be read."), null),
+            AuthenticationFailedException a => (401, "invalid_credentials", Loc.T("Anmeldung fehlgeschlagen", "Sign-in failed"), a.Message, null),
+            UnauthorizedAccessException => (401, "unauthorized", Loc.T("Nicht angemeldet", "Not signed in"), Loc.T("Bitte melden Sie sich an.", "Please sign in."), null),
+            EntitlementException e => (402, e.Code, Loc.T("Tarifgrenze erreicht", "Plan limit reached"), e.Message, null),
+            ForbiddenException f => (403, "forbidden", Loc.T("Keine Berechtigung", "No permission"), f.Message, null),
+            NotFoundException n => (404, "not_found", Loc.T("Nicht gefunden", "Not found"), n.Message, null),
+            ConflictException c => (c.Code == "too_many_requests" ? 429 : 409, c.Code, Loc.T("Konflikt", "Conflict"), c.Message, null),
+            DomainException d => (409, d.Code, Loc.T("Aktion nicht möglich", "Action not possible"), d.Message, null),
+            DbUpdateConcurrencyException => (409, "concurrency_conflict", Loc.T("Bearbeitungskonflikt", "Edit conflict"),
+                Loc.T("Der Datensatz wurde zwischenzeitlich geändert. Bitte laden Sie ihn neu.", "The record was changed in the meantime. Please reload it."), null),
+            DbUpdateException { InnerException: SqlException { Number: 2601 or 2627 } } => (409, "duplicate", Loc.T("Konflikt", "Conflict"),
+                Loc.T("Der Eintrag existiert bereits oder wurde gleichzeitig angelegt.", "The entry already exists or was created at the same time."), null),
+            SqlException { Number: 1205 } or DbUpdateException { InnerException: SqlException { Number: 1205 } } => (409, "concurrency_conflict", Loc.T("Bearbeitungskonflikt", "Edit conflict"),
+                Loc.T("Die Aktion kollidierte mit einer gleichzeitigen Änderung. Bitte versuchen Sie es erneut.", "The action collided with a simultaneous change. Please try again."), null),
+            GoneException g => (410, "gone", Loc.T("Nicht mehr verfügbar", "No longer available"), g.Message, null),
+            OperationCanceledException when http.RequestAborted.IsCancellationRequested => (499, "cancelled", Loc.T("Abgebrochen", "Cancelled"), null, null),
+            _ => (500, "internal_error", Loc.T("Serverfehler", "Server error"),
+                Loc.T("Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.", "An unexpected error occurred. Please try again later."), (Dictionary<string, string[]>?)null),
         };
 
         if (status == 500)
@@ -191,6 +198,35 @@ public sealed class ProblemExceptionHandler(ILogger<ProblemExceptionHandler> log
     /// <summary>"LineItems[0].UnitPriceNet" → "lineItems[0].unitPriceNet".</summary>
     public static string CamelPath(string path) =>
         string.Join('.', path.Split('.').Select(segment => segment.Length == 0 ? segment : char.ToLowerInvariant(segment[0]) + segment[1..]));
+}
+
+/// <summary>
+/// Selects the language of user-facing messages from Accept-Language: English when the client prefers it, otherwise
+/// German. Only the UI culture is set; the formatting culture stays untouched, so documents (PDF, e-invoice, CSV,
+/// customer emails) are byte-for-byte the same in both languages. Registered before the exception handler so error
+/// responses are localized too.
+/// </summary>
+public sealed class RequestLanguageMiddleware(RequestDelegate next)
+{
+    public Task InvokeAsync(HttpContext http)
+    {
+        var language = FromAcceptLanguage(http.Request.GetTypedHeaders().AcceptLanguage);
+        CultureInfo.CurrentUICulture = Loc.Culture(language);
+        // Set when the response starts: the exception handler clears headers set earlier.
+        http.Response.OnStarting(() =>
+        {
+            http.Response.Headers.ContentLanguage = language;
+            return Task.CompletedTask;
+        });
+        return next(http);
+    }
+
+    /// <summary>First supported language by quality ("en-GB;q=0.9, de;q=0.8" → "en"); German when none is supported.</summary>
+    public static string FromAcceptLanguage(IEnumerable<StringWithQualityHeaderValue> values) =>
+        values.Where(v => v.Quality is null or > 0)
+            .OrderByDescending(v => v.Quality ?? 1)
+            .Select(v => v.Value.Value?.Split('-')[0].ToLowerInvariant())
+            .FirstOrDefault(Loc.IsSupported) ?? Loc.German;
 }
 
 /// <summary>Adds conservative security headers to every API response.</summary>

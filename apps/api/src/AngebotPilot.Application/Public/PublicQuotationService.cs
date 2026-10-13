@@ -73,16 +73,18 @@ public sealed class PublicQuotationService(
         if (await ExpireIfDueAsync(q, now, today, ct))
         {
             await db.SaveChangesAsync(ct);
-            throw new ConflictException("quotation_expired", "Dieses Angebot ist abgelaufen und kann nicht mehr angenommen werden. Bitte wenden Sie sich an den Anbieter.");
+            throw new ConflictException("quotation_expired", Loc.T(
+                "Dieses Angebot ist abgelaufen und kann nicht mehr angenommen werden. Bitte wenden Sie sich an den Anbieter.",
+                "This quotation has expired and can no longer be accepted. Please contact the provider."));
         }
 
         if (q.Status != QuotationStatus.Sent)
         {
             throw new ConflictException("already_decided", q.Status switch
             {
-                QuotationStatus.Accepted => "Dieses Angebot wurde bereits angenommen.",
-                QuotationStatus.Rejected => "Dieses Angebot wurde bereits abgelehnt.",
-                _ => "Zu diesem Angebot ist keine Entscheidung mehr möglich.",
+                QuotationStatus.Accepted => Loc.T("Dieses Angebot wurde bereits angenommen.", "This quotation has already been accepted."),
+                QuotationStatus.Rejected => Loc.T("Dieses Angebot wurde bereits abgelehnt.", "This quotation has already been rejected."),
+                _ => Loc.T("Zu diesem Angebot ist keine Entscheidung mehr möglich.", "A decision is no longer possible for this quotation."),
             });
         }
 
@@ -112,11 +114,12 @@ public sealed class PublicQuotationService(
 
         if (company.Settings!.NotifyOnCustomerDecision && q.SentByUserId is { } senderId)
         {
-            var senderEmail = await db.Users.Where(u => u.Id == senderId).Select(u => u.Email).FirstOrDefaultAsync(ct);
-            if (senderEmail is not null)
+            // The sender's language, not the customer's request language.
+            var sender = await db.Users.Where(u => u.Id == senderId).Select(u => new { u.Email, u.Language }).FirstOrDefaultAsync(ct);
+            if (sender is not null)
             {
-                var content = EmailTemplates.DecisionNotification(q, accept, name, cleanNote, _app.WebUrl($"angebote/{q.Id}"), _app.ProductName);
-                await outbox.EnqueueAsync(new EnqueueEmail(q.CompanyId, q.Id, EmailKind.DecisionNotification, $"decision:{q.Id:N}", senderEmail, content), ct);
+                var content = EmailTemplates.DecisionNotification(q, accept, name, cleanNote, _app.WebUrl($"angebote/{q.Id}"), _app.ProductName, sender.Language);
+                await outbox.EnqueueAsync(new EnqueueEmail(q.CompanyId, q.Id, EmailKind.DecisionNotification, $"decision:{q.Id:N}", sender.Email, content), ct);
             }
         }
 
@@ -128,7 +131,7 @@ public sealed class PublicQuotationService(
         catch (DbUpdateException)
         {
             // Two decisions raced (row version or the notification's idempotency key); the first one wins.
-            throw new ConflictException("already_decided", "Zu diesem Angebot wurde soeben bereits eine Entscheidung erfasst.");
+            throw new ConflictException("already_decided", Loc.T("Zu diesem Angebot wurde soeben bereits eine Entscheidung erfasst.", "A decision has just been recorded for this quotation."));
         }
 
         dispatchSignal.Notify();
@@ -194,24 +197,26 @@ public sealed class PublicQuotationService(
     {
         if (!SecureTokens.LooksValid(token))
         {
-            throw new NotFoundException("Dieser Link ist ungültig.");
+            throw new NotFoundException(Loc.T("Dieser Link ist ungültig.", "This link is invalid."));
         }
 
         var hash = SecureTokens.Hash(token);
         var query = db.PublicQuotationAccesses.IgnoreQueryFilters().Where(a => a.TokenHash == hash);
         var access = await (tracking ? query : query.AsNoTracking()).FirstOrDefaultAsync(ct)
-            ?? throw new NotFoundException("Dieser Link ist ungültig.");
+            ?? throw new NotFoundException(Loc.T("Dieser Link ist ungültig.", "This link is invalid."));
         if (!access.IsUsable(clock.GetUtcNow()))
         {
-            throw new GoneException("Dieser Link ist abgelaufen oder wurde vom Anbieter widerrufen. Bitte wenden Sie sich an den Anbieter.");
+            throw new GoneException(Loc.T(
+                "Dieser Link ist abgelaufen oder wurde vom Anbieter widerrufen. Bitte wenden Sie sich an den Anbieter.",
+                "This link has expired or was revoked by the provider. Please contact the provider."));
         }
 
         var qQuery = db.Quotations.IgnoreQueryFilters().Include(x => x.LineItems).Where(x => x.Id == access.QuotationId && x.DeletedAt == null);
         var quotation = await (tracking ? qQuery : qQuery.AsNoTracking()).FirstOrDefaultAsync(ct)
-            ?? throw new GoneException("Dieses Angebot ist nicht mehr verfügbar.");
+            ?? throw new GoneException(Loc.T("Dieses Angebot ist nicht mehr verfügbar.", "This quotation is no longer available."));
         if (quotation.Status == QuotationStatus.Draft)
         {
-            throw new GoneException("Dieses Angebot ist nicht mehr verfügbar.");
+            throw new GoneException(Loc.T("Dieses Angebot ist nicht mehr verfügbar.", "This quotation is no longer available."));
         }
 
         return (access, quotation);

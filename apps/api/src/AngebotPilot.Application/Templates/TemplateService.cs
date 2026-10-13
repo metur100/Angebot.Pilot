@@ -2,6 +2,7 @@ using AngebotPilot.Application.Abstractions;
 using AngebotPilot.Application.Billing;
 using AngebotPilot.Application.Common;
 using AngebotPilot.Application.Contracts;
+using AngebotPilot.Domain;
 using AngebotPilot.Domain.Quotations;
 using AngebotPilot.Domain.Templates;
 using Microsoft.EntityFrameworkCore;
@@ -91,5 +92,5 @@ public sealed class TemplateService(IAppDbContext db, BillingService billing, IA
 
     private async Task<QuotationTemplate> LoadAsync(Guid id, CancellationToken ct) =>
         await db.Templates.Include(t => t.LineItems).FirstOrDefaultAsync(t => t.Id == id && t.ArchivedAt == null, ct)
-            ?? throw new NotFoundException("Die Vorlage wurde nicht gefunden.");
+            ?? throw new NotFoundException(Loc.T("Die Vorlage wurde nicht gefunden.", "The template was not found."));
 }

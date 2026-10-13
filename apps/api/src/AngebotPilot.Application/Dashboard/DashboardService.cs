@@ -10,9 +10,11 @@ namespace AngebotPilot.Application.Dashboard;
 
 public sealed class DashboardService(IAppDbContext db, TimeProvider clock)
 {
-    public const string ConversionDefinition =
+    public static string ConversionDefinition => Loc.T(
         "Abschlussquote = angenommene Angebote ÷ (angenommene + abgelehnte + abgelaufene Angebote) mit Angebotsdatum im gewählten Zeitraum. "
-        + "Offene, stornierte und Entwurfs-Angebote zählen nicht. Revisionen werden einzeln gezählt.";
+        + "Offene, stornierte und Entwurfs-Angebote zählen nicht. Revisionen werden einzeln gezählt.",
+        "Conversion rate = accepted quotations ÷ (accepted + rejected + expired quotations) with a quotation date in the selected period. "
+        + "Open, cancelled and draft quotations do not count. Revisions are counted individually.");
 
     public async Task<DashboardDto> GetAsync(CurrentMember member, DateOnly? from, DateOnly? to, CancellationToken ct)
     {
@@ -86,55 +88,61 @@ public sealed class DashboardService(IAppDbContext db, TimeProvider clock)
         var rows = await q.OrderByDescending(a => a.OccurredAt).Skip((p - 1) * size).Take(size).ToListAsync(ct);
         var userIds = rows.Where(r => r.UserId != null).Select(r => r.UserId!.Value).Distinct().ToList();
         var names = await db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.DisplayName, ct);
-        var items = rows.Select(a => new ActivityDto(
-            a.Id, a.Action, a.OccurredAt,
-            a.UserId is { } uid ? names.GetValueOrDefault(uid, "Gelöschter Benutzer") : a.Action.EndsWith("_by_customer", StringComparison.Ordinal) || a.Action == "customer.opted_out" ? "Kunde" : "System",
-            string.IsNullOrWhiteSpace(a.Summary) ? Labels[a.Action] : $"{Labels[a.Action]}: {a.Summary}",
-            a.EntityType, a.EntityId)).ToList();
+        var items = rows.Select(a =>
+        {
+            var label = Loc.T(Labels[a.Action].De, Labels[a.Action].En);
+            var summary = StoredText.ActivitySummary(a.Action, a.Summary);
+            return new ActivityDto(
+                a.Id, a.Action, a.OccurredAt,
+                a.UserId is { } uid ? names.GetValueOrDefault(uid, Loc.T("Gelöschter Benutzer", "Deleted user"))
+                    : a.Action.EndsWith("_by_customer", StringComparison.Ordinal) || a.Action == "customer.opted_out" ? Loc.T("Kunde", "Customer") : "System",
+                string.IsNullOrWhiteSpace(summary) ? label : $"{label}: {summary}",
+                a.EntityType, a.EntityId);
+        }).ToList();
         return new PagedResult<ActivityDto>(items, p, size, total);
     }
 
-    private static readonly Dictionary<string, string> Labels = new()
+    private static readonly Dictionary<string, (string De, string En)> Labels = new()
     {
-        ["company.created"] = "Firma angelegt",
-        ["company.updated"] = "Firmendaten geändert",
-        ["company.settings_updated"] = "Einstellungen geändert",
-        ["company.logo_uploaded"] = "Logo hochgeladen",
-        ["customer.created"] = "Kunde angelegt",
-        ["customer.updated"] = "Kunde bearbeitet",
-        ["customer.archived"] = "Kunde archiviert",
-        ["customer.anonymized"] = "Kunde anonymisiert",
-        ["customer.deleted"] = "Kunde gelöscht",
-        ["customer.opted_out"] = "Kunde hat Erinnerungen abbestellt",
-        ["quotation.created"] = "Angebot erstellt",
-        ["quotation.duplicated"] = "Angebot dupliziert",
-        ["quotation.revised"] = "Revision erstellt",
-        ["quotation.sent"] = "Angebot per E-Mail versendet",
-        ["quotation.marked_sent"] = "Angebot als versendet markiert",
-        ["quotation.accepted"] = "Annahme erfasst",
-        ["quotation.rejected"] = "Ablehnung erfasst",
-        ["quotation.accepted_by_customer"] = "Angebot vom Kunden angenommen",
-        ["quotation.rejected_by_customer"] = "Angebot vom Kunden abgelehnt",
-        ["quotation.cancelled"] = "Angebot storniert",
-        ["quotation.expired"] = "Angebot abgelaufen",
-        ["quotation.deleted"] = "Entwurf gelöscht",
-        ["job.created"] = "Auftrag erstellt",
-        ["invoice.created"] = "Rechnungsentwurf erstellt",
-        ["invoice.issued"] = "Rechnung gestellt",
-        ["invoice.sent"] = "Rechnung per E-Mail versendet",
-        ["invoice.marked_sent"] = "Rechnung als versendet markiert",
-        ["invoice.payment_recorded"] = "Teilzahlung erfasst",
-        ["invoice.paid"] = "Rechnung bezahlt",
-        ["invoice.payment_removed"] = "Zahlung entfernt",
-        ["invoice.reminder_sent"] = "Zahlungserinnerung versendet",
-        ["invoice.cancelled"] = "Rechnung storniert",
-        ["invoice.deleted"] = "Rechnungsentwurf gelöscht",
-        ["job.status_changed"] = "Auftragsstatus geändert",
-        ["template.created"] = "Vorlage erstellt",
-        ["member.invited"] = "Teammitglied eingeladen",
-        ["member.joined"] = "Teammitglied beigetreten",
-        ["member.deactivated"] = "Teammitglied deaktiviert",
-        ["member.role_changed"] = "Rolle geändert",
+        ["company.created"] = ("Firma angelegt", "Company created"),
+        ["company.updated"] = ("Firmendaten geändert", "Company details changed"),
+        ["company.settings_updated"] = ("Einstellungen geändert", "Settings changed"),
+        ["company.logo_uploaded"] = ("Logo hochgeladen", "Logo uploaded"),
+        ["customer.created"] = ("Kunde angelegt", "Customer created"),
+        ["customer.updated"] = ("Kunde bearbeitet", "Customer edited"),
+        ["customer.archived"] = ("Kunde archiviert", "Customer archived"),
+        ["customer.anonymized"] = ("Kunde anonymisiert", "Customer anonymised"),
+        ["customer.deleted"] = ("Kunde gelöscht", "Customer deleted"),
+        ["customer.opted_out"] = ("Kunde hat Erinnerungen abbestellt", "Customer unsubscribed from reminders"),
+        ["quotation.created"] = ("Angebot erstellt", "Quotation created"),
+        ["quotation.duplicated"] = ("Angebot dupliziert", "Quotation duplicated"),
+        ["quotation.revised"] = ("Revision erstellt", "Revision created"),
+        ["quotation.sent"] = ("Angebot per E-Mail versendet", "Quotation sent by email"),
+        ["quotation.marked_sent"] = ("Angebot als versendet markiert", "Quotation marked as sent"),
+        ["quotation.accepted"] = ("Annahme erfasst", "Acceptance recorded"),
+        ["quotation.rejected"] = ("Ablehnung erfasst", "Rejection recorded"),
+        ["quotation.accepted_by_customer"] = ("Angebot vom Kunden angenommen", "Quotation accepted by the customer"),
+        ["quotation.rejected_by_customer"] = ("Angebot vom Kunden abgelehnt", "Quotation rejected by the customer"),
+        ["quotation.cancelled"] = ("Angebot storniert", "Quotation cancelled"),
+        ["quotation.expired"] = ("Angebot abgelaufen", "Quotation expired"),
+        ["quotation.deleted"] = ("Entwurf gelöscht", "Draft deleted"),
+        ["job.created"] = ("Auftrag erstellt", "Job created"),
+        ["invoice.created"] = ("Rechnungsentwurf erstellt", "Invoice draft created"),
+        ["invoice.issued"] = ("Rechnung gestellt", "Invoice issued"),
+        ["invoice.sent"] = ("Rechnung per E-Mail versendet", "Invoice sent by email"),
+        ["invoice.marked_sent"] = ("Rechnung als versendet markiert", "Invoice marked as sent"),
+        ["invoice.payment_recorded"] = ("Teilzahlung erfasst", "Partial payment recorded"),
+        ["invoice.paid"] = ("Rechnung bezahlt", "Invoice paid"),
+        ["invoice.payment_removed"] = ("Zahlung entfernt", "Payment removed"),
+        ["invoice.reminder_sent"] = ("Zahlungserinnerung versendet", "Payment reminder sent"),
+        ["invoice.cancelled"] = ("Rechnung storniert", "Invoice cancelled"),
+        ["invoice.deleted"] = ("Rechnungsentwurf gelöscht", "Invoice draft deleted"),
+        ["job.status_changed"] = ("Auftragsstatus geändert", "Job status changed"),
+        ["template.created"] = ("Vorlage erstellt", "Template created"),
+        ["member.invited"] = ("Teammitglied eingeladen", "Team member invited"),
+        ["member.joined"] = ("Teammitglied beigetreten", "Team member joined"),
+        ["member.deactivated"] = ("Teammitglied deaktiviert", "Team member deactivated"),
+        ["member.role_changed"] = ("Rolle geändert", "Role changed"),
     };
 
     private static readonly string[] LabelKeys = [.. Labels.Keys];

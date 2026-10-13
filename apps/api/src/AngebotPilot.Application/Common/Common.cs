@@ -7,9 +7,11 @@ using AngebotPilot.Domain.Companies;
 
 namespace AngebotPilot.Application.Common;
 
-public sealed class NotFoundException(string message = "Der Eintrag wurde nicht gefunden.") : Exception(message);
+public sealed class NotFoundException(string? message = null)
+    : Exception(message ?? Loc.T("Der Eintrag wurde nicht gefunden.", "The item was not found."));
 
-public sealed class ForbiddenException(string message = "Für diese Aktion fehlt Ihnen die Berechtigung.") : Exception(message);
+public sealed class ForbiddenException(string? message = null)
+    : Exception(message ?? Loc.T("Für diese Aktion fehlt Ihnen die Berechtigung.", "You do not have permission for this action."));
 
 /// <summary>409 with a stable code, e.g. <c>concurrency_conflict</c>, <c>already_converted</c>.</summary>
 public sealed class ConflictException(string code, string message) : Exception(message)
@@ -79,7 +81,7 @@ public static class RowVersions
         }
         catch (FormatException)
         {
-            throw new ConflictException("concurrency_conflict", "Ungültige Versionsangabe.");
+            throw new ConflictException("concurrency_conflict", Loc.T("Ungültige Versionsangabe.", "Invalid version."));
         }
     }
 }
@@ -123,9 +125,9 @@ public static class MemberExtensions
         {
             throw new ForbiddenException(message ?? minimum switch
             {
-                MembershipRole.Owner => "Nur Inhaber:innen dürfen diese Aktion ausführen.",
-                MembershipRole.Admin => "Nur Administrator:innen und Inhaber:innen dürfen diese Aktion ausführen.",
-                _ => "Für diese Aktion fehlt Ihnen die Berechtigung.",
+                MembershipRole.Owner => Loc.T("Nur Inhaber:innen dürfen diese Aktion ausführen.", "Only owners may perform this action."),
+                MembershipRole.Admin => Loc.T("Nur Administrator:innen und Inhaber:innen dürfen diese Aktion ausführen.", "Only admins and owners may perform this action."),
+                _ => Loc.T("Für diese Aktion fehlt Ihnen die Berechtigung.", "You do not have permission for this action."),
             });
         }
     }

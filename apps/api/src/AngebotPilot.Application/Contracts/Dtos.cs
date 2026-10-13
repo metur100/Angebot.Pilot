@@ -5,7 +5,8 @@ namespace AngebotPilot.Application.Contracts;
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
 
 // ---------- Auth ----------
-public sealed record RegisterRequest(string Email, string Password, string DisplayName, bool AcceptTerms, ClientKind Client = ClientKind.Web);
+/// <summary><c>Language</c> ("de"/"en") is the initial UI language and the language of account emails; omitted = German.</summary>
+public sealed record RegisterRequest(string Email, string Password, string DisplayName, bool AcceptTerms, ClientKind Client = ClientKind.Web, string? Language = null);
 
 public sealed record LoginRequest(string Email, string Password, ClientKind Client = ClientKind.Web);
 
@@ -21,14 +22,15 @@ public sealed record VerifyEmailRequest(string Token);
 
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 
-public sealed record UpdateProfileRequest(string DisplayName);
+/// <summary><c>Language</c> is optional so older clients keep working; omitted = unchanged.</summary>
+public sealed record UpdateProfileRequest(string DisplayName, string? Language = null);
 
 public sealed record DeleteAccountRequest(string Password);
 
 /// <summary>The refresh token is only returned in the body for mobile clients; web clients receive an HttpOnly cookie.</summary>
 public sealed record AuthResponse(string AccessToken, DateTimeOffset AccessTokenExpiresAt, string? RefreshToken, DateTimeOffset RefreshTokenExpiresAt, MeDto User);
 
-public sealed record MeDto(Guid Id, string Email, string DisplayName, bool EmailVerified, IReadOnlyList<MembershipDto> Companies);
+public sealed record MeDto(Guid Id, string Email, string DisplayName, bool EmailVerified, string Language, IReadOnlyList<MembershipDto> Companies);
 
 public sealed record MembershipDto(Guid CompanyId, string CompanyName, MembershipRole Role, Guid MembershipId, bool IsDemo);
 
