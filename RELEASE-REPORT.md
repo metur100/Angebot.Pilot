@@ -76,4 +76,6 @@ Apple developer accounts (closed test with 12 testers for 14 days on Play), paym
 
 ## Repository
 
-<!-- REPOSITORY: filled in after push verification -->
+- Private repository: https://github.com/metur100/Angebot.Pilot (visibility verified: private)
+- Release commit: `97d73440eb69b41de0766e6455bd78b80f999bd4` on `main` – verified identical on the remote (`git ls-remote`), 493 files, no secrets, keys, build output or owner credentials in the tree or history
+- All quality gates in this report were run on that commit. This file and `docs/REMAINING-TASKS.md` were updated afterwards in a documentation-only commit.

@@ -38,7 +38,7 @@ access, accounts, money or legal decisions only the owner can provide. Last upda
 - [x] API deployed to https://angebotpilot.runasp.net – production smoke test 13/13
 - [x] Web app live at https://metur100.github.io/Angebot.Pilot.App/ (public repo `Angebot.Pilot.App`, built bundle only) – deployed smoke 8/8
 - [x] Scheduled jobs: GitHub Actions cron every 15 min with `JOBS_TRIGGER_SECRET` – manual run succeeded
-- [ ] Push private source repo `Angebot.Pilot` after all quality gates pass
+- [x] Private source repo pushed after all quality gates: https://github.com/metur100/Angebot.Pilot (release commit 97d7344)
 
 ## Owner actions before commercial launch
 - [ ] **Owner:** MonsterASP Free plan forbids commercial use → upgrade to a paid plan (Premium) before taking paying customers
