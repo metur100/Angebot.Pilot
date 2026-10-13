@@ -1,10 +1,10 @@
 import { customerTypeLabel, type CustomerDto } from '@angebotpilot/api-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, ArchiveRestore, BellOff, FileText, Hammer, Mail, MoreHorizontal, Pencil, Phone, Plus, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, BellOff, FileText, Hammer, Mail, MoreHorizontal, Pencil, Phone, Plus, ReceiptText, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useCompany } from '@/app/company';
-import { Badge, JobStatusBadge, QuotationStatusBadge } from '@/components/ui/Badge';
+import { Badge, InvoiceStatusBadge, JobStatusBadge, QuotationStatusBadge } from '@/components/ui/Badge';
 import { ButtonLink, IconButton } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader, DetailList } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/Dialog';
@@ -12,6 +12,7 @@ import { Alert, EmptyState, ErrorState, PageSkeleton, Spinner } from '@/componen
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/Menu';
 import { PageHeader, table } from '@/components/ui/Page';
 import { toast } from '@/components/ui/Toast';
+import { invoiceAmount } from '@/features/invoices/shared';
 import { api } from '@/lib/api';
 import { cx } from '@/lib/cx';
 import { errorMessage } from '@/lib/errors';
@@ -34,6 +35,7 @@ export default function CustomerDetailPage() {
   const customer = useQuery({ queryKey: qk.customer(companyId, id), queryFn: () => api.customers.get(companyId, id) });
   const quotations = useQuery({ queryKey: qk.customerQuotations(companyId, id), queryFn: () => api.customers.quotations(companyId, id) });
   const jobs = useQuery({ queryKey: qk.customerJobs(companyId, id), queryFn: () => api.customers.jobs(companyId, id) });
+  const invoices = useQuery({ queryKey: qk.customerInvoices(companyId, id), queryFn: () => api.customers.invoices(companyId, id) });
 
   const archive = useMutation({
     mutationFn: (archived: boolean) => (archived ? api.customers.archive(companyId, id) : api.customers.unarchive(companyId, id)),
@@ -108,7 +110,7 @@ export default function CustomerDetailPage() {
 
       {c.isAnonymized && (
         <Alert tone="warning" className="mb-6" title="Personenbezogene Daten wurden entfernt">
-          Dieser Kunde wurde anonymisiert. Seine Angebote und Aufträge bleiben aufgrund von Aufbewahrungspflichten erhalten.
+          Dieser Kunde wurde anonymisiert. Seine Angebote, Aufträge und Rechnungen bleiben aufgrund von Aufbewahrungspflichten erhalten.
         </Alert>
       )}
 
@@ -242,6 +244,77 @@ export default function CustomerDetailPage() {
               </ul>
             )}
           </Card>
+
+          <Card>
+            <CardHeader
+              title="Rechnungen"
+              description={
+                invoices.data && invoices.data.some((i) => i.openAmount > 0)
+                  ? `Offen: ${formatEur(invoices.data.reduce((sum, i) => sum + i.openAmount, 0))}`
+                  : undefined
+              }
+              actions={
+                !c.isArchived &&
+                !c.isAnonymized && (
+                  <ButtonLink to={`/rechnungen/neu?kunde=${c.id}`} size="sm" icon={Plus}>
+                    Neue Rechnung
+                  </ButtonLink>
+                )
+              }
+            />
+            {invoices.isPending ? (
+              <div className="p-5">
+                <Spinner />
+              </div>
+            ) : invoices.isError ? (
+              <ErrorState error={invoices.error} onRetry={() => void invoices.refetch()} />
+            ) : invoices.data.length === 0 ? (
+              <EmptyState
+                compact
+                icon={ReceiptText}
+                title="Noch keine Rechnungen"
+                description="Erstellen Sie eine Rechnung manuell oder aus einem Auftrag bzw. angenommenen Angebot dieses Kunden."
+              />
+            ) : (
+              <div className={table.wrapper}>
+                <table className={table.table}>
+                  <thead>
+                    <tr>
+                      <th scope="col" className={table.th}>Nummer</th>
+                      <th scope="col" className={table.th}>Betreff</th>
+                      <th scope="col" className={table.th}>Status</th>
+                      <th scope="col" className={cx(table.th, 'text-right')}>Datum</th>
+                      <th scope="col" className={cx(table.th, 'text-right')}>Brutto</th>
+                      <th scope="col" className={cx(table.th, 'text-right')}>Offen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoices.data.map((i) => (
+                      <tr key={i.id} className={table.row}>
+                        <td className={cx(table.td, 'whitespace-nowrap')}>
+                          <Link
+                            to={`/rechnungen/${i.id}`}
+                            className={cx('font-medium hover:text-brand-700 hover:underline', i.number ? 'text-neutral-900' : 'text-neutral-500 italic')}
+                          >
+                            {i.number ?? 'Entwurf'}
+                          </Link>
+                        </td>
+                        <td className={cx(table.td, 'max-w-[220px] truncate')}>{i.title}</td>
+                        <td className={table.td}>
+                          <InvoiceStatusBadge status={i.status} kind={i.kind} isOverdue={i.isOverdue} />
+                        </td>
+                        <td className={cx(table.td, table.num)}>{formatDate(i.issueDate)}</td>
+                        <td className={cx(table.td, table.num, 'font-medium')}>{invoiceAmount(i.grossTotal, i.kind)}</td>
+                        <td className={cx(table.td, table.num, i.isOverdue ? 'font-medium text-danger-text' : 'text-neutral-600')}>
+                          {i.openAmount > 0 ? formatEur(i.openAmount) : '–'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
         </div>
       </div>
 
@@ -265,10 +338,10 @@ export default function CustomerDetailPage() {
       >
         <div className="space-y-2 text-sm text-neutral-700">
           <p>
-            <strong className="font-medium text-neutral-900">Ohne Angebote oder Aufträge</strong> wird der Kunde vollständig gelöscht.
+            <strong className="font-medium text-neutral-900">Ohne Angebote, Aufträge oder Rechnungen</strong> wird der Kunde vollständig gelöscht.
           </p>
           <p>
-            <strong className="font-medium text-neutral-900">Mit Angeboten oder Aufträgen</strong> werden stattdessen Name, Kontakt- und
+            <strong className="font-medium text-neutral-900">Mit Angeboten, Aufträgen oder Rechnungen</strong> werden stattdessen Name, Kontakt- und
             Adressdaten anonymisiert. Die Dokumente selbst bleiben wegen gesetzlicher Aufbewahrungspflichten erhalten.
           </p>
           <p className="text-neutral-500">Dieser Schritt kann nicht rückgängig gemacht werden. Zum Ausblenden genügt „Archivieren“.</p>

@@ -2,6 +2,7 @@ import { formatPercent, type CompanyDto, type CompanySettingsDto, type TaxMode, 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ImageUp, Pencil, Plus, Trash2, TriangleAlert } from 'lucide-react';
 import { useRef, useState, type ChangeEvent } from 'react';
+import { Link } from 'react-router';
 import { useCompany, useCompanyDetails, useCompanySettings, useTaxRates } from '@/app/company';
 import { TaxModePicker } from '@/components/domain/TaxMode';
 import { Badge } from '@/components/ui/Badge';
@@ -190,7 +191,20 @@ function DocumentDefaultsCard({ settings, readOnly }: { settings: CompanySetting
   const dirty = JSON.stringify(values) !== JSON.stringify(settings);
   const prefixError = (v: string) => (/^[A-Z0-9]{1,8}$/.test(v) ? undefined : '1–8 Großbuchstaben oder Ziffern.');
   const validityError = Number.isInteger(values.defaultValidityDays) && values.defaultValidityDays >= 1 && values.defaultValidityDays <= 365 ? undefined : 'Zwischen 1 und 365 Tagen.';
-  const invalid = Boolean(prefixError(values.quotationPrefix) || prefixError(values.jobPrefix) || validityError);
+  const paymentDaysError =
+    Number.isInteger(values.invoicePaymentDays) && values.invoicePaymentDays >= 0 && values.invoicePaymentDays <= 120 ? undefined : 'Zwischen 0 und 120 Tagen.';
+  const reminderDaysError =
+    Number.isInteger(values.invoiceReminderAfterDays) && values.invoiceReminderAfterDays >= 1 && values.invoiceReminderAfterDays <= 60
+      ? undefined
+      : 'Zwischen 1 und 60 Tagen.';
+  const invalid = Boolean(
+    prefixError(values.quotationPrefix) ||
+      prefixError(values.jobPrefix) ||
+      validityError ||
+      prefixError(values.invoicePrefix) ||
+      paymentDaysError ||
+      (values.invoiceReminderEnabled && reminderDaysError),
+  );
   const save = useMutation({
     mutationFn: () =>
       api.companies.updateSettings(companyId, {
@@ -203,6 +217,10 @@ function DocumentDefaultsCard({ settings, readOnly }: { settings: CompanySetting
         iban: emptyToNull(values.iban?.replace(/\s/g, '')),
         bic: emptyToNull(values.bic),
         bankName: emptyToNull(values.bankName),
+        invoicePrefix: values.invoicePrefix.trim().toUpperCase(),
+        // null would leave the invoice texts unchanged on the server; an empty string clears them.
+        invoiceIntroText: values.invoiceIntroText?.trim() ?? '',
+        invoiceClosingText: values.invoiceClosingText?.trim() ?? '',
       }),
     onSuccess: (saved) => {
       queryClient.setQueryData(qk.settings(companyId), saved);
@@ -215,7 +233,7 @@ function DocumentDefaultsCard({ settings, readOnly }: { settings: CompanySetting
 
   return (
     <Card>
-      <CardHeader title="Dokumente & Standardtexte" description="Vorgaben für neue Angebote. Bestehende Angebote bleiben unverändert." />
+      <CardHeader title="Dokumente & Standardtexte" description="Vorgaben für neue Angebote und Rechnungen. Bestehende Dokumente bleiben unverändert." />
       <fieldset disabled={readOnly} className="min-w-0">
         <CardBody className="space-y-6 py-6">
           {errorText && (
@@ -257,7 +275,7 @@ function DocumentDefaultsCard({ settings, readOnly }: { settings: CompanySetting
               <Textarea rows={3} value={values.defaultTerms ?? ''} onChange={(e) => set('defaultTerms', e.target.value)} />
             </Field>
           </FormSection>
-          <FormSection title="Bankverbindung" description="Optional in der Fußzeile der Angebote.">
+          <FormSection title="Bankverbindung" description="Optional in der Fußzeile der Angebote, auf Rechnungen immer (sofern eine IBAN hinterlegt ist).">
             <Switch
               checked={values.showBankDetails}
               onCheckedChange={(v) => set('showBankDetails', v)}
@@ -278,6 +296,52 @@ function DocumentDefaultsCard({ settings, readOnly }: { settings: CompanySetting
                 <Input value={values.bic ?? ''} onChange={(e) => set('bic', e.target.value.toUpperCase())} className="font-mono" />
               </Field>
             </div>
+          </FormSection>
+          <FormSection title="Rechnungen" description="Nummernkreis, Zahlungsziel und Texte für neue Rechnungen.">
+            <Alert tone="info">
+              Für Rechnungen sind die vollständige Anschrift sowie Steuernummer oder USt-IdNr. in den{' '}
+              <Link to="/einstellungen/firma">Firmendaten</Link> Pflicht. Ohne diese Angaben kann eine Rechnung nicht gestellt werden.
+            </Alert>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="Präfix Rechnungen"
+                error={prefixError(values.invoicePrefix)}
+                hint={`z. B. ${values.invoicePrefix || 'RE'}-${new Date().getFullYear()}-0001 · fortlaufend und lückenlos`}
+              >
+                <Input value={values.invoicePrefix} onChange={(e) => set('invoicePrefix', e.target.value.toUpperCase())} maxLength={8} />
+              </Field>
+              <Field label="Zahlungsziel (Tage)" error={paymentDaysError} hint="Fälligkeit = Rechnungsdatum + Zahlungsziel. 0 = sofort fällig.">
+                <NumberInput value={values.invoicePaymentDays} onValueChange={(v) => set('invoicePaymentDays', v)} maxFractionDigits={0} align="left" />
+              </Field>
+            </div>
+            <Field label="Einleitung Rechnungen" optional>
+              <Textarea rows={3} value={values.invoiceIntroText ?? ''} onChange={(e) => set('invoiceIntroText', e.target.value)} />
+            </Field>
+            <Field label="Schlusstext Rechnungen" optional>
+              <Textarea rows={3} value={values.invoiceClosingText ?? ''} onChange={(e) => set('invoiceClosingText', e.target.value)} />
+            </Field>
+            <div className="space-y-3 rounded-lg border border-neutral-200 p-4">
+              <Switch
+                checked={values.invoiceReminderEnabled}
+                onCheckedChange={(v) => set('invoiceReminderEnabled', v)}
+                label="Automatische Zahlungserinnerung"
+                description="Eine freundliche Erinnerung per E-Mail, wenn eine per E-Mail versendete Rechnung überfällig ist."
+                disabled={readOnly}
+              />
+              <Field label="Tage nach Fälligkeit" error={values.invoiceReminderEnabled ? reminderDaysError : undefined} className="sm:max-w-[220px]">
+                <NumberInput
+                  value={values.invoiceReminderAfterDays}
+                  onValueChange={(v) => set('invoiceReminderAfterDays', v)}
+                  maxFractionDigits={0}
+                  align="left"
+                  disabled={readOnly || !values.invoiceReminderEnabled}
+                />
+              </Field>
+            </div>
+            <p className="text-[13px] leading-[18px] text-neutral-500">
+              Auf Rechnungen wird Ihre Bankverbindung immer angegeben, sofern eine IBAN hinterlegt ist. Rechnungen enthalten einen GiroCode zum
+              Bezahlen per Banking-App.
+            </p>
           </FormSection>
         </CardBody>
         {!readOnly && (

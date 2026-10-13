@@ -1,8 +1,8 @@
 // Create/edit a quotation, optimised for small screens: four steps (Kunde, Basis, Positionen, Texte), line items as
 // stacked cards edited in a focused bottom sheet, and a sticky live-totals bar (calculateTotals = server preview).
 import {
-  addDaysIso, ApiError, calculateTotals, errorMessage, formatEur, formatPercent, formatQuantity, quotationSchema, todayIso,
-  type LineItemForm, type QuotationDto, type QuotationForm, type TaxMode,
+  addDaysIso, ApiError, calculateTotals, errorMessage, formatEur, quotationSchema, todayIso,
+  type QuotationDto, type QuotationForm,
 } from '@angebotpilot/api-contracts';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,7 +10,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Controller, useFieldArray, useForm, useWatch, type FieldErrors } from 'react-hook-form';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import { Button, IconButton } from '@/components/Button';
 import { Card, SectionHeader } from '@/components/Card';
@@ -23,9 +23,10 @@ import { useToast } from '@/components/Toast';
 import { emptyToNull, isConflict } from '@/lib/forms';
 import { keys, useCompanySettings, useCustomer, useQuotation, useTaxRates } from '@/lib/queries';
 import { api, useCompanyId } from '@/lib/session';
-import { colors, radius, space, touch } from '@/theme';
+import { colors, radius, space } from '@/theme';
 
 import { CustomerPicker } from './CustomerPicker';
+import { LineCard, StepIndicator } from './EditorParts';
 import { LineItemEditor } from './LineItemEditor';
 import { TemplatePicker } from './TemplatePicker';
 
@@ -71,84 +72,6 @@ function emptyForm(): QuotationForm {
     customerId: '', title: '', issueDate: today, validUntil: addDaysIso(today, 30), taxMode: 'Standard',
     introText: '', closingText: '', terms: '', paymentTerms: '', internalNotes: '', lineItems: [],
   };
-}
-
-function StepIndicator({ step, onSelect, errorSteps }: { step: number; onSelect: (s: number) => void; errorSteps: Set<number> }) {
-  return (
-    <View style={styles.steps} accessibilityRole="tablist">
-      {STEPS.map((label, i) => {
-        const active = i === step;
-        const hasError = errorSteps.has(i);
-        return (
-          <Pressable
-            key={label}
-            accessibilityRole="tab"
-            accessibilityLabel={`Schritt ${i + 1} von ${STEPS.length}: ${label}${hasError ? ', enthält Fehler' : ''}`}
-            accessibilityState={{ selected: active }}
-            onPress={() => onSelect(i)}
-            style={[styles.step, active ? styles.stepActive : null]}
-            testID={`step-${i}`}
-          >
-            <View style={[styles.stepNumber, active ? styles.stepNumberActive : null, hasError ? styles.stepNumberError : null]}>
-              {hasError ? (
-                <Ionicons name="alert" size={14} color={colors.onBrand} />
-              ) : (
-                <Text variant="small" style={{ color: active ? colors.onBrand : colors.textSecondary, fontWeight: '700' }}>
-                  {i + 1}
-                </Text>
-              )}
-            </View>
-            <Text variant="small" tone={active ? 'brand' : 'secondary'} numberOfLines={1} style={styles.stepLabel}>
-              {label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
-function LineCard({
-  item, index, count, taxMode, onEdit, onMove, onDuplicate, onDelete,
-}: {
-  item: LineItemForm; index: number; count: number; taxMode: TaxMode;
-  onEdit: () => void; onMove: (dir: -1 | 1) => void; onDuplicate: () => void; onDelete: () => void;
-}) {
-  const totals = calculateTotals([item], 'Standard');
-  return (
-    <Card style={styles.lineCard} testID={`line-card-${index}`}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Position ${index + 1}: ${item.title}, ${formatEur(totals.netTotal)} netto. Bearbeiten`} onPress={onEdit} style={styles.lineMain}>
-        <View style={styles.lineHeader}>
-          <Text variant="small" tone="muted">
-            Pos. {index + 1}
-          </Text>
-          <Text variant="bodyStrong" testID={`line-net-${index}`}>
-            {formatEur(totals.netTotal)}
-          </Text>
-        </View>
-        <Text variant="bodyStrong" numberOfLines={2}>
-          {item.title}
-        </Text>
-        {item.description ? (
-          <Text variant="caption" tone="secondary" numberOfLines={2}>
-            {item.description}
-          </Text>
-        ) : null}
-        <Text variant="caption" tone="secondary">
-          {formatQuantity(item.quantity)} {item.unit} × {formatEur(item.unitPriceNet)}
-          {item.discountPercent ? ` · −${formatPercent(item.discountPercent)}` : ''}
-          {taxMode === 'Standard' ? ` · ${formatPercent(item.taxRatePercent)} USt.` : ''}
-        </Text>
-      </Pressable>
-      <View style={styles.lineActions}>
-        <IconButton icon="arrow-up" accessibilityLabel={`Position ${index + 1} nach oben`} onPress={() => onMove(-1)} disabled={index === 0} size={20} testID={`line-up-${index}`} />
-        <IconButton icon="arrow-down" accessibilityLabel={`Position ${index + 1} nach unten`} onPress={() => onMove(1)} disabled={index === count - 1} size={20} testID={`line-down-${index}`} />
-        <IconButton icon="copy-outline" accessibilityLabel={`Position ${index + 1} duplizieren`} onPress={onDuplicate} size={20} testID={`line-duplicate-${index}`} />
-        <IconButton icon="create-outline" accessibilityLabel={`Position ${index + 1} bearbeiten`} onPress={onEdit} size={20} testID={`line-edit-${index}`} />
-        <IconButton icon="trash-outline" accessibilityLabel={`Position ${index + 1} löschen`} onPress={onDelete} color={colors.danger} size={20} testID={`line-delete-${index}`} />
-      </View>
-    </Card>
-  );
 }
 
 interface EditorInit {
@@ -416,7 +339,7 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
           ),
         }}
       />
-      <StepIndicator step={step} onSelect={setStep} errorSteps={errorSteps} />
+      <StepIndicator steps={STEPS} step={step} onSelect={setStep} errorSteps={errorSteps} />
       <FormScroll bottomInset={false} contentStyle={styles.content}>
         <InlineError message={formError} testID="editor-error" />
 
@@ -622,24 +545,7 @@ const styles = StyleSheet.create({
   gap: { gap: space[3] },
   row: { flexDirection: 'row', gap: space[3] },
   content: { paddingBottom: space[8] },
-  steps: {
-    flexDirection: 'row', backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border, paddingHorizontal: space[2],
-  },
-  step: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: space[2], minHeight: touch + 8, borderBottomWidth: 3, borderBottomColor: 'transparent' },
-  stepActive: { borderBottomColor: colors.brand },
-  stepNumber: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceMuted },
-  stepNumberActive: { backgroundColor: colors.brand },
-  stepNumberError: { backgroundColor: colors.danger },
-  stepLabel: { fontWeight: '600' },
   customerCard: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
-  lineCard: { padding: 0, overflow: 'hidden' },
-  lineMain: { padding: space[4], gap: 2 },
-  lineHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  lineActions: {
-    flexDirection: 'row', justifyContent: 'space-around', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border,
-    backgroundColor: colors.neutral[25],
-  },
   emptyLines: { alignItems: 'center', gap: space[2], borderStyle: 'dashed', borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.xl },
   totalsRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
 });

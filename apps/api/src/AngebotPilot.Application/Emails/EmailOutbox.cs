@@ -21,7 +21,8 @@ public sealed record EnqueueEmail(
     string? FromDisplayName = null,
     Guid? AttachmentFileId = null,
     string? AttachmentFileName = null,
-    Guid? CreatedByUserId = null);
+    Guid? CreatedByUserId = null,
+    Guid? InvoiceId = null);
 
 public interface IEmailOutbox
 {
@@ -46,6 +47,7 @@ public sealed class EmailOutbox(IAppDbContext db, TimeProvider clock) : IEmailOu
         {
             CompanyId = email.CompanyId,
             QuotationId = email.QuotationId,
+            InvoiceId = email.InvoiceId,
             Kind = email.Kind,
             IdempotencyKey = email.IdempotencyKey,
             ToAddress = email.To.Trim(),

@@ -1,4 +1,4 @@
-import type { CustomerListQuery, JobListQuery, QuotationListQuery } from '@angebotpilot/api-contracts';
+import type { CustomerListQuery, InvoiceListQuery, JobListQuery, QuotationListQuery } from '@angebotpilot/api-contracts';
 
 /** Query keys. Everything company-scoped starts with ['c', companyId] so switching companies never mixes data. */
 export const qk = {
@@ -15,6 +15,7 @@ export const qk = {
   customer: (c: string, id: string) => ['c', c, 'customers', 'detail', id] as const,
   customerQuotations: (c: string, id: string) => ['c', c, 'customers', 'detail', id, 'quotations'] as const,
   customerJobs: (c: string, id: string) => ['c', c, 'customers', 'detail', id, 'jobs'] as const,
+  customerInvoices: (c: string, id: string) => ['c', c, 'customers', 'detail', id, 'invoices'] as const,
   quotations: (c: string) => ['c', c, 'quotations'] as const,
   quotationList: (c: string, query: QuotationListQuery) => ['c', c, 'quotations', 'list', query] as const,
   quotation: (c: string, id: string) => ['c', c, 'quotations', 'detail', id] as const,
@@ -27,6 +28,12 @@ export const qk = {
   jobs: (c: string) => ['c', c, 'jobs'] as const,
   jobList: (c: string, query: JobListQuery) => ['c', c, 'jobs', 'list', query] as const,
   job: (c: string, id: string) => ['c', c, 'jobs', 'detail', id] as const,
+  invoices: (c: string) => ['c', c, 'invoices'] as const,
+  invoiceList: (c: string, query: InvoiceListQuery) => ['c', c, 'invoices', 'list', query] as const,
+  invoice: (c: string, id: string) => ['c', c, 'invoices', 'detail', id] as const,
+  invoiceEvents: (c: string, id: string) => ['c', c, 'invoices', 'detail', id, 'events'] as const,
+  invoiceDeliveries: (c: string, id: string) => ['c', c, 'invoices', 'detail', id, 'deliveries'] as const,
+  invoicePdf: (c: string, id: string, rowVersion: string) => ['c', c, 'invoices', 'detail', id, 'pdf', rowVersion] as const,
   notifications: (c: string) => ['c', c, 'notifications'] as const,
   unreadCount: (c: string) => ['c', c, 'notifications', 'unread'] as const,
   activity: (c: string, page: number) => ['c', c, 'activity', page] as const,

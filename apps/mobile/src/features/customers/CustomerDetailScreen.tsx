@@ -7,14 +7,14 @@ import { Alert, StyleSheet, View } from 'react-native';
 
 import { Button, IconButton } from '@/components/Button';
 import { Card, KeyValue, SectionHeader } from '@/components/Card';
-import { JobCard, QuotationCard } from '@/components/EntityCards';
+import { InvoiceCard, JobCard, QuotationCard } from '@/components/EntityCards';
 import { ContentScroll, Screen } from '@/components/Layout';
 import { OptionSheet } from '@/components/Sheet';
 import { Badge } from '@/components/StatusBadge';
 import { ErrorState, ListSkeleton } from '@/components/States';
 import { Text } from '@/components/Text';
 import { useToast } from '@/components/Toast';
-import { keys, useCustomer, useCustomerJobs, useCustomerQuotations } from '@/lib/queries';
+import { keys, useCustomer, useCustomerInvoices, useCustomerJobs, useCustomerQuotations } from '@/lib/queries';
 import { api, useCompanyId } from '@/lib/session';
 import { space } from '@/theme';
 
@@ -43,6 +43,7 @@ export default function CustomerDetailScreen() {
   const customer = useCustomer(id);
   const quotations = useCustomerQuotations(id);
   const jobs = useCustomerJobs(id);
+  const invoices = useCustomerInvoices(id);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const c = customer.data;
@@ -115,6 +116,7 @@ export default function CustomerDetailScreen() {
           void customer.refetch();
           void quotations.refetch();
           void jobs.refetch();
+          void invoices.refetch();
         }}
         testID="customer-detail"
       >
@@ -187,6 +189,29 @@ export default function CustomerDetailScreen() {
         {jobs.data?.length === 0 ? <Text variant="caption" tone="muted">Noch keine Aufträge.</Text> : null}
         <View style={styles.list}>
           {jobs.data?.map((j) => <JobCard key={j.id} item={j} />)}
+        </View>
+
+        <SectionHeader
+          title={`Rechnungen${invoices.data ? ` (${invoices.data.length})` : ''}`}
+          action={
+            !c.isArchived && !c.isAnonymized ? (
+              <Button
+                label="Neue Rechnung"
+                icon="add"
+                variant="ghost"
+                size="sm"
+                fullWidth={false}
+                onPress={() => router.push({ pathname: '/invoice-editor', params: { customerId: c.id } })}
+                accessibilityLabel="Neue Rechnung für diesen Kunden"
+                testID="customer-new-invoice"
+              />
+            ) : null
+          }
+        />
+        {invoices.isError ? <ErrorState error={invoices.error} onRetry={() => void invoices.refetch()} compact /> : null}
+        {invoices.data?.length === 0 ? <Text variant="caption" tone="muted">Noch keine Rechnungen.</Text> : null}
+        <View style={styles.list} testID="customer-invoices">
+          {invoices.data?.map((i) => <InvoiceCard key={i.id} item={i} />)}
         </View>
       </ContentScroll>
 

@@ -8,7 +8,7 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button, type IconName } from '@/components/Button';
 import { Card, PressableCard, SectionHeader } from '@/components/Card';
-import { QuotationCard } from '@/components/EntityCards';
+import { InvoiceCard, QuotationCard } from '@/components/EntityCards';
 import { ContentScroll, Screen } from '@/components/Layout';
 import { ErrorState, Skeleton } from '@/components/States';
 import { Text } from '@/components/Text';
@@ -17,24 +17,24 @@ import { useMembership, useSession } from '@/lib/session';
 import { colors, radius, space, touch } from '@/theme';
 
 function Kpi({
-  label, value, icon, hint, onPress, testID,
-}: { label: string; value: string; icon: IconName; hint?: string; onPress?: () => void; testID?: string }) {
+  label, value, icon, hint, onPress, testID, danger,
+}: { label: string; value: string; icon: IconName; hint?: string; onPress?: () => void; testID?: string; danger?: boolean }) {
   return (
     <Pressable
       accessibilityRole={onPress ? 'button' : 'text'}
       accessibilityLabel={`${label}: ${value}${hint ? `, ${hint}` : ''}`}
       onPress={onPress}
       disabled={!onPress}
-      style={({ pressed }) => [styles.kpi, pressed ? { backgroundColor: colors.surfaceMuted } : null]}
+      style={({ pressed }) => [styles.kpi, danger ? styles.kpiDanger : null, pressed ? { backgroundColor: colors.surfaceMuted } : null]}
       testID={testID}
     >
       <View style={styles.kpiHeader}>
-        <Ionicons name={icon} size={18} color={colors.brand} />
-        <Text variant="caption" tone="secondary" style={styles.flex} numberOfLines={2}>
+        <Ionicons name={icon} size={18} color={danger ? colors.danger : colors.brand} />
+        <Text variant="caption" tone={danger ? 'danger' : 'secondary'} style={styles.flex} numberOfLines={2}>
           {label}
         </Text>
       </View>
-      <Text variant="title" numberOfLines={1} adjustsFontSizeToFit>
+      <Text variant="title" tone={danger ? 'danger' : 'default'} numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </Text>
       {hint ? (
@@ -93,7 +93,8 @@ function ActivityRow({ item }: { item: ActivityDto }) {
     item.entityId && item.entityType === 'Quotation' ? `/quotation/${item.entityId}`
       : item.entityId && item.entityType === 'Job' ? `/job/${item.entityId}`
         : item.entityId && item.entityType === 'Customer' ? `/customer/${item.entityId}`
-          : null;
+          : item.entityId && item.entityType === 'Invoice' ? `/invoice/${item.entityId}`
+            : null;
   const content = (
     <>
       <View style={styles.dot} />
@@ -134,6 +135,7 @@ export default function DashboardScreen() {
   const dashboard = useDashboard();
   const d = dashboard.data;
   const goToStatus = (status: QuotationStatus) => router.push({ pathname: '/quotations', params: { status } });
+  const goToInvoices = (filter: 'open' | 'overdue') => router.push({ pathname: '/invoices', params: { filter } });
 
   return (
     <Screen>
@@ -174,10 +176,38 @@ export default function DashboardScreen() {
               <Kpi label="Gewonnen (netto)" value={formatEur(d.acceptedValueNet)} icon="trophy-outline" testID="kpi-won" />
               <Kpi label="Offene Aufträge" value={String(d.openJobsCount)} icon="briefcase-outline" onPress={() => router.push('/jobs')} testID="kpi-jobs" />
               <Kpi label="Fällige Erinnerungen" value={String(d.followUpsDueCount)} icon="alarm-outline" testID="kpi-followups" />
+              <Kpi
+                label="Offene Rechnungen"
+                value={formatEur(d.openInvoicesAmount)}
+                hint={`${d.openInvoicesCount} ${d.openInvoicesCount === 1 ? 'Rechnung' : 'Rechnungen'}`}
+                icon="receipt-outline"
+                onPress={() => goToInvoices('open')}
+                testID="kpi-open-invoices"
+              />
+              <Kpi
+                label="Überfällig"
+                value={formatEur(d.overdueInvoicesAmount)}
+                hint={`${d.overdueInvoicesCount} ${d.overdueInvoicesCount === 1 ? 'Rechnung' : 'Rechnungen'}`}
+                icon="alert-circle-outline"
+                onPress={() => goToInvoices('overdue')}
+                danger={d.overdueInvoicesCount > 0}
+                testID="kpi-overdue-invoices"
+              />
             </View>
             <Text variant="small" tone="muted" testID="conversion-definition">
               {d.conversionRateDefinition}
             </Text>
+
+            {d.overdueInvoices.length > 0 ? (
+              <>
+                <SectionHeader title={`Überfällige Rechnungen (${d.overdueInvoicesCount})`} />
+                <View style={styles.list}>
+                  {d.overdueInvoices.slice(0, 5).map((i) => (
+                    <InvoiceCard key={i.id} item={i} />
+                  ))}
+                </View>
+              </>
+            ) : null}
 
             {d.awaitingDecision.length > 0 ? (
               <>
@@ -249,6 +279,7 @@ const styles = StyleSheet.create({
     flexBasis: '47%', flexGrow: 1, backgroundColor: colors.surface, borderRadius: radius.xl, padding: space[3], gap: space[1],
     borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, minHeight: 96,
   },
+  kpiDanger: { backgroundColor: colors.dangerSoft, borderColor: colors.palette.danger.border },
   kpiHeader: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
   list: { gap: space[3] },
   firstSteps: { gap: space[3] },

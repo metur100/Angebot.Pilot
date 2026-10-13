@@ -175,6 +175,11 @@ public sealed class CompanySettingsValidator : AbstractValidator<CompanySettings
         RuleFor(x => x.SecondReminderAfterDays).InclusiveBetween(4, 90).GreaterThan(x => x.FirstReminderAfterDays + 1)
             .When(x => x.SecondReminderEnabled).WithMessage("Die zweite Erinnerung muss mindestens 2 Tage nach der ersten liegen.");
         RuleFor(x => x.ExpiryReminderDaysBefore).InclusiveBetween(1, 30);
+        RuleFor(x => x.InvoicePrefix).Must(p => Rules.Prefix().IsMatch(p ?? string.Empty)).When(x => x.InvoicePrefix is not null).WithMessage("1–8 Großbuchstaben oder Ziffern.");
+        RuleFor(x => x.InvoicePaymentDays).InclusiveBetween(0, 120).When(x => x.InvoicePaymentDays is not null);
+        RuleFor(x => x.InvoiceIntroText).MaximumLength(Rules.LongText);
+        RuleFor(x => x.InvoiceClosingText).MaximumLength(Rules.LongText);
+        RuleFor(x => x.InvoiceReminderAfterDays).InclusiveBetween(1, 60).When(x => x.InvoiceReminderAfterDays is not null);
     }
 }
 
@@ -410,4 +415,79 @@ public sealed class ChangePlanRequestValidator : AbstractValidator<ChangePlanReq
 public sealed class ChangeJobStatusRequestValidator : AbstractValidator<ChangeJobStatusRequest>
 {
     public ChangeJobStatusRequestValidator() => RuleFor(x => x.Status).IsInEnum().WithMessage("Unbekannter Status.");
+}
+
+public sealed class CreateInvoiceRequestValidator : AbstractValidator<CreateInvoiceRequest>
+{
+    public CreateInvoiceRequestValidator()
+    {
+        RuleFor(x => x.CustomerId).NotEmpty().WithMessage("Bitte Kunden auswählen.");
+        RuleFor(x => x.Title).MaximumLength(Rules.ShortText);
+        RuleFor(x => x.ServiceDateTo).GreaterThanOrEqualTo(x => x.ServiceDateFrom).When(x => x.ServiceDateFrom is not null && x.ServiceDateTo is not null)
+            .WithMessage("Das Ende des Leistungszeitraums muss nach dem Beginn liegen.");
+        RuleFor(x => x.DueDate).GreaterThanOrEqualTo(x => x.IssueDate).When(x => x.IssueDate is not null && x.DueDate is not null)
+            .WithMessage("Das Fälligkeitsdatum darf nicht vor dem Rechnungsdatum liegen.");
+        RuleFor(x => x.TaxMode).IsInEnum().When(x => x.TaxMode is not null);
+        RuleFor(x => x.IntroText).MaximumLength(Rules.LongText);
+        RuleFor(x => x.ClosingText).MaximumLength(Rules.LongText);
+        RuleFor(x => x.PaymentTerms).MaximumLength(1000);
+        RuleFor(x => x.BuyerReference).MaximumLength(100);
+        RuleFor(x => x.InternalNotes).MaximumLength(Rules.LongText);
+        RuleFor(x => x.LineItems).Must(l => l is null || l.Count <= QuotationCalculator.MaxLineItems).WithMessage("Höchstens 200 Positionen.");
+        RuleForEach(x => x.LineItems).SetValidator(new LineItemInputValidator());
+    }
+}
+
+public sealed class UpdateInvoiceRequestValidator : AbstractValidator<UpdateInvoiceRequest>
+{
+    public UpdateInvoiceRequestValidator()
+    {
+        RuleFor(x => x.CustomerId).NotEmpty().WithMessage("Bitte Kunden auswählen.");
+        RuleFor(x => x.Title).NotEmpty().WithMessage("Bitte Betreff angeben.").MaximumLength(Rules.ShortText);
+        RuleFor(x => x.ServiceDateTo).GreaterThanOrEqualTo(x => x.ServiceDateFrom).When(x => x.ServiceDateFrom is not null && x.ServiceDateTo is not null)
+            .WithMessage("Das Ende des Leistungszeitraums muss nach dem Beginn liegen.");
+        RuleFor(x => x.DueDate).GreaterThanOrEqualTo(x => x.IssueDate).WithMessage("Das Fälligkeitsdatum darf nicht vor dem Rechnungsdatum liegen.");
+        RuleFor(x => x.DueDate).LessThanOrEqualTo(x => x.IssueDate.AddDays(365)).WithMessage("Das Zahlungsziel darf höchstens ein Jahr betragen.");
+        RuleFor(x => x.TaxMode).IsInEnum();
+        RuleFor(x => x.IntroText).MaximumLength(Rules.LongText);
+        RuleFor(x => x.ClosingText).MaximumLength(Rules.LongText);
+        RuleFor(x => x.PaymentTerms).MaximumLength(1000);
+        RuleFor(x => x.BuyerReference).MaximumLength(100);
+        RuleFor(x => x.InternalNotes).MaximumLength(Rules.LongText);
+        RuleFor(x => x.LineItems).NotNull().Must(l => l.Count <= QuotationCalculator.MaxLineItems).WithMessage("Höchstens 200 Positionen.");
+        RuleForEach(x => x.LineItems).SetValidator(new LineItemInputValidator());
+        RuleFor(x => x.RowVersion).NotEmpty();
+    }
+}
+
+public sealed class SendInvoiceRequestValidator : AbstractValidator<SendInvoiceRequest>
+{
+    public SendInvoiceRequestValidator()
+    {
+        RuleFor(x => x.Mode).IsInEnum();
+        RuleFor(x => x.RecipientEmail).EmailAddress().MaximumLength(254).When(x => !string.IsNullOrWhiteSpace(x.RecipientEmail)).WithMessage("Bitte gültige E-Mail-Adresse angeben.");
+        RuleFor(x => x.Subject).MaximumLength(200);
+        RuleFor(x => x.Message).MaximumLength(Rules.LongText);
+    }
+}
+
+public sealed class RecordPaymentRequestValidator : AbstractValidator<RecordPaymentRequest>
+{
+    public RecordPaymentRequestValidator()
+    {
+        RuleFor(x => x.Amount).GreaterThan(0).WithMessage("Der Betrag muss größer als 0 € sein.")
+            .LessThanOrEqualTo(1_000_000_000m).PrecisionScale(18, 2, true).WithMessage("Höchstens 2 Nachkommastellen.");
+        RuleFor(x => x.PaidOn).NotEmpty().WithMessage("Bitte Zahlungsdatum angeben.");
+        RuleFor(x => x.Method).MaximumLength(50);
+        RuleFor(x => x.Note).MaximumLength(500);
+    }
+}
+
+public sealed class PaymentReminderRequestValidator : AbstractValidator<PaymentReminderRequest>
+{
+    public PaymentReminderRequestValidator()
+    {
+        RuleFor(x => x.RecipientEmail).EmailAddress().MaximumLength(254).When(x => !string.IsNullOrWhiteSpace(x.RecipientEmail)).WithMessage("Bitte gültige E-Mail-Adresse angeben.");
+        RuleFor(x => x.Message).MaximumLength(Rules.LongText);
+    }
 }

@@ -41,12 +41,15 @@ test.describe('signed-in pages (demo account)', () => {
     ['/angebote', /^Angebote$/],
     ['/kunden', /^Kunden$/],
     ['/auftraege', /^Aufträge$/],
+    ['/rechnungen', /^Rechnungen$/],
+    ['/rechnungen?ueberfaellig=1', /^Rechnungen$/],
     ['/vorlagen', /^Vorlagen$/],
     ['/team', /^Team$/],
     ['/einstellungen/firma', /^Einstellungen$/],
     ['/einstellungen/dokumente', /^Einstellungen$/],
     ['/einstellungen/abo', /^Einstellungen$/],
     ['/angebote/neu', /^Neues Angebot$/],
+    ['/rechnungen/neu', /^Neue Rechnung$/],
   ];
 
   for (const [path, heading] of pages) {

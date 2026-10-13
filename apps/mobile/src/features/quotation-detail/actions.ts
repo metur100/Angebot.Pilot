@@ -4,7 +4,7 @@ import type { IconName } from '@/components/Button';
 
 export type QuotationAction =
   | 'edit' | 'send' | 'resend' | 'accept' | 'reject' | 'cancel' | 'revise' | 'duplicate' | 'convert' | 'openJob'
-  | 'pdf' | 'publicLink' | 'delete' | 'cancelFollowUps';
+  | 'pdf' | 'publicLink' | 'delete' | 'cancelFollowUps' | 'createInvoice';
 
 export interface ActionDef {
   action: QuotationAction;
@@ -28,6 +28,7 @@ const defs: Record<QuotationAction, ActionDef> = {
   publicLink: { action: 'publicLink', label: 'Kundenlink neu erzeugen & teilen', icon: 'link-outline' },
   delete: { action: 'delete', label: 'Entwurf löschen', icon: 'trash-outline', destructive: true },
   cancelFollowUps: { action: 'cancelFollowUps', label: 'Erinnerungen abbrechen', icon: 'alarm-outline' },
+  createInvoice: { action: 'createInvoice', label: 'Rechnung erstellen', icon: 'receipt-outline' },
 };
 
 /**
@@ -51,6 +52,8 @@ export function availableActions(q: QuotationDto, hasScheduledFollowUps = false)
   if (q.status === 'Accepted') {
     primary.push(q.jobId ? 'openJob' : 'convert');
   }
+  // Accepted: invoice directly from the quotation (in addition to the job conversion).
+  if (q.status === 'Accepted') more.push('createInvoice');
   if (q.status === 'Sent' || q.status === 'Rejected' || q.status === 'Expired') more.push('revise');
   // The API lets users record a late acceptance (e.g. by phone) on an expired quotation; customers cannot.
   if (q.status === 'Expired') primary.push('accept');

@@ -1,6 +1,22 @@
 // Domain rules of the mock backend (mirrors apps/api: Quotation.cs, QuotationService, FollowUpCanceller, NotificationService).
-import { addDaysIso, todayIso, type ActorType, type CompanySettingsDto, type FollowUpKind, type JobStatus, type QuotationEventType, type QuotationStatus } from '@angebotpilot/api-contracts';
-import { newId, nowIso, type CompanyRec, type MockDb, type QuotationRec } from './model';
+import {
+  addDaysIso,
+  calculateTotals,
+  todayIso,
+  type ActorType,
+  type CompanySettingsDto,
+  type FollowUpKind,
+  type InvoiceAction,
+  type InvoiceEventType,
+  type InvoiceStatus,
+  type JobStatus,
+  type MembershipRole,
+  type QuotationEventType,
+  type QuotationStatus,
+  type TaxMode,
+  type TotalsDto,
+} from '@angebotpilot/api-contracts';
+import { newId, nowIso, type CompanyRec, type InvoiceRec, type MockDb, type QuotationRec } from './model';
 
 export const IS_TEST = import.meta.env.MODE === 'test';
 
@@ -200,3 +216,114 @@ export function expireQuotation(db: MockDb, q: QuotationRec, at: string = nowIso
   cancelScheduledFollowUps(db, q.id, 'Angebot abgelaufen', at);
   addAudit(db, q.companyId, null, 'quotation.expired', 'Quotation', q.id, q.number, at);
 }
+
+// ---------- invoices (mirrors Invoice.cs, InvoiceDocuments.CompanyProblems and InvoiceService.AllowedActions) ----------
+
+export function invoiceTotals(i: Pick<InvoiceRec, 'lineItems' | 'taxMode'>): TotalsDto {
+  return calculateTotals(i.lineItems, i.taxMode);
+}
+
+const round2 = (value: number) => Math.round(value * 100) / 100;
+
+/** Issued and not (fully) paid, not cancelled. Cancellation invoices are never open. */
+export function isInvoiceOpen(i: Pick<InvoiceRec, 'kind' | 'status'>): boolean {
+  return i.kind === 'Invoice' && (i.status === 'Issued' || i.status === 'PartiallyPaid');
+}
+
+export function invoiceOpenAmount(i: InvoiceRec): number {
+  return isInvoiceOpen(i) ? round2(invoiceTotals(i).grossTotal - i.paidAmount) : 0;
+}
+
+export function invoiceDaysOverdue(i: InvoiceRec, today: string): number {
+  if (!isInvoiceOpen(i) || i.dueDate >= today) return 0;
+  return Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${i.dueDate}T00:00:00Z`)) / 86_400_000);
+}
+
+export function addInvoiceEvent(
+  db: MockDb,
+  i: InvoiceRec,
+  type: InvoiceEventType,
+  actorType: ActorType,
+  userId: string | null,
+  details: string | null = null,
+  at: string = nowIso(),
+): void {
+  db.invoiceEvents.push({ id: newId(), companyId: i.companyId, invoiceId: i.id, type, occurredAt: at, actorType, actorUserId: userId, details });
+}
+
+export function invoiceCompanyProblems(company: CompanyRec, taxMode: TaxMode): string[] {
+  const problems: string[] = [];
+  if (!company.addressLine1?.trim() || !company.postalCode?.trim() || !company.city?.trim()) {
+    problems.push('Bitte die vollständige Anschrift Ihrer Firma hinterlegen (Einstellungen → Firma).');
+  }
+  if (!company.taxNumber?.trim() && !company.vatId?.trim()) {
+    problems.push('Bitte Steuernummer oder USt-IdNr. Ihrer Firma hinterlegen (Einstellungen → Firma).');
+  }
+  if (taxMode === 'ReverseCharge' && !company.vatId?.trim()) {
+    problems.push('Für § 13b UStG ist die USt-IdNr. Ihrer Firma erforderlich.');
+  }
+  return problems;
+}
+
+/** Document-level requirements for issuing (§ 14 UStG), like Invoice.IssueProblems of the API. */
+export function invoiceIssueProblems(i: InvoiceRec, today: string): string[] {
+  const problems: string[] = [];
+  if (i.lineItems.length === 0) problems.push('Die Rechnung enthält keine Positionen.');
+  else if (i.kind === 'Invoice' && invoiceTotals(i).netTotal <= 0) problems.push('Der Rechnungsbetrag muss größer als 0 € sein.');
+  if (!i.serviceDateFrom) problems.push('Bitte das Leistungsdatum bzw. den Leistungszeitraum angeben (§ 14 UStG).');
+  else if (i.serviceDateTo && i.serviceDateTo < i.serviceDateFrom) problems.push('Das Ende des Leistungszeitraums liegt vor dem Beginn.');
+  if (i.issueDate > today) problems.push('Das Rechnungsdatum darf nicht in der Zukunft liegen.');
+  if (i.dueDate < i.issueDate) problems.push('Das Fälligkeitsdatum darf nicht vor dem Rechnungsdatum liegen.');
+  if (!i.recipientName.trim() || !i.recipientStreet || !i.recipientCity) {
+    problems.push('Beim Kunden fehlen Name oder vollständige Rechnungsanschrift (Straße, PLZ, Ort).');
+  }
+  if (i.taxMode === 'ReverseCharge' && !i.recipientVatId?.trim()) {
+    problems.push('Für die Steuerschuldnerschaft des Leistungsempfängers (§ 13b UStG) ist die USt-IdNr. des Kunden erforderlich.');
+  }
+  return problems;
+}
+
+export function invoiceAllowedActions(i: InvoiceRec, role: MembershipRole): InvoiceAction[] {
+  const admin = role === 'Owner' || role === 'Admin';
+  if (i.status === 'Draft') return admin ? ['edit', 'delete', 'duplicate', 'issue'] : ['edit', 'delete', 'duplicate'];
+  const actions: InvoiceAction[] = [];
+  if (i.kind !== 'Cancellation') actions.push('duplicate');
+  if (!admin) return actions;
+  actions.push('send');
+  if (isInvoiceOpen(i)) actions.push('recordPayment', 'remind');
+  if (i.status === 'PartiallyPaid' || i.status === 'Paid') actions.push('removePayment');
+  if (i.kind !== 'Cancellation' && i.status !== 'Cancelled') actions.push('cancel');
+  return actions;
+}
+
+/** Recomputes paid amount and status from the recorded payments (Invoice.ApplyPayments). */
+export function applyInvoicePayments(db: MockDb, i: InvoiceRec, at: string = nowIso()): void {
+  const payments = db.invoicePayments.filter((p) => p.invoiceId === i.id);
+  i.paidAmount = round2(payments.reduce((sum, p) => sum + p.amount, 0));
+  const gross = invoiceTotals(i).grossTotal;
+  if (payments.length > 0 && i.paidAmount >= gross) {
+    i.status = 'Paid';
+    i.paidOn = payments.map((p) => p.paidOn).sort().at(-1) ?? null;
+  } else {
+    i.status = i.paidAmount > 0 ? 'PartiallyPaid' : 'Issued';
+    i.paidOn = null;
+  }
+  i.updatedAt = at;
+}
+
+export function invoicePdfFileName(i: Pick<InvoiceRec, 'number' | 'kind'>): string {
+  if (!i.number) return 'Rechnung_Entwurf.pdf';
+  return `${i.kind === 'Cancellation' ? 'Stornorechnung' : 'Rechnung'}_${i.number}.pdf`;
+}
+
+export function invoiceXmlFileName(i: Pick<InvoiceRec, 'number' | 'kind'>): string {
+  return `${i.kind === 'Cancellation' ? 'Stornorechnung' : 'Rechnung'}_${i.number ?? 'Entwurf'}.xml`;
+}
+
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+  Draft: 'Entwurf',
+  Issued: 'Offen',
+  PartiallyPaid: 'Teilweise bezahlt',
+  Paid: 'Bezahlt',
+  Cancelled: 'Storniert',
+};

@@ -16,3 +16,17 @@ export function downloadBlob(blob: Blob, fileName: string) {
 export function fileStamp(date: Date = new Date()): string {
   return date.toISOString().slice(0, 10);
 }
+
+/** File-name friendly document number (e.g. "RE-2026-0001"; other characters become "_"). */
+export function safeFileName(value: string): string {
+  return value.replace(/[^A-Za-z0-9_-]/g, '_');
+}
+
+/**
+ * Loads a document from the API (e.g. the e-invoice XML) and saves it under the given name.
+ * The content type is forced when given, so browsers do not try to render XML inline.
+ */
+export async function downloadDocument(load: () => Promise<Blob>, fileName: string, contentType?: string): Promise<void> {
+  const blob = await load();
+  downloadBlob(contentType && blob.type !== contentType ? new Blob([blob], { type: contentType }) : blob, fileName);
+}

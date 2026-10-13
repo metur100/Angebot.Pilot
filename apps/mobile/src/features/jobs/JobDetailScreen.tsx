@@ -6,6 +6,7 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button, type IconName } from '@/components/Button';
 import { Card, KeyValue, SectionHeader } from '@/components/Card';
+import { InvoiceLinkCard } from '@/components/EntityCards';
 import { DateField, SelectField, TextField } from '@/components/Field';
 import { FormScroll, Screen } from '@/components/Layout';
 import { JobStatusBadge } from '@/components/StatusBadge';
@@ -13,7 +14,7 @@ import { ErrorState, InlineError, ListSkeleton } from '@/components/States';
 import { Text } from '@/components/Text';
 import { useToast } from '@/components/Toast';
 import { emptyToNull, isConflict } from '@/lib/forms';
-import { keys, useJob } from '@/lib/queries';
+import { invalidateInvoiceData, keys, useJob } from '@/lib/queries';
 import { api, useCompanyId } from '@/lib/session';
 import { space, touch } from '@/theme';
 
@@ -53,8 +54,26 @@ export default function JobDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [changing, setChanging] = useState<JobStatus | null>(null);
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
 
   const j = job.data;
+
+  /** Creates an invoice draft prefilled from the job (line items of its quotation) and opens it for editing. */
+  const createInvoice = async () => {
+    if (!j) return;
+    setCreatingInvoice(true);
+    try {
+      const draft = await api.jobs.createInvoice(companyId, j.id);
+      invalidateInvoiceData(queryClient, companyId, draft);
+      void queryClient.invalidateQueries({ queryKey: keys.job(companyId, j.id) });
+      toast('Rechnungsentwurf angelegt');
+      router.push({ pathname: '/invoice-editor', params: { id: draft.id, created: '1' } });
+    } catch (e) {
+      Alert.alert('Rechnung konnte nicht erstellt werden', errorMessage(e));
+    } finally {
+      setCreatingInvoice(false);
+    }
+  };
 
   const apply = (updated: JobDto) => {
     queryClient.setQueryData(keys.job(companyId, updated.id), updated);
@@ -184,6 +203,27 @@ export default function JobDetailScreen() {
           </>
         ) : null}
 
+        <SectionHeader title={`Rechnungen (${j.invoices.length})`} />
+        <View style={styles.invoices} testID="job-invoices">
+          {j.invoices.length === 0 ? (
+            <Text variant="caption" tone="muted">
+              Noch keine Rechnung zu diesem Auftrag.
+            </Text>
+          ) : null}
+          {j.invoices.map((inv) => (
+            <InvoiceLinkCard key={inv.id} item={inv} />
+          ))}
+          <Button
+            label="Rechnung erstellen"
+            icon="receipt-outline"
+            variant={j.invoices.length === 0 && j.status === 'Completed' ? 'primary' : 'outline'}
+            onPress={() => void createInvoice()}
+            loading={creatingInvoice}
+            accessibilityHint="Legt einen Rechnungsentwurf mit den Positionen des Angebots an"
+            testID="job-create-invoice"
+          />
+        </View>
+
         <SectionHeader
           title="Details"
           action={
@@ -250,4 +290,5 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   link: { minHeight: touch, justifyContent: 'center', alignSelf: 'flex-start' },
   statusButtons: { gap: space[2] },
+  invoices: { gap: space[3] },
 });

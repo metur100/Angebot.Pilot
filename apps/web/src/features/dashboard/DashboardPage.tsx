@@ -1,7 +1,9 @@
-import { followUpKindLabel, todayIso, type DashboardDto, type QuotationListItemDto } from '@angebotpilot/api-contracts';
+import { followUpKindLabel, todayIso, type DashboardDto, type InvoiceListItemDto, type QuotationListItemDto } from '@angebotpilot/api-contracts';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   Activity,
+  AlarmClock,
+  Banknote,
   BellRing,
   CircleCheck,
   CircleX,
@@ -11,6 +13,7 @@ import {
   Hourglass,
   Percent,
   Plus,
+  ReceiptText,
   Send,
   TrendingUp,
   UserPlus,
@@ -31,7 +34,7 @@ import { PageHeader } from '@/components/ui/Page';
 import { api } from '@/lib/api';
 import { cx } from '@/lib/cx';
 import { datePresetLabel, rangeForPreset, type DatePreset } from '@/lib/dateRange';
-import { daysUntil, formatDate, formatDateTime, formatEur, formatRelative } from '@/lib/format';
+import { daysUntil, formatDate, formatDateTime, formatEur, formatRelative, plural } from '@/lib/format';
 import { useListParams } from '@/lib/listParams';
 import { qk } from '@/lib/queryKeys';
 
@@ -50,6 +53,8 @@ interface KpiProps {
   to?: string;
   help?: ReactNode;
   tone?: 'brand' | 'success' | 'danger' | 'warning' | 'neutral';
+  /** Colours the value itself, e.g. overdue amounts. */
+  valueTone?: 'danger';
 }
 
 const toneClass = {
@@ -60,7 +65,7 @@ const toneClass = {
   neutral: 'bg-neutral-100 text-neutral-600',
 };
 
-function Kpi({ label, value, icon: Icon, hint, to, help, tone = 'neutral' }: KpiProps) {
+function Kpi({ label, value, icon: Icon, hint, to, help, tone = 'neutral', valueTone }: KpiProps) {
   const body = (
     <>
       <div className="flex items-center justify-between gap-2">
@@ -69,7 +74,9 @@ function Kpi({ label, value, icon: Icon, hint, to, help, tone = 'neutral' }: Kpi
           <Icon aria-hidden size={15} />
         </span>
       </div>
-      <p className="mt-2 text-2xl leading-8 font-semibold tracking-[-0.01em] text-neutral-900 tabular">{value}</p>
+      <p className={cx('mt-2 text-2xl leading-8 font-semibold tracking-[-0.01em] tabular', valueTone === 'danger' ? 'text-danger-text' : 'text-neutral-900')}>
+        {value}
+      </p>
       {hint && <p className="mt-0.5 text-xs text-neutral-500">{hint}</p>}
     </>
   );
@@ -211,6 +218,69 @@ function Kpis({ data }: { data: DashboardDto }) {
   );
 }
 
+function InvoiceKpis({ data }: { data: DashboardDto }) {
+  const overdue = data.overdueInvoicesCount > 0;
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <Kpi
+        label="Offene Rechnungen"
+        value={formatEur(data.openInvoicesAmount)}
+        icon={ReceiptText}
+        tone="brand"
+        hint={data.openInvoicesCount === 0 ? 'keine offenen Rechnungen' : `${plural(data.openInvoicesCount, 'Rechnung', 'Rechnungen')} offen`}
+        to="/rechnungen?status=Issued,PartiallyPaid"
+      />
+      <Kpi
+        label="Überfällig"
+        value={formatEur(data.overdueInvoicesAmount)}
+        icon={AlarmClock}
+        tone={overdue ? 'danger' : 'neutral'}
+        valueTone={overdue ? 'danger' : undefined}
+        hint={overdue ? `${plural(data.overdueInvoicesCount, 'Rechnung', 'Rechnungen')} überfällig` : 'nichts überfällig'}
+        to="/rechnungen?ueberfaellig=1"
+      />
+      <Kpi label="Zahlungseingang" value={formatEur(data.paymentsReceived)} icon={Banknote} tone="success" hint="Zahlungen im Zeitraum" />
+      <Kpi
+        label="Abgerechnet netto"
+        value={formatEur(data.invoicedNet)}
+        icon={TrendingUp}
+        hint="gestellte Rechnungen im Zeitraum"
+        help={
+          <HelpPopover label="Was zählt als abgerechnet?">
+            Nettobetrag aller im Zeitraum gestellten Rechnungen (nach Rechnungsdatum). Stornorechnungen werden abgezogen, Entwürfe zählen nicht.
+          </HelpPopover>
+        }
+      />
+    </div>
+  );
+}
+
+function OverdueInvoices({ items }: { items: InvoiceListItemDto[] }) {
+  if (items.length === 0) return <p className="px-5 py-6 text-sm text-neutral-500">Keine überfälligen Rechnungen – alles im Zahlungsziel.</p>;
+  return (
+    <ul className="divide-y divide-neutral-100">
+      {items.map((i) => (
+        <li key={i.id}>
+          <Link to={`/rechnungen/${i.id}`} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-neutral-25">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-neutral-900">{i.customerName}</p>
+              <p className="truncate text-[13px] text-neutral-500">
+                {i.number ?? 'Entwurf'} · {i.title}
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-sm font-medium text-neutral-900 tabular">{formatEur(i.openAmount)}</p>
+              <p className="text-xs text-danger-text">
+                {i.daysOverdue} {i.daysOverdue === 1 ? 'Tag' : 'Tage'} überfällig
+              </p>
+            </div>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function DashboardPage() {
   const user = useUser();
   const { companyId, membership } = useCompany();
@@ -286,10 +356,19 @@ export default function DashboardPage() {
           <ErrorState error={dashboard.error} onRetry={() => void dashboard.refetch()} />
         </Card>
       ) : !dashboard.data ? (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-          {Array.from({ length: 10 }, (_, i) => (
-            <KpiSkeleton key={i} />
-          ))}
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+            {Array.from({ length: 10 }, (_, i) => (
+              <KpiSkeleton key={i} />
+            ))}
+          </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3">
+              {Array.from({ length: 4 }, (_, i) => (
+                <KpiSkeleton key={i} />
+              ))}
+            </div>
+          </div>
         </div>
       ) : (
         <div className={cx('space-y-6', dashboard.isPlaceholderData && 'opacity-60 transition-opacity')}>
@@ -298,6 +377,27 @@ export default function DashboardPage() {
               Zeitraum: {formatDate(dashboard.data.from)} – {formatDate(dashboard.data.to)} (nach Angebotsdatum)
             </p>
             <Kpis data={dashboard.data} />
+          </section>
+
+          <section aria-labelledby="dashboard-invoices" className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
+            <div>
+              <h2 id="dashboard-invoices" className="mb-2 text-xs text-neutral-600">
+                Rechnungen: offen und überfällig zum heutigen Stand, Zahlungen und Abrechnung im Zeitraum
+              </h2>
+              <InvoiceKpis data={dashboard.data} />
+            </div>
+            <Card className="self-start">
+              <CardHeader
+                title="Überfällige Rechnungen"
+                description="Zahlungsziel überschritten – Zeit für eine Erinnerung"
+                actions={
+                  <Link to="/rechnungen?ueberfaellig=1" className="text-[13px] font-medium text-brand-600 hover:underline">
+                    Alle
+                  </Link>
+                }
+              />
+              <OverdueInvoices items={dashboard.data.overdueInvoices} />
+            </Card>
           </section>
 
           <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">

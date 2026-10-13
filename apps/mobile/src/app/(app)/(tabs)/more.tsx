@@ -47,6 +47,17 @@ export default function MoreScreen() {
           </Text>
         </View>
 
+        <SectionHeader title="Rechnungen" />
+        <Group>
+          <ListRow
+            icon="receipt-outline"
+            label="Rechnungen"
+            value="Rechnungen stellen, versenden und Zahlungen erfassen"
+            onPress={() => router.push('/invoices')}
+            testID="more-invoices"
+          />
+        </Group>
+
         <SectionHeader title="Unternehmen" />
         <Group>
           <ListRow

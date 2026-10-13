@@ -1,6 +1,6 @@
 import {
-  emailStatusLabel, emailStatusTone, jobStatusLabel, jobStatusTone, quotationStatusLabel, quotationStatusTone,
-  type EmailStatus, type JobStatus, type QuotationStatus, type Tone,
+  emailStatusLabel, emailStatusTone, invoiceDisplayStatus, jobStatusLabel, jobStatusTone, quotationStatusLabel, quotationStatusTone,
+  type EmailStatus, type InvoiceKind, type InvoiceStatus, type JobStatus, type QuotationStatus, type Tone,
 } from '@angebotpilot/api-contracts';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, View } from 'react-native';
@@ -59,6 +59,21 @@ export function QuotationStatusBadge({ status }: { status: QuotationStatus }) {
 
 export function JobStatusBadge({ status }: { status: JobStatus }) {
   return <Badge label={jobStatusLabel[status]} tone={jobStatusTone[status]} icon={jobIcon[status]} testID={`job-status-${status}`} />;
+}
+
+const invoiceIcon: Record<InvoiceStatus, IconName> = {
+  Draft: 'create-outline',
+  Issued: 'receipt-outline',
+  PartiallyPaid: 'pie-chart-outline',
+  Paid: 'checkmark-done-circle-outline',
+  Cancelled: 'ban-outline',
+};
+
+/** Invoice badge: cancellation invoices and overdue invoices get their own wording (invoiceDisplayStatus). */
+export function InvoiceStatusBadge({ invoice }: { invoice: { kind: InvoiceKind; status: InvoiceStatus; isOverdue?: boolean } }) {
+  const { label, tone } = invoiceDisplayStatus({ kind: invoice.kind, status: invoice.status, isOverdue: !!invoice.isOverdue });
+  const icon: IconName = invoice.kind === 'Cancellation' ? 'return-down-back-outline' : invoice.isOverdue ? 'alert-circle-outline' : invoiceIcon[invoice.status];
+  return <Badge label={label} tone={tone} icon={icon} testID={`invoice-status-${invoice.status}`} />;
 }
 
 export function EmailStatusBadge({ status }: { status: EmailStatus }) {

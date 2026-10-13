@@ -1,7 +1,7 @@
 import { jobStatusLabel, todayIso, type JobDto, type JobStatus, type UpdateJobRequest } from '@angebotpilot/api-contracts';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlarmClock, Ban, CircleCheck, Play, RefreshCw, RotateCcw, Save, type LucideIcon } from 'lucide-react';
+import { AlarmClock, Ban, CircleCheck, Play, ReceiptText, RefreshCw, RotateCcw, Save, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useParams } from 'react-router';
@@ -17,6 +17,7 @@ import { Field } from '@/components/ui/Field';
 import { Input, Select, Textarea } from '@/components/ui/Input';
 import { PageHeader } from '@/components/ui/Page';
 import { toast } from '@/components/ui/Toast';
+import { InvoiceLinkList, useCreateInvoiceFrom } from '@/features/invoices/shared';
 import { api } from '@/lib/api';
 import { applyServerErrors, errorMessage, hasFieldErrors, isConflict, isForbidden } from '@/lib/errors';
 import { daysUntil, formatDate, formatDateTime, formatEur, getDisplayTimeZone } from '@/lib/format';
@@ -105,6 +106,36 @@ const statusToast: Record<JobStatus, string> = {
   Completed: 'Auftrag abgeschlossen',
   Cancelled: 'Auftrag storniert',
 };
+
+/** Invoices of the job plus "Rechnung erstellen" (emphasised once the job is completed and not yet invoiced). */
+function JobInvoices({ job }: { job: JobDto }) {
+  const create = useCreateInvoiceFrom({ type: 'job', id: job.id });
+  const invoiced = job.invoices.some((i) => i.kind === 'Invoice' && i.status !== 'Cancelled');
+  const highlight = job.status === 'Completed' && !invoiced;
+  return (
+    <Card>
+      <CardHeader title="Rechnungen" as="h2" />
+      <CardBody className="space-y-3">
+        {highlight && (
+          <Alert tone="success" icon={ReceiptText} title="Bereit zur Abrechnung">
+            Der Auftrag ist abgeschlossen. Die Positionen aus Angebot {job.quotationNumber} werden in den Rechnungsentwurf übernommen.
+          </Alert>
+        )}
+        <InvoiceLinkList invoices={job.invoices} empty="Noch keine Rechnung zu diesem Auftrag." />
+        <Button
+          variant={highlight ? 'primary' : 'secondary'}
+          size={highlight ? 'md' : 'sm'}
+          icon={ReceiptText}
+          loading={create.isPending}
+          onClick={() => create.mutate()}
+          className={highlight ? 'w-full sm:w-auto' : undefined}
+        >
+          Rechnung erstellen
+        </Button>
+      </CardBody>
+    </Card>
+  );
+}
 
 function JobDetail({ job }: { job: JobDto }) {
   const { companyId } = useCompany();
@@ -316,6 +347,7 @@ function JobDetail({ job }: { job: JobDto }) {
               />
             </CardBody>
           </Card>
+          <JobInvoices job={job} />
           <Card>
             <CardHeader title="Verlauf" as="h2" />
             <CardBody>

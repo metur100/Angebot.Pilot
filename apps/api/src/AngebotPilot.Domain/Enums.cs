@@ -84,6 +84,8 @@ public enum EmailKind
     PasswordReset = 5,
     EmailVerification = 6,
     DecisionNotification = 7,
+    InvoiceSent = 8,
+    PaymentReminder = 9,
 }
 
 public enum EmailStatus
@@ -133,6 +135,8 @@ public enum FilePurpose
 {
     CompanyLogo = 0,
     QuotationPdf = 1,
+    InvoicePdf = 2,
+    InvoiceXml = 3,
 }
 
 public enum FileStatus
@@ -175,4 +179,47 @@ public enum DocumentSequenceKind
 {
     Quotation = 0,
     Job = 1,
+    Invoice = 2,
+}
+
+public enum InvoiceStatus
+{
+    /// <summary>Editable; no number assigned yet.</summary>
+    Draft = 0,
+
+    /// <summary>Finalised (festgeschrieben): numbered, frozen and awaiting payment.</summary>
+    Issued = 1,
+
+    PartiallyPaid = 2,
+
+    Paid = 3,
+
+    /// <summary>Reversed by a cancellation invoice (Stornorechnung).</summary>
+    Cancelled = 4,
+}
+
+public enum InvoiceKind
+{
+    Invoice = 0,
+
+    /// <summary>Stornorechnung: reverses an issued invoice in full. Amounts are stored positive and shown negated.</summary>
+    Cancellation = 1,
+}
+
+public enum InvoiceEventType
+{
+    Created = 0,
+    Updated = 1,
+    Issued = 2,
+    Sent = 3,
+    MarkedAsSent = 4,
+    PaymentRecorded = 5,
+    PaymentRemoved = 6,
+    Paid = 7,
+    Cancelled = 8,
+    CancellationCreated = 9,
+    ReminderQueued = 10,
+    EmailHandedOff = 11,
+    EmailFailed = 12,
+    Duplicated = 13,
 }

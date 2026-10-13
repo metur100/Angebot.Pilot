@@ -2,6 +2,7 @@ import type {
   EmailKind, EmailStatus, FollowUpKind, FollowUpStatus, JobStatus, MembershipRole, QuotationEventType,
   QuotationStatus, SubscriptionStatus, TaxMode, CustomerType,
 } from './types';
+import type * as T from './types';
 
 /** Semantic tone for status badges. UIs must always render the text label too (never colour alone). */
 export type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'muted';
@@ -60,6 +61,8 @@ export const emailKindLabel: Record<EmailKind, string> = {
   FirstReminder: '1. Erinnerung',
   SecondReminder: '2. Erinnerung',
   ExpiryReminder: 'Erinnerung vor Ablauf',
+  InvoiceSent: 'Rechnungsversand',
+  PaymentReminder: 'Zahlungserinnerung',
   Invitation: 'Einladung',
   PasswordReset: 'Passwort zurücksetzen',
   EmailVerification: 'E-Mail-Bestätigung',
@@ -131,3 +134,25 @@ export const quotationEventLabel: Record<QuotationEventType, string> = {
 };
 
 export const unitSuggestions = ['Stk.', 'Std.', 'Tag', 'pauschal', 'm', 'm²', 'm³', 'kg', 'l', 'km', 'Monat'];
+
+// ---------- Invoices ----------
+export const invoiceStatusLabel: Record<T.InvoiceStatus, string> = {
+  Draft: 'Entwurf', Issued: 'Offen', PartiallyPaid: 'Teilweise bezahlt', Paid: 'Bezahlt', Cancelled: 'Storniert',
+};
+export const invoiceStatusTone: Record<T.InvoiceStatus, Tone> = {
+  Draft: 'neutral', Issued: 'info', PartiallyPaid: 'warning', Paid: 'success', Cancelled: 'muted',
+};
+/** Label shown in lists/badges: cancellation invoices and overdue invoices get their own wording. */
+export function invoiceDisplayStatus(i: { kind: T.InvoiceKind; status: T.InvoiceStatus; isOverdue: boolean }): { label: string; tone: Tone } {
+  if (i.kind === 'Cancellation') return { label: 'Stornorechnung', tone: 'muted' };
+  if (i.isOverdue) return { label: i.status === 'PartiallyPaid' ? 'Teilweise bezahlt · überfällig' : 'Überfällig', tone: 'danger' };
+  return { label: invoiceStatusLabel[i.status], tone: invoiceStatusTone[i.status] };
+}
+export const invoiceEventLabel: Record<T.InvoiceEventType, string> = {
+  Created: 'Entwurf erstellt', Updated: 'Bearbeitet', Issued: 'Rechnung gestellt', Sent: 'Per E-Mail versendet',
+  MarkedAsSent: 'Als versendet markiert', PaymentRecorded: 'Zahlung erfasst', PaymentRemoved: 'Zahlung entfernt', Paid: 'Vollständig bezahlt',
+  Cancelled: 'Storniert', CancellationCreated: 'Stornorechnung erstellt', ReminderQueued: 'Zahlungserinnerung',
+  EmailHandedOff: 'E-Mail übergeben', EmailFailed: 'E-Mail fehlgeschlagen', Duplicated: 'Kopiert',
+};
+/** Common payment methods offered in the payment dialog (free text is allowed too). */
+export const paymentMethodSuggestions = ['Überweisung', 'Lastschrift', 'Bar', 'EC-/Kreditkarte', 'PayPal'];

@@ -19,10 +19,12 @@ interface CustomerPickerProps {
   onChange: (customerId: string) => void;
   error?: string | undefined;
   disabled?: boolean;
+  /** Document the customer is picked for, used in the "Neuer Kunde" dialog (default: "dieses Angebot"). */
+  documentLabel?: string;
 }
 
 /** Searchable customer combobox (ARIA 1.2 combobox pattern) with inline "Neuer Kunde" dialog. */
-export function CustomerPicker({ value, onChange, error, disabled }: CustomerPickerProps) {
+export function CustomerPicker({ value, onChange, error, disabled, documentLabel = 'dieses Angebot' }: CustomerPickerProps) {
   const { companyId } = useCompany();
   const queryClient = useQueryClient();
   const baseId = useId();
@@ -223,7 +225,7 @@ export function CustomerPicker({ value, onChange, error, disabled }: CustomerPic
         open={creating}
         onOpenChange={setCreating}
         title="Neuer Kunde"
-        description="Der Kunde wird angelegt und direkt für dieses Angebot ausgewählt."
+        description={`Der Kunde wird angelegt und direkt für ${documentLabel} ausgewählt.`}
         size="lg"
         dismissible={false}
         footer={

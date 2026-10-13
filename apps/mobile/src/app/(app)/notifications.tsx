@@ -18,6 +18,7 @@ function targetFor(n: NotificationDto): string | null {
   if (n.entityType === 'Quotation') return `/quotation/${n.entityId}`;
   if (n.entityType === 'Job') return `/job/${n.entityId}`;
   if (n.entityType === 'Customer') return `/customer/${n.entityId}`;
+  if (n.entityType === 'Invoice') return `/invoice/${n.entityId}`;
   return null;
 }
 

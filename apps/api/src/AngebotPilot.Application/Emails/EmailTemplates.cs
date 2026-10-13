@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text;
 using AngebotPilot.Domain;
+using AngebotPilot.Domain.Invoices;
 using AngebotPilot.Domain.Quotations;
 
 namespace AngebotPilot.Application.Emails;
@@ -59,6 +60,37 @@ public static class EmailTemplates
         };
         return Compose(subject, Salutation(q.RecipientContact), [text, Summary(q)], publicUrl, publicUrl is null ? null : "Angebot ansehen", NextStep(publicUrl, pdfAttached, q.ValidUntil),
             signature ?? $"Mit freundlichen Grüßen\n{companyName}", companyName, optOutUrl, brandColor);
+    }
+
+    public static string DefaultSubject(Invoice invoice, string companyName) =>
+        invoice.IsCancellation ? $"Stornorechnung {invoice.Number} von {companyName}" : $"Ihre Rechnung {invoice.Number} von {companyName}";
+
+    public static ComposedEmail InvoiceSent(Invoice invoice, string companyName, string? subject, string? message, string? signature, string brandColor)
+    {
+        var intro = string.IsNullOrWhiteSpace(message)
+            ? invoice.IsCancellation
+                ? $"anbei erhalten Sie die Stornorechnung {invoice.Number} zu unserer Rechnung {invoice.CancelledInvoiceNumber}."
+                : $"vielen Dank für Ihren Auftrag. Anbei erhalten Sie unsere Rechnung {invoice.Number} „{invoice.Title}“."
+            : message.Trim();
+        var summary = invoice.IsCancellation
+            ? $"Stornorechnung: {invoice.Number}\nStorniert: Rechnung {invoice.CancelledInvoiceNumber}\nBetrag: −{Eur(invoice.GrossTotal)}"
+            : $"Rechnungsnummer: {invoice.Number}\nRechnungsbetrag: {Eur(invoice.GrossTotal)}{(invoice.TaxMode == TaxMode.Standard ? " inkl. USt." : string.Empty)}\nZahlbar bis: {Date(invoice.DueDate)}";
+        var after = invoice.IsCancellation
+            ? "Die Rechnung finden Sie im Anhang als PDF. Sie enthält zusätzlich die strukturierten Rechnungsdaten (E-Rechnung im ZUGFeRD-Format)."
+            : "Die Rechnung finden Sie im Anhang als PDF. Sie enthält zusätzlich die strukturierten Rechnungsdaten (E-Rechnung im ZUGFeRD-Format), die Ihre Buchhaltungssoftware direkt einlesen kann.";
+        return Compose(subject ?? DefaultSubject(invoice, companyName), Salutation(invoice.RecipientContact), [intro, summary], null, null, after,
+            signature ?? $"Mit freundlichen Grüßen\n{companyName}", companyName, null, brandColor);
+    }
+
+    public static ComposedEmail PaymentReminder(Invoice invoice, string companyName, string? message, string? signature, string brandColor)
+    {
+        var intro = string.IsNullOrWhiteSpace(message)
+            ? $"sicher ist es Ihrer Aufmerksamkeit entgangen: Unsere Rechnung {invoice.Number} „{invoice.Title}“ vom {Date(invoice.IssueDate)} war am {Date(invoice.DueDate)} fällig. Bis heute konnten wir noch keinen vollständigen Zahlungseingang feststellen."
+            : message.Trim();
+        var summary = $"Rechnungsnummer: {invoice.Number}\nRechnungsbetrag: {Eur(invoice.GrossTotal)}\nNoch offen: {Eur(invoice.OpenAmount)}\nFällig seit: {Date(invoice.DueDate)}";
+        return Compose($"Zahlungserinnerung zu Rechnung {invoice.Number}", Salutation(invoice.RecipientContact), [intro, summary], null, null,
+            $"Bitte überweisen Sie den offenen Betrag in den nächsten Tagen unter Angabe der Rechnungsnummer. Die Rechnung finden Sie zur Sicherheit noch einmal im Anhang. Sollte sich Ihre Zahlung mit dieser E-Mail überschnitten haben, betrachten Sie sie bitte als gegenstandslos.",
+            signature ?? $"Mit freundlichen Grüßen\n{companyName}", companyName, null, brandColor);
     }
 
     public static ComposedEmail DecisionNotification(Quotation q, bool accepted, string? decisionName, string? note, string detailUrl, string productName)

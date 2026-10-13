@@ -11,6 +11,7 @@ using AngebotPilot.Application.Contracts;
 using AngebotPilot.Application.Customers;
 using AngebotPilot.Application.Dashboard;
 using AngebotPilot.Application.Files;
+using AngebotPilot.Application.Invoices;
 using AngebotPilot.Application.Jobs;
 using AngebotPilot.Application.Public;
 using AngebotPilot.Application.Quotations;
@@ -291,6 +292,58 @@ public static class Endpoints
         c.MapGet("/jobs/{id:guid}", (Guid id, JobService s, CancellationToken ct) => s.GetAsync(id, ct));
         c.MapPut("/jobs/{id:guid}", (Guid id, UpdateJobRequest r, HttpContext h, JobService s, CancellationToken ct) => s.UpdateAsync(h.Member(), id, r, ct)).Validate<UpdateJobRequest>();
         c.MapPost("/jobs/{id:guid}/status", (Guid id, ChangeJobStatusRequest r, HttpContext h, JobService s, CancellationToken ct) => s.ChangeStatusAsync(h.Member(), id, r.Status, ct)).Validate<ChangeJobStatusRequest>();
+
+        // Invoices
+        c.MapGet("/invoices", (string? search, string? status, bool? overdue, Guid? customerId, DateOnly? from, DateOnly? to, string? sort, int? page, int? pageSize, HttpContext h, InvoiceService s, CancellationToken ct) =>
+            s.ListAsync(h.Member(), new InvoiceListQuery(search, ParseList<InvoiceStatus>(status), overdue ?? false, customerId, from, to, sort, page ?? 1, pageSize ?? 25), ct));
+        c.MapPost("/invoices", async (CreateInvoiceRequest r, HttpContext h, InvoiceService s, CancellationToken ct) =>
+        {
+            var invoice = await s.CreateAsync(h.Member(), r, ct);
+            return Results.Created($"invoices/{invoice.Id}", invoice);
+        }).Validate<CreateInvoiceRequest>();
+        c.MapGet("/invoices/export.csv", async (string? search, string? status, bool? overdue, Guid? customerId, DateOnly? from, DateOnly? to, HttpContext h, InvoiceService s, CancellationToken ct) =>
+            CsvFile(await s.ExportCsvAsync(h.Member(), new InvoiceListQuery(search, ParseList<InvoiceStatus>(status), overdue ?? false, customerId, from, to, null), ct), "rechnungen"));
+        c.MapGet("/invoices/{id:guid}", (Guid id, HttpContext h, InvoiceService s, CancellationToken ct) => s.GetAsync(h.Member(), id, ct));
+        c.MapPut("/invoices/{id:guid}", (Guid id, UpdateInvoiceRequest r, HttpContext h, InvoiceService s, CancellationToken ct) => s.UpdateAsync(h.Member(), id, r, ct)).Validate<UpdateInvoiceRequest>();
+        c.MapDelete("/invoices/{id:guid}", async (Guid id, HttpContext h, InvoiceService s, CancellationToken ct) =>
+        {
+            await s.DeleteDraftAsync(h.Member(), id, ct);
+            return Results.NoContent();
+        });
+        c.MapPost("/invoices/{id:guid}/duplicate", (Guid id, HttpContext h, InvoiceService s, CancellationToken ct) => s.DuplicateAsync(h.Member(), id, ct));
+        c.MapPost("/invoices/{id:guid}/issue", (Guid id, HttpContext h, InvoiceService s, CancellationToken ct) => s.IssueAsync(h.Member(), id, ct));
+        c.MapPost("/invoices/{id:guid}/send", (Guid id, SendInvoiceRequest r, HttpContext h, InvoiceService s, CancellationToken ct) => s.SendAsync(h.Member(), id, r, ct))
+            .Validate<SendInvoiceRequest>().RequireRateLimiting("send");
+        c.MapPost("/invoices/{id:guid}/payments", (Guid id, RecordPaymentRequest r, HttpContext h, InvoiceService s, CancellationToken ct) => s.RecordPaymentAsync(h.Member(), id, r, ct))
+            .Validate<RecordPaymentRequest>();
+        c.MapDelete("/invoices/{id:guid}/payments/{paymentId:guid}", (Guid id, Guid paymentId, HttpContext h, InvoiceService s, CancellationToken ct) => s.RemovePaymentAsync(h.Member(), id, paymentId, ct));
+        c.MapPost("/invoices/{id:guid}/remind", (Guid id, PaymentReminderRequest r, HttpContext h, InvoiceService s, CancellationToken ct) => s.SendReminderAsync(h.Member(), id, r, ct))
+            .Validate<PaymentReminderRequest>().RequireRateLimiting("send");
+        c.MapPost("/invoices/{id:guid}/cancel", (Guid id, CancelRequest r, HttpContext h, InvoiceService s, CancellationToken ct) => s.CancelAsync(h.Member(), id, r.Reason, ct)).Validate<CancelRequest>();
+        c.MapGet("/invoices/{id:guid}/pdf", async (Guid id, HttpContext h, InvoiceService s, CancellationToken ct) =>
+        {
+            var (content, fileName) = await s.PdfAsync(h.Member(), id, ct);
+            return PdfFile(h, content, fileName);
+        });
+        c.MapGet("/invoices/{id:guid}/xml", async (Guid id, HttpContext h, InvoiceService s, CancellationToken ct) =>
+        {
+            var (content, fileName) = await s.XmlAsync(h.Member(), id, ct);
+            h.Response.Headers.CacheControl = "no-store";
+            return Results.File(content, "application/xml", fileName);
+        });
+        c.MapGet("/invoices/{id:guid}/events", (Guid id, InvoiceService s, CancellationToken ct) => s.EventsAsync(id, ct));
+        c.MapGet("/invoices/{id:guid}/deliveries", (Guid id, HttpContext h, InvoiceService s, CancellationToken ct) => s.DeliveriesAsync(h.Member(), id, ct));
+        c.MapPost("/jobs/{id:guid}/invoice", async (Guid id, HttpContext h, InvoiceService s, CancellationToken ct) =>
+        {
+            var invoice = await s.CreateFromJobAsync(h.Member(), id, ct);
+            return Results.Created($"invoices/{invoice.Id}", invoice);
+        });
+        c.MapPost("/quotations/{id:guid}/invoice", async (Guid id, HttpContext h, InvoiceService s, CancellationToken ct) =>
+        {
+            var invoice = await s.CreateFromQuotationAsync(h.Member(), id, ct);
+            return Results.Created($"invoices/{invoice.Id}", invoice);
+        });
+        c.MapGet("/customers/{id:guid}/invoices", (Guid id, HttpContext h, InvoiceService s, CancellationToken ct) => s.ForCustomerAsync(h.Member(), id, ct));
 
         // Notifications
         c.MapGet("/notifications", (bool? unreadOnly, int? page, int? pageSize, HttpContext h, NotificationService s, CancellationToken ct) =>

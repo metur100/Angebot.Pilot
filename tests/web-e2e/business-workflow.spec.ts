@@ -13,7 +13,8 @@ import {
 /**
  * Full business workflow against the real API:
  * register → company → customer → quotation (multiple line items, totals) → PDF → send by email → events →
- * public link from the captured email → customer accepts → reminders cancelled → job → isolation → CSV export.
+ * public link from the captured email → customer accepts → reminders cancelled → job → invoice from the job (issue, PDF,
+ * full payment) → isolation → CSV export.
  */
 test('complete quotation workflow @desktop-only', async ({ page, browser, request }) => {
   test.setTimeout(240_000);
@@ -23,6 +24,8 @@ test('complete quotation workflow @desktop-only', async ({ page, browser, reques
   let quotationId = '';
   let quotationNumber = '';
   let publicToken = '';
+  let invoiceId = '';
+  let invoiceNumber = '';
 
   await test.step('register a new account', async () => {
     await goto(page, '/registrieren');
@@ -171,6 +174,60 @@ test('complete quotation workflow @desktop-only', async ({ page, browser, reques
     await expect(page.getByRole('link', { name: quotationNumber })).toBeVisible();
     await page.getByRole('link', { name: quotationNumber }).click();
     await expect(page.getByRole('link', { name: 'Zum Auftrag' }).first()).toBeVisible();
+  });
+
+  await test.step('company tax number (required for invoices)', async () => {
+    await goto(page, '/einstellungen/firma');
+    await page.getByLabel(/^Steuernummer/).fill('143/512/40877');
+    await page.getByRole('button', { name: 'Speichern', exact: true }).click();
+    await expect(page.getByText('Firmendaten gespeichert')).toBeVisible();
+  });
+
+  await test.step('create an invoice from the job, issue it and record the full payment', async () => {
+    await goto(page, `/angebote/${quotationId}`);
+    await page.getByRole('link', { name: 'Zum Auftrag' }).first().click();
+    await expect(page).toHaveURL(/#\/auftraege\/[^/]+$/);
+    await page.getByRole('button', { name: 'Rechnung erstellen' }).click();
+    await expect(page).toHaveURL(/#\/rechnungen\/[^/]+\/bearbeiten/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Rechnungsentwurf bearbeiten' })).toBeVisible();
+    invoiceId = /#\/rechnungen\/([^/]+)\/bearbeiten/.exec(page.url())?.[1] ?? '';
+    expect(invoiceId).not.toBe('');
+
+    // Line items come from the quotation; the service date is prefilled (fill it if the server left it empty).
+    await expect(page.getByTestId('sticky-gross')).toHaveText(/213,09/);
+    const serviceDate = page.getByLabel(/^Leistungsdatum/);
+    if (!(await serviceDate.inputValue())) {
+      await serviceDate.fill(await page.getByLabel(/^Rechnungsdatum/).inputValue());
+    }
+
+    await page.getByRole('button', { name: /Rechnung stellen/ }).click();
+    const issueDialog = page.getByRole('dialog', { name: 'Rechnung stellen?' });
+    await expect(issueDialog.getByText('Alle Pflichtangaben sind vorhanden. Die Rechnung kann gestellt werden.')).toBeVisible();
+    await issueDialog.getByRole('button', { name: 'Jetzt Rechnung stellen' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: /^RE-\d{4}-\d{4}$/ })).toBeVisible();
+    invoiceNumber = ((await page.getByRole('heading', { level: 1 }).textContent()) ?? '').trim();
+    await expect(page.getByText('Offen', { exact: true }).first()).toBeVisible();
+    await expectNoSeriousA11yViolations(page, 'invoice detail');
+  });
+
+  await test.step('invoice PDF renders', async () => {
+    await goto(page, `/rechnungen/${invoiceId}/pdf`);
+    await expect(page.getByTestId('pdf-page').first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: 'E-Rechnung (XML)' })).toBeVisible();
+  });
+
+  await test.step('record the full payment → status "Bezahlt"', async () => {
+    await goto(page, `/rechnungen/${invoiceId}`);
+    await expect(page.getByRole('heading', { level: 1, name: invoiceNumber })).toBeVisible();
+    await page.getByRole('button', { name: /Zahlung erfassen/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Zahlung erfassen' });
+    await expect(dialog.getByText(/Entspricht dem offenen Betrag/)).toBeVisible();
+    await dialog.getByRole('button', { name: 'Zahlung speichern' }).click();
+    await expect(page.getByText(/^Bezahlt am /)).toBeVisible();
+    await expect(page.getByText('Bezahlt', { exact: true }).first()).toBeVisible();
+    await expect(page.getByTestId('open-amount')).toHaveText(/0,00/);
+    await goto(page, '/rechnungen');
+    await expect(page.getByRole('link', { name: invoiceNumber }).first()).toBeVisible();
   });
 
   await test.step('another user/company cannot access the quotation', async () => {

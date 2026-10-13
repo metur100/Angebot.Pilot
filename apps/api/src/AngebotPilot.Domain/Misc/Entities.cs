@@ -16,6 +16,8 @@ namespace AngebotPilot.Domain.Emails
 
         public Guid? QuotationId { get; set; }
 
+        public Guid? InvoiceId { get; set; }
+
         public EmailKind Kind { get; set; }
 
         public required string IdempotencyKey { get; set; }

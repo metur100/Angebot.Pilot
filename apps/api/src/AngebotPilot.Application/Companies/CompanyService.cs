@@ -154,6 +154,24 @@ public sealed class CompanyService(
         s.ExpiryReminderDaysBefore = dto.ExpiryReminderDaysBefore;
         s.AttachPdfToEmails = dto.AttachPdfToEmails;
         s.NotifyOnCustomerDecision = dto.NotifyOnCustomerDecision;
+        if (dto.InvoicePrefix is not null)
+        {
+            s.InvoicePrefix = dto.InvoicePrefix.Trim().ToUpperInvariant();
+        }
+
+        s.InvoicePaymentDays = dto.InvoicePaymentDays ?? s.InvoicePaymentDays;
+        if (dto.InvoiceIntroText is not null)
+        {
+            s.InvoiceIntroText = Text.Clean(dto.InvoiceIntroText);
+        }
+
+        if (dto.InvoiceClosingText is not null)
+        {
+            s.InvoiceClosingText = Text.Clean(dto.InvoiceClosingText);
+        }
+
+        s.InvoiceReminderEnabled = dto.InvoiceReminderEnabled ?? s.InvoiceReminderEnabled;
+        s.InvoiceReminderAfterDays = dto.InvoiceReminderAfterDays ?? s.InvoiceReminderAfterDays;
         audit.Record(member.CompanyId, member.UserId, "company.settings_updated", "CompanySettings", member.CompanyId, null);
         await db.SaveChangesAsync(ct);
         return ToDto(s);
@@ -439,6 +457,10 @@ public sealed class CompanyService(
         }
 
         await db.SaveChangesAsync(ct);
+        await db.InvoicePayments.IgnoreQueryFilters().Where(x => x.CompanyId == companyId).ExecuteDeleteAsync(ct);
+        await db.InvoiceEvents.IgnoreQueryFilters().Where(x => x.CompanyId == companyId).ExecuteDeleteAsync(ct);
+        await db.InvoiceLineItems.Where(x => db.Invoices.IgnoreQueryFilters().Any(i => i.Id == x.InvoiceId && i.CompanyId == companyId)).ExecuteDeleteAsync(ct);
+        await db.Invoices.IgnoreQueryFilters().Where(x => x.CompanyId == companyId).ExecuteDeleteAsync(ct);
         await db.Jobs.IgnoreQueryFilters().Where(x => x.CompanyId == companyId).ExecuteDeleteAsync(ct);
         await db.FollowUpSchedules.IgnoreQueryFilters().Where(x => x.CompanyId == companyId).ExecuteDeleteAsync(ct);
         await db.PublicQuotationAccesses.IgnoreQueryFilters().Where(x => x.CompanyId == companyId).ExecuteDeleteAsync(ct);
@@ -480,6 +502,7 @@ public sealed class CompanyService(
             Customers = await db.Customers.AsNoTracking().OrderBy(c => c.CreatedAt).ToListAsync(ct),
             Quotations = await db.Quotations.AsNoTracking().Include(q => q.LineItems).Include(q => q.Events).OrderBy(q => q.CreatedAt).ToListAsync(ct),
             Jobs = await db.Jobs.AsNoTracking().OrderBy(j => j.CreatedAt).ToListAsync(ct),
+            Invoices = await db.Invoices.AsNoTracking().Include(i => i.LineItems).Include(i => i.Payments).Include(i => i.Events).OrderBy(i => i.CreatedAt).ToListAsync(ct),
             Templates = await db.Templates.AsNoTracking().Include(t => t.LineItems).ToListAsync(ct),
             EmailDeliveries = await db.EmailDeliveries.AsNoTracking().Where(e => e.CompanyId == member.CompanyId)
                 .Select(e => new { e.Kind, e.ToAddress, e.Subject, e.Status, e.CreatedAt, e.HandedOffAt }).ToListAsync(ct),
@@ -494,7 +517,8 @@ public sealed class CompanyService(
         s.QuotationPrefix, s.JobPrefix, s.DefaultValidityDays, s.DefaultTaxMode, s.DefaultIntroText, s.DefaultClosingText, s.DefaultTerms,
         s.PaymentTerms, s.ShowBankDetails, s.BankAccountHolder, s.Iban, s.Bic, s.BankName, s.EmailSignature, s.ReplyToEmail,
         s.FirstReminderEnabled, s.FirstReminderAfterDays, s.SecondReminderEnabled, s.SecondReminderAfterDays,
-        s.ExpiryReminderEnabled, s.ExpiryReminderDaysBefore, s.AttachPdfToEmails, s.NotifyOnCustomerDecision);
+        s.ExpiryReminderEnabled, s.ExpiryReminderDaysBefore, s.AttachPdfToEmails, s.NotifyOnCustomerDecision,
+        s.InvoicePrefix, s.InvoicePaymentDays, s.InvoiceIntroText, s.InvoiceClosingText, s.InvoiceReminderEnabled, s.InvoiceReminderAfterDays);
 
     private async Task<CompanyMembership> LoadMemberAsync(CurrentMember member, Guid membershipId, CancellationToken ct) =>
         await db.Memberships.FirstOrDefaultAsync(m => m.Id == membershipId && m.CompanyId == member.CompanyId, ct) ?? throw new NotFoundException();

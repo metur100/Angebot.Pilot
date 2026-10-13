@@ -92,7 +92,7 @@ try {
   });
 
   const owner = await register('owner');
-  let companyId, customer, quotation, publicToken, job;
+  let companyId, customer, quotation, publicToken, job, invoice;
 
   await step('auth: register, me, invalid token rejected', async () => {
     const me = await call('GET', '/api/v1/me', { token: owner.token });
@@ -158,6 +158,39 @@ try {
     assert(job.quotationId === quotation.id, 'job does not reference quotation');
     await call('POST', `/api/v1/companies/${companyId}/quotations/${quotation.id}/convert-to-job`, { token: owner.token, body: {}, expect: [409] });
     return job.number;
+  });
+
+  await step('invoice: draft from job, issue, ZUGFeRD PDF + XML', async () => {
+    const c = `/api/v1/companies/${companyId}`;
+    const draft = await call('POST', `${c}/jobs/${job.id}/invoice`, { token: owner.token, expect: [201] });
+    assert(draft.number === null && draft.totals.grossTotal === 213.09, 'draft mismatch');
+    assert(draft.issueProblems.length > 0, 'missing tax number/address not reported');
+    await call('POST', `${c}/invoices/${draft.id}/issue`, { token: owner.token, expect: [409] });
+    // Complete the company tax number and the customer address, then issue.
+    const company = await call('GET', c, { token: owner.token });
+    await call('PUT', c, { token: owner.token, body: { ...company, taxNumber: '214/5678/9012' } });
+    const cust = await call('GET', `${c}/customers/${customer.id}`, { token: owner.token });
+    await call('PUT', `${c}/customers/${customer.id}`, { token: owner.token, body: { ...cust, billingStreet: 'Kundenweg 2', billingPostalCode: '10115', billingCity: 'Berlin' } });
+    invoice = await call('POST', `${c}/invoices/${draft.id}/issue`, { token: owner.token });
+    assert(/^RE-\d{4}-0001$/.test(invoice.number) && invoice.hasEInvoice, `issue failed: ${invoice.number}`);
+    const r = await call('GET', `${c}/invoices/${invoice.id}/pdf`, { token: owner.token, raw: true });
+    const pdf = new TextDecoder('latin1').decode(new Uint8Array(await r.arrayBuffer()));
+    assert(pdf.startsWith('%PDF-'), 'invalid PDF');
+    assert(pdf.includes('factur-x.xml'), 'e-invoice not embedded in the PDF');
+    assert(pdf.includes('urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#'), 'Factur-X metadata missing');
+    const xml = await (await call('GET', `${c}/invoices/${invoice.id}/xml`, { token: owner.token, raw: true })).text();
+    assert(xml.includes('urn:cen.eu:en16931:2017') && xml.includes(invoice.number), 'e-invoice XML mismatch');
+    return invoice.number;
+  });
+
+  await step('invoice: payment and cancellation', async () => {
+    const c = `/api/v1/companies/${companyId}`;
+    const today = new Date().toISOString().slice(0, 10);
+    const paid = await call('POST', `${c}/invoices/${invoice.id}/payments`, { token: owner.token, body: { amount: invoice.openAmount, paidOn: today, method: 'Überweisung' } });
+    assert(paid.status === 'Paid', `status ${paid.status}`);
+    const cancelled = await call('POST', `${c}/invoices/${invoice.id}/cancel`, { token: owner.token, body: { reason: 'Smoke-Test' } });
+    assert(cancelled.status === 'Cancelled' && /-0002$/.test(cancelled.cancellationInvoiceNumber), 'cancellation failed');
+    return cancelled.cancellationInvoiceNumber;
   });
 
   await step('tenant isolation', async () => {

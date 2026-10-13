@@ -123,7 +123,8 @@ public sealed class CustomerService(IAppDbContext db, BillingService billing, IA
         member.Require(MembershipRole.Admin);
         var customer = await LoadAsync(id, ct);
         var hasDocuments = await db.Quotations.IgnoreQueryFilters().AnyAsync(q => q.CustomerId == id, ct)
-            || await db.Jobs.AnyAsync(j => j.CustomerId == id, ct);
+            || await db.Jobs.AnyAsync(j => j.CustomerId == id, ct)
+            || await db.Invoices.IgnoreQueryFilters().AnyAsync(i => i.CustomerId == id, ct);
         var now = clock.GetUtcNow();
         if (!hasDocuments)
         {
@@ -138,6 +139,9 @@ public sealed class CustomerService(IAppDbContext db, BillingService billing, IA
         // Drafts are not commercial documents yet; remove their personal snapshot as well.
         await db.Quotations.Where(q => q.CustomerId == id && q.Status == QuotationStatus.Draft)
             .ExecuteUpdateAsync(s => s.SetProperty(q => q.RecipientEmail, (string?)null).SetProperty(q => q.RecipientContact, (string?)null).SetProperty(q => q.RecipientAddress, (string?)null), ct);
+        await db.Invoices.Where(i => i.CustomerId == id && i.Status == InvoiceStatus.Draft)
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.RecipientEmail, (string?)null).SetProperty(i => i.RecipientContact, (string?)null).SetProperty(i => i.RecipientAddress, (string?)null)
+                .SetProperty(i => i.RecipientStreet, (string?)null).SetProperty(i => i.RecipientPostalCode, (string?)null).SetProperty(i => i.RecipientCity, (string?)null), ct);
         audit.Record(member.CompanyId, member.UserId, "customer.anonymized", "Customer", id, null);
         await db.SaveChangesAsync(ct);
         return "anonymized";

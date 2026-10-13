@@ -8,6 +8,7 @@ using AngebotPilot.Domain.Customers;
 using AngebotPilot.Domain.Emails;
 using AngebotPilot.Domain.Files;
 using AngebotPilot.Domain.FollowUps;
+using AngebotPilot.Domain.Invoices;
 using AngebotPilot.Domain.Jobs;
 using AngebotPilot.Domain.Notifications;
 using AngebotPilot.Domain.Quotations;
@@ -37,6 +38,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<EmailDelivery> EmailDeliveries => Set<EmailDelivery>();
     public DbSet<FollowUpSchedule> FollowUpSchedules => Set<FollowUpSchedule>();
     public DbSet<Job> Jobs => Set<Job>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<InvoiceLineItem> InvoiceLineItems => Set<InvoiceLineItem>();
+    public DbSet<InvoiceEvent> InvoiceEvents => Set<InvoiceEvent>();
+    public DbSet<InvoicePayment> InvoicePayments => Set<InvoicePayment>();
     public DbSet<QuotationTemplate> Templates => Set<QuotationTemplate>();
     public DbSet<StoredFile> Files => Set<StoredFile>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -165,6 +170,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
             e.Property(x => x.Iban).HasMaxLength(34);
             e.Property(x => x.Bic).HasMaxLength(11);
             e.Property(x => x.ReplyToEmail).HasMaxLength(254);
+            e.Property(x => x.InvoicePrefix).HasMaxLength(8);
+            e.Property(x => x.InvoiceIntroText).HasMaxLength(4000);
+            e.Property(x => x.InvoiceClosingText).HasMaxLength(4000);
         });
 
         b.Entity<CompanyMembership>(e =>
@@ -285,6 +293,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
             e.HasIndex(x => x.IdempotencyKey).IsUnique();
             e.HasIndex(x => new { x.Status, x.NextAttemptAt });
             e.HasIndex(x => x.QuotationId);
+            e.HasIndex(x => x.InvoiceId);
             e.HasIndex(x => new { x.CompanyId, x.CreatedAt });
             e.Property(x => x.IdempotencyKey).HasMaxLength(120);
             e.Property(x => x.ToAddress).HasMaxLength(254);
@@ -315,6 +324,70 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
             e.Property(x => x.Notes).HasMaxLength(4000);
             e.HasOne(x => x.Quotation).WithMany().HasForeignKey(x => x.QuotationId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasQueryFilter(x => x.CompanyId == CurrentCompanyId);
+        });
+
+        b.Entity<Invoice>(e =>
+        {
+            e.Property(x => x.RowVersion).IsRowVersion();
+            // Gap-free numbering per company; drafts have no number yet.
+            e.HasIndex(x => new { x.CompanyId, x.Number }).IsUnique().HasFilter("[Number] IS NOT NULL");
+            // An invoice can be reversed only once.
+            e.HasIndex(x => x.CancelledInvoiceId).IsUnique().HasFilter("[CancelledInvoiceId] IS NOT NULL");
+            e.HasIndex(x => new { x.CompanyId, x.Status, x.DueDate });
+            e.HasIndex(x => new { x.CompanyId, x.CustomerId });
+            e.HasIndex(x => new { x.CompanyId, x.IssueDate });
+            e.HasIndex(x => x.JobId);
+            e.HasIndex(x => x.QuotationId);
+            e.Property(x => x.Number).HasMaxLength(40);
+            e.Property(x => x.QuotationNumber).HasMaxLength(40);
+            e.Property(x => x.JobNumber).HasMaxLength(40);
+            e.Property(x => x.CancelledInvoiceNumber).HasMaxLength(40);
+            e.Property(x => x.Currency).HasMaxLength(3).IsFixedLength();
+            e.Property(x => x.RecipientAddress).HasMaxLength(500);
+            e.Property(x => x.RecipientPostalCode).HasMaxLength(10);
+            e.Property(x => x.RecipientCity).HasMaxLength(100);
+            e.Property(x => x.RecipientCountry).HasMaxLength(2).IsFixedLength();
+            e.Property(x => x.RecipientEmail).HasMaxLength(254);
+            e.Property(x => x.RecipientVatId).HasMaxLength(20);
+            e.Property(x => x.BuyerReference).HasMaxLength(100);
+            e.Property(x => x.PaymentTerms).HasMaxLength(1000);
+            e.Property(x => x.CancellationReason).HasMaxLength(1000);
+            foreach (var p in new[] { nameof(Invoice.IntroText), nameof(Invoice.ClosingText), nameof(Invoice.InternalNotes) })
+            {
+                e.Property(p).HasMaxLength(4000);
+            }
+
+            e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.LineItems).WithOne().HasForeignKey(x => x.InvoiceId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Events).WithOne().HasForeignKey(x => x.InvoiceId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Payments).WithOne().HasForeignKey(x => x.InvoiceId).OnDelete(DeleteBehavior.Cascade);
+            e.HasQueryFilter(x => x.CompanyId == CurrentCompanyId && x.DeletedAt == null);
+        });
+
+        b.Entity<InvoiceLineItem>(e =>
+        {
+            e.HasIndex(x => new { x.InvoiceId, x.Position });
+            e.Property(x => x.Description).HasMaxLength(2000);
+            e.Property(x => x.Unit).HasMaxLength(20);
+            e.Property(x => x.Quantity).HasPrecision(18, 3);
+            e.Property(x => x.DiscountPercent).HasPrecision(5, 2);
+            e.Property(x => x.TaxRatePercent).HasPrecision(5, 2);
+        });
+
+        b.Entity<InvoiceEvent>(e =>
+        {
+            e.HasIndex(x => new { x.InvoiceId, x.OccurredAt });
+            e.Property(x => x.Details).HasMaxLength(500);
+            e.HasQueryFilter(x => x.CompanyId == CurrentCompanyId);
+        });
+
+        b.Entity<InvoicePayment>(e =>
+        {
+            e.HasIndex(x => new { x.CompanyId, x.PaidOn });
+            e.Property(x => x.Method).HasMaxLength(50);
+            e.Property(x => x.Note).HasMaxLength(500);
             e.HasQueryFilter(x => x.CompanyId == CurrentCompanyId);
         });
 

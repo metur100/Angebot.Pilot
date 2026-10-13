@@ -15,8 +15,8 @@ namespace AngebotPilot.Infrastructure.Pdf;
 /// </summary>
 public sealed class QuotationPdfRenderer : IQuotationPdfRenderer
 {
-    private const string Font = "Inter";
-    private static readonly CultureInfo De = CultureInfo.GetCultureInfo("de-DE");
+    internal const string Font = "Inter";
+    internal static readonly CultureInfo De = CultureInfo.GetCultureInfo("de-DE");
     private static readonly object InitLock = new();
     private static bool _initialised;
 
@@ -118,9 +118,9 @@ public sealed class QuotationPdfRenderer : IQuotationPdfRenderer
                     }
 
                     col.Item().PaddingTop(14).Element(e => LineItems(e, items, hasDiscount, showTaxColumn, brand));
-                    col.Item().PaddingTop(8).AlignRight().Width(80, Unit.Millimetre).Element(e => Totals(e, q, totals, brand));
+                    col.Item().PaddingTop(8).AlignRight().Width(80, Unit.Millimetre).Element(e => Totals(e, q.TaxMode, totals, brand, q.TaxMode == TaxMode.Standard ? "Gesamtbetrag brutto" : "Gesamtbetrag"));
 
-                    var notes = TaxNotes(q).ToList();
+                    var notes = TaxNotes(q.TaxMode).ToList();
                     if (notes.Count > 0)
                     {
                         col.Item().PaddingTop(10).Column(n =>
@@ -178,7 +178,7 @@ public sealed class QuotationPdfRenderer : IQuotationPdfRenderer
         }).GeneratePdf();
     }
 
-    private static void Header(IContainer container, PdfCompany c, string brand)
+    internal static void Header(IContainer container, PdfCompany c, string brand)
     {
         container.PaddingBottom(6).BorderBottom(2).BorderColor(brand).PaddingBottom(8).Row(row =>
         {
@@ -207,7 +207,7 @@ public sealed class QuotationPdfRenderer : IQuotationPdfRenderer
         });
     }
 
-    private static void LineItems(IContainer container, List<QuotationLineItem> items, bool hasDiscount, bool showTax, string brand)
+    internal static void LineItems(IContainer container, IReadOnlyList<IDocumentLineItem> items, bool hasDiscount, bool showTax, string brand, bool negate = false)
     {
         container.Table(table =>
         {
@@ -273,39 +273,41 @@ public sealed class QuotationPdfRenderer : IQuotationPdfRenderer
                     BodyCell(table.Cell()).AlignRight().Text($"{item.TaxRatePercent.ToString("0.##", De)} %");
                 }
 
-                BodyCell(table.Cell()).AlignRight().Text(Eur(item.LineNet)).SemiBold();
+                BodyCell(table.Cell()).AlignRight().Text(Eur(negate ? -item.LineNet : item.LineNet)).SemiBold();
             }
         });
     }
 
-    private static void Totals(IContainer container, Quotation q, QuotationTotals totals, string brand)
+    /// <param name="negate">Shows amounts as negative (cancellation invoices).</param>
+    internal static void Totals(IContainer container, TaxMode taxMode, QuotationTotals totals, string brand, string grossLabel, bool negate = false)
     {
+        var sign = negate ? -1m : 1m;
         container.Column(col =>
         {
             if (totals.DiscountTotal > 0)
             {
-                TotalLine(col, "Summe vor Rabatt", Eur(totals.SubtotalBeforeDiscount));
-                TotalLine(col, "Rabatt", "− " + Eur(totals.DiscountTotal));
+                TotalLine(col, "Summe vor Rabatt", Eur(sign * totals.SubtotalBeforeDiscount));
+                TotalLine(col, "Rabatt", negate ? Eur(totals.DiscountTotal) : "− " + Eur(totals.DiscountTotal));
             }
 
-            TotalLine(col, "Nettobetrag", Eur(totals.NetTotal));
-            if (q.TaxMode == TaxMode.Standard)
+            TotalLine(col, "Nettobetrag", Eur(sign * totals.NetTotal));
+            if (taxMode == TaxMode.Standard)
             {
                 foreach (var group in totals.TaxGroups)
                 {
-                    TotalLine(col, $"USt. {group.RatePercent.ToString("0.##", De)} % auf {Eur(group.NetAmount)}", Eur(group.TaxAmount));
+                    TotalLine(col, $"USt. {group.RatePercent.ToString("0.##", De)} % auf {Eur(sign * group.NetAmount)}", Eur(sign * group.TaxAmount));
                 }
             }
 
             col.Item().PaddingTop(4).Background(brand).PaddingVertical(6).PaddingHorizontal(8).Row(r =>
             {
-                r.RelativeItem().Text(q.TaxMode == TaxMode.Standard ? "Gesamtbetrag brutto" : "Gesamtbetrag").FontColor(Colors.White).SemiBold();
-                r.AutoItem().Text(Eur(totals.GrossTotal)).FontColor(Colors.White).Bold();
+                r.RelativeItem().Text(grossLabel).FontColor(Colors.White).SemiBold();
+                r.AutoItem().Text(Eur(sign * totals.GrossTotal)).FontColor(Colors.White).Bold();
             });
         });
     }
 
-    private static void Footer(IContainer container, PdfCompany c)
+    internal static void Footer(IContainer container, PdfCompany c)
     {
         container.BorderTop(0.6f).BorderColor("#E2E5EA").PaddingTop(6).Column(col =>
         {
@@ -356,23 +358,23 @@ public sealed class QuotationPdfRenderer : IQuotationPdfRenderer
         });
     }
 
-    private static IEnumerable<string> TaxNotes(Quotation q) => q.TaxMode switch
+    internal static IEnumerable<string> TaxNotes(TaxMode taxMode) => taxMode switch
     {
         TaxMode.SmallBusiness => ["Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung)."],
         TaxMode.ReverseCharge => ["Steuerschuldnerschaft des Leistungsempfängers (§ 13b UStG). Die Umsatzsteuer ist vom Leistungsempfänger anzumelden und abzuführen."],
         _ => [],
     };
 
-    private static void HeaderCell(IContainer cell, string text, bool right)
+    internal static void HeaderCell(IContainer cell, string text, bool right)
     {
         var c = cell.PaddingVertical(5).PaddingHorizontal(3);
         (right ? c.AlignRight() : c).Text(text).FontSize(8).SemiBold().FontColor("#4D5566");
     }
 
-    private static IContainer BodyCell(IContainer cell) =>
+    internal static IContainer BodyCell(IContainer cell) =>
         cell.BorderBottom(0.5f).BorderColor("#EEF0F3").PaddingVertical(5).PaddingHorizontal(3);
 
-    private static void InfoLine(ColumnDescriptor col, string label, string value, bool bold = false) =>
+    internal static void InfoLine(ColumnDescriptor col, string label, string value, bool bold = false) =>
         col.Item().Row(r =>
         {
             r.RelativeItem().Text(label).FontSize(8.5f).FontColor("#6B7485");
@@ -383,32 +385,32 @@ public sealed class QuotationPdfRenderer : IQuotationPdfRenderer
             }
         });
 
-    private static void TotalLine(ColumnDescriptor col, string label, string value) =>
+    internal static void TotalLine(ColumnDescriptor col, string label, string value) =>
         col.Item().PaddingVertical(2).PaddingHorizontal(8).Row(r =>
         {
             r.RelativeItem().Text(label).FontColor("#4D5566");
             r.AutoItem().Text(value);
         });
 
-    private static string QrSvg(string url)
+    internal static string QrSvg(string url)
     {
         using var generator = new QRCodeGenerator();
         using var data = generator.CreateQrCode(url, QRCodeGenerator.ECCLevel.M);
         return new SvgQRCode(data).GetGraphic(4, "#141821", "#FFFFFF", drawQuietZones: false);
     }
 
-    private static string SenderLine(PdfCompany c) => Join(" · ", c.Name, c.AddressLine1, Join(" ", c.PostalCode, c.City));
+    internal static string SenderLine(PdfCompany c) => Join(" · ", c.Name, c.AddressLine1, Join(" ", c.PostalCode, c.City));
 
-    private static string Join(string separator, params string?[] parts) =>
+    internal static string Join(string separator, params string?[] parts) =>
         string.Join(separator, parts.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p!.Trim()));
 
-    private static string Eur(decimal value) => value.ToString("#,##0.00", De) + " €";
+    internal static string Eur(decimal value) => (value < 0 ? "−" + (-value).ToString("#,##0.00", De) : value.ToString("#,##0.00", De)) + " €";
 
-    private static string Quantity(decimal value) => value.ToString("#,##0.###", De);
+    internal static string Quantity(decimal value) => value.ToString("#,##0.###", De);
 
-    private static string Date(DateOnly value) => value.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
+    internal static string Date(DateOnly value) => value.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
 
-    private static string FormatIban(string iban) => string.Join(' ', Enumerable.Range(0, (iban.Length + 3) / 4).Select(i => iban.Substring(i * 4, Math.Min(4, iban.Length - (i * 4)))));
+    internal static string FormatIban(string iban) => string.Join(' ', Enumerable.Range(0, (iban.Length + 3) / 4).Select(i => iban.Substring(i * 4, Math.Min(4, iban.Length - (i * 4)))));
 
-    private static bool IsHex(string? color) => color is { Length: 7 } && color[0] == '#' && color[1..].All(Uri.IsHexDigit);
+    internal static bool IsHex(string? color) => color is { Length: 7 } && color[0] == '#' && color[1..].All(Uri.IsHexDigit);
 }

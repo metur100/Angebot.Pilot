@@ -13,6 +13,9 @@ export default function AppLayout() {
       <Stack.Screen name="customer/[id]" options={{ title: 'Kunde' }} />
       <Stack.Screen name="customer-form" options={{ title: 'Kunde' }} />
       <Stack.Screen name="job/[id]" options={{ title: 'Auftrag' }} />
+      <Stack.Screen name="invoices" options={{ title: 'Rechnungen' }} />
+      <Stack.Screen name="invoice/[id]" options={{ title: 'Rechnung' }} />
+      <Stack.Screen name="invoice-editor" options={{ title: 'Rechnung' }} />
       <Stack.Screen name="templates" options={{ title: 'Vorlage wählen' }} />
       <Stack.Screen name="notifications" options={{ title: 'Benachrichtigungen' }} />
       <Stack.Screen name="company" options={{ title: 'Unternehmen' }} />

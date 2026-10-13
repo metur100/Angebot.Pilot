@@ -8,6 +8,11 @@ import {
   type EmailDeliveryDto,
   type FollowUpDto,
   type InvitationDto,
+  type InvoiceDto,
+  type InvoiceEventDto,
+  type InvoiceLinkDto,
+  type InvoiceListItemDto,
+  type InvoicePaymentDto,
   type JobDto,
   type JobListItemDto,
   type MeDto,
@@ -23,7 +28,17 @@ import {
   type TotalsDto,
 } from '@angebotpilot/api-contracts';
 import { db } from '../db';
-import { allowedTransitions, JOB_TRANSITIONS } from '../domain';
+import {
+  allowedTransitions,
+  companyToday,
+  invoiceAllowedActions,
+  invoiceCompanyProblems,
+  invoiceDaysOverdue,
+  invoiceIssueProblems,
+  invoiceOpenAmount,
+  invoiceTotals,
+  JOB_TRANSITIONS,
+} from '../domain';
 import {
   customerContactPerson,
   customerDisplayName,
@@ -35,6 +50,8 @@ import {
   type EventRec,
   type FollowUpRec,
   type InvitationRec,
+  type InvoiceEventRec,
+  type InvoiceRec,
   type JobRec,
   type MembershipRec,
   type NotificationRec,
@@ -244,6 +261,7 @@ export function toQuotation(q: QuotationRec): QuotationDto {
     publicLinkLastOpenedAt: q.publicLinkLastOpenedAt,
     allowedTransitions: allowedTransitions(q.status),
     rowVersion: q.rowVersion,
+    invoices: invoiceLinks((i) => i.quotationId === q.id),
   };
 }
 
@@ -322,6 +340,7 @@ export function toJob(j: JobRec): JobDto {
     cancelledAt: j.cancelledAt,
     allowedTransitions: [...JOB_TRANSITIONS[j.status]],
     rowVersion: j.rowVersion,
+    invoices: invoiceLinks((i) => i.jobId === j.id),
   };
 }
 
@@ -379,6 +398,16 @@ const ACTIVITY_LABELS: Record<string, string> = {
   'job.created': 'Auftrag erstellt',
   'job.status_changed': 'Auftragsstatus geändert',
   'template.created': 'Vorlage erstellt',
+  'invoice.created': 'Rechnungsentwurf erstellt',
+  'invoice.issued': 'Rechnung gestellt',
+  'invoice.sent': 'Rechnung per E-Mail versendet',
+  'invoice.marked_sent': 'Rechnung als versendet markiert',
+  'invoice.payment_recorded': 'Teilzahlung erfasst',
+  'invoice.paid': 'Rechnung bezahlt',
+  'invoice.payment_removed': 'Zahlung entfernt',
+  'invoice.reminder_sent': 'Zahlungserinnerung versendet',
+  'invoice.cancelled': 'Rechnung storniert',
+  'invoice.deleted': 'Rechnungsentwurf gelöscht',
   'member.invited': 'Teammitglied eingeladen',
   'member.joined': 'Teammitglied beigetreten',
   'member.deactivated': 'Teammitglied deaktiviert',
@@ -407,4 +436,122 @@ export function toActivity(a: AuditRec): ActivityDto {
     entityType: a.entityType,
     entityId: a.entityId,
   };
+}
+
+// ---------- invoices ----------
+
+function companyTodayOf(companyId: string): string {
+  return companyToday(db.companies.find((c) => c.id === companyId));
+}
+
+export function activeInvoices(companyId: string): InvoiceRec[] {
+  return db.invoices.filter((i) => i.companyId === companyId && !i.deletedAt);
+}
+
+export function toInvoiceListItem(i: InvoiceRec): InvoiceListItemDto {
+  const totals = invoiceTotals(i);
+  const today = companyTodayOf(i.companyId);
+  const daysOverdue = invoiceDaysOverdue(i, today);
+  return {
+    id: i.id,
+    number: i.number,
+    kind: i.kind,
+    status: i.status,
+    title: i.title,
+    customerId: i.customerId,
+    customerName: i.recipientName,
+    issueDate: i.issueDate,
+    dueDate: i.dueDate,
+    netTotal: totals.netTotal,
+    grossTotal: totals.grossTotal,
+    paidAmount: i.paidAmount,
+    openAmount: invoiceOpenAmount(i),
+    isOverdue: daysOverdue > 0,
+    daysOverdue,
+    sentAt: i.sentAt,
+    updatedAt: i.updatedAt,
+  };
+}
+
+export function toInvoiceLink(i: InvoiceRec): InvoiceLinkDto {
+  return { id: i.id, number: i.number, kind: i.kind, status: i.status, grossTotal: invoiceTotals(i).grossTotal };
+}
+
+/** Invoices linked to a quotation or job (drafts included), oldest first. */
+export function invoiceLinks(filter: (i: InvoiceRec) => boolean): InvoiceLinkDto[] {
+  return db.invoices
+    .filter((i) => !i.deletedAt && filter(i))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map(toInvoiceLink);
+}
+
+export function toInvoice(i: InvoiceRec, role: MembershipRole): InvoiceDto {
+  const company = db.companies.find((c) => c.id === i.companyId);
+  const today = companyToday(company);
+  const customer = db.customers.find((c) => c.id === i.customerId);
+  const daysOverdue = invoiceDaysOverdue(i, today);
+  const cancellation = i.cancellationInvoiceId ? db.invoices.find((x) => x.id === i.cancellationInvoiceId) : undefined;
+  const problems = i.status === 'Draft' && company ? [...invoiceCompanyProblems(company, i.taxMode), ...invoiceIssueProblems(i, today)] : [];
+  const payments: InvoicePaymentDto[] = db.invoicePayments
+    .filter((p) => p.invoiceId === i.id)
+    .sort((a, b) => a.paidOn.localeCompare(b.paidOn) || a.createdAt.localeCompare(b.createdAt))
+    .map((p) => ({ id: p.id, amount: p.amount, paidOn: p.paidOn, method: p.method, note: p.note, createdAt: p.createdAt, createdByName: userName(p.createdByUserId) }));
+  return {
+    id: i.id,
+    number: i.number,
+    kind: i.kind,
+    status: i.status,
+    title: i.title,
+    customerId: i.customerId,
+    customerName: customer ? customerName(customer) : i.recipientName,
+    recipientName: i.recipientName,
+    recipientContact: i.recipientContact,
+    recipientAddress: i.recipientAddress,
+    recipientEmail: i.recipientEmail,
+    recipientVatId: i.recipientVatId,
+    issueDate: i.issueDate,
+    serviceDateFrom: i.serviceDateFrom,
+    serviceDateTo: i.serviceDateTo,
+    dueDate: i.dueDate,
+    taxMode: i.taxMode,
+    introText: i.introText,
+    closingText: i.closingText,
+    paymentTerms: i.paymentTerms,
+    buyerReference: i.buyerReference,
+    internalNotes: i.internalNotes,
+    currency: i.currency,
+    lineItems: [...i.lineItems].sort((a, b) => a.position - b.position),
+    totals: invoiceTotals(i),
+    paidAmount: i.paidAmount,
+    openAmount: invoiceOpenAmount(i),
+    isOverdue: daysOverdue > 0,
+    daysOverdue,
+    paidOn: i.paidOn,
+    payments,
+    quotationId: i.quotationId,
+    quotationNumber: i.quotationNumber,
+    jobId: i.jobId,
+    jobNumber: i.jobNumber,
+    cancelledInvoiceId: i.cancelledInvoiceId,
+    cancelledInvoiceNumber: i.cancelledInvoiceNumber,
+    cancellationInvoiceId: i.cancellationInvoiceId,
+    cancellationInvoiceNumber: cancellation?.number ?? null,
+    createdAt: i.createdAt,
+    updatedAt: i.updatedAt,
+    issuedAt: i.issuedAt,
+    sentAt: i.sentAt,
+    cancelledAt: i.cancelledAt,
+    cancellationReason: i.cancellationReason,
+    lastReminderAt: i.lastReminderAt,
+    reminderCount: i.reminderCount,
+    hasEInvoice: i.status !== 'Draft',
+    issueProblems: problems,
+    allowedActions: invoiceAllowedActions(i, role),
+    rowVersion: i.rowVersion,
+  };
+}
+
+export function toInvoiceEvent(e: InvoiceEventRec): InvoiceEventDto {
+  const actorName = e.actorType === 'Customer' ? 'Kunde' : e.actorType === 'System' ? 'System' : userName(e.actorUserId);
+  return { id: e.id, type: e.type, occurredAt: e.occurredAt, actorType: e.actorType, actorName, details: e.details };
 }

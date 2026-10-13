@@ -21,7 +21,7 @@ import {
   sortBy,
   type CompanyCtx,
 } from './http';
-import { activeQuotations, customerName, toCustomer, toCustomerListItem, toJobListItem, toQuotationListItem } from './mappers';
+import { activeInvoices, activeQuotations, customerName, toCustomer, toCustomerListItem, toInvoiceListItem, toJobListItem, toQuotationListItem } from './mappers';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TYPES: CustomerType[] = ['Business', 'Private'];
@@ -169,7 +169,7 @@ export const customerHandlers: HttpHandler[] = [
   companyRoute('delete', '/customers/:customerId', (ctx) => {
     const c = findCustomer(ctx, ctx.params.customerId);
     const quotations = db.quotations.filter((q) => q.customerId === c.id);
-    const hasDocuments = quotations.length > 0 || db.jobs.some((j) => j.customerId === c.id);
+    const hasDocuments = quotations.length > 0 || db.jobs.some((j) => j.customerId === c.id) || db.invoices.some((i) => i.customerId === c.id && !i.deletedAt);
     if (!hasDocuments) {
       db.customers = db.customers.filter((x) => x.id !== c.id);
       addAudit(db, ctx.company.id, ctx.user.id, 'customer.deleted', 'Customer', null, null);
@@ -199,5 +199,13 @@ export const customerHandlers: HttpHandler[] = [
   companyRoute('get', '/customers/:customerId/jobs', (ctx) => {
     const c = findCustomer(ctx, ctx.params.customerId);
     return json(db.jobs.filter((j) => j.customerId === c.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(toJobListItem));
+  }),
+
+  companyRoute('get', '/customers/:customerId/invoices', (ctx) => {
+    const c = findCustomer(ctx, ctx.params.customerId);
+    const list = activeInvoices(ctx.company.id)
+      .filter((i) => i.customerId === c.id)
+      .sort((a, b) => b.issueDate.localeCompare(a.issueDate) || (b.number ?? '').localeCompare(a.number ?? ''));
+    return json(list.map(toInvoiceListItem));
   }),
 ];

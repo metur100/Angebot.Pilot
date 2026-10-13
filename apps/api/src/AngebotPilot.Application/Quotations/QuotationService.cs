@@ -696,7 +696,9 @@ public sealed class QuotationService(
             QuotationMapping.ToDto(q.CalculateTotals()),
             q.RevisionNumber, q.RootQuotationId, q.PreviousRevisionId, revisions.Count > 1 ? revisions : [],
             q.CreatedAt, q.UpdatedAt, q.SentAt, q.DecidedAt, q.DecidedByActor, q.DecisionName, q.DecisionNote, q.ExpiredAt, q.CancelledAt, q.CancellationReason,
-            jobId, link?.Active ?? false, link?.LastOpened, QuotationMapping.AllowedActions(q, jobId is not null), RowVersions.Encode(q.RowVersion));
+            jobId, link?.Active ?? false, link?.LastOpened, QuotationMapping.AllowedActions(q, jobId is not null), RowVersions.Encode(q.RowVersion),
+            await db.Invoices.AsNoTracking().Where(i => i.QuotationId == q.Id).OrderBy(i => i.CreatedAt)
+                .Select(i => new InvoiceLinkDto(i.Id, i.Number, i.Kind, i.Status, i.GrossTotal)).ToListAsync(ct));
     }
 
     private async Task<Quotation> LoadAsync(Guid id, CancellationToken ct) =>

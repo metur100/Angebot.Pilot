@@ -1,22 +1,37 @@
 // Demo data of the mock backend: an electrician business in Munich with realistic quotations in every status.
 // All dates are relative to "today" (Europe/Berlin) so expiring/expired examples stay meaningful.
-import { addDaysIso, todayIso, type LineItemInput, type MembershipRole, type QuotationStatus, type TemplateLineItemInput } from '@angebotpilot/api-contracts';
+import {
+  addDaysIso,
+  formatDate,
+  formatEur,
+  todayIso,
+  type LineItemInput,
+  type MembershipRole,
+  type QuotationStatus,
+  type TemplateLineItemInput,
+} from '@angebotpilot/api-contracts';
 import {
   addAudit,
   addEvent,
+  addInvoiceEvent,
+  applyInvoicePayments,
   cancelScheduledFollowUps,
+  invoiceTotals,
   planFollowUps,
 } from './domain';
 import {
   buildLineItems,
   buildTemplateLineItems,
   defaultSettings,
+  newId,
   nextNumber,
   nextRowVersion,
   nowIso,
+  snapshotInvoiceRecipient,
   snapshotRecipient,
   type CompanyRec,
   type CustomerRec,
+  type InvoiceRec,
   type JobRec,
   type MockDb,
   type QuotationRec,
@@ -815,10 +830,183 @@ export function seedDemo(db: MockDb): void {
     if (status !== 'Open') addAudit(db, q.companyId, opts.assignee?.id ?? lena.id, 'job.status_changed', 'Job', j.id, `${j.number}: ${status === 'Completed' ? 'Abgeschlossen' : 'In Arbeit'}`, j.updatedAt);
     return j;
   };
-  job(q1, 'Completed', { assignee: tobias, planned: -48, due: -40, created: -54, started: -48, completed: -42, notes: 'Abnahme durch Herrn Huber erfolgt.' });
+  const j1 = job(q1, 'Completed', { assignee: tobias, planned: -48, due: -40, created: -54, started: -48, completed: -42, notes: 'Abnahme durch Herrn Huber erfolgt.' });
   const j2 = job(q2, 'InProgress', { assignee: aylin, planned: -3, due: 4, created: -35, started: -3, notes: 'Material ist geliefert (Lager Regal 4).' });
   job(q3, 'Open', { assignee: tobias, planned: 6, due: 14, created: -17, notes: 'Schlüssel bei Hausmeister Herrn Pichler abholen (Tel. 0170 5566778).' });
   const j4 = job(q13, 'Open', { planned: 10, due: 20, created: -7 });
+
+  // ---------- invoices ----------
+  interface InvoiceSeed {
+    customer: CustomerRec;
+    title: string;
+    lines: LineItemInput[];
+    /** Days relative to today. */
+    created: number;
+    issue: number;
+    service: number;
+    serviceTo?: number;
+    due: number;
+    issued?: boolean;
+    sent?: number;
+    quotation?: QuotationRec;
+    job?: JobRec;
+    buyerReference?: string;
+    payments?: { amount: number | 'full'; on: number; method: string; note?: string }[];
+    reminders?: number[];
+    createdBy?: UserRec;
+    internalNotes?: string;
+  }
+  const invoice = (s: InvoiceSeed): InvoiceRec => {
+    const settings = elektro.settings;
+    const creator = s.createdBy ?? lena;
+    const createdAt = at(s.created, 9, 40);
+    const i: InvoiceRec = {
+      id: sid(),
+      companyId: elektro.id,
+      customerId: s.customer.id,
+      number: null,
+      kind: 'Invoice',
+      status: 'Draft',
+      title: s.title,
+      recipientName: '',
+      recipientContact: null,
+      recipientAddress: null,
+      recipientStreet: null,
+      recipientPostalCode: null,
+      recipientCity: null,
+      recipientEmail: null,
+      recipientVatId: null,
+      issueDate: d(s.issue),
+      serviceDateFrom: d(s.service),
+      serviceDateTo: s.serviceTo !== undefined ? d(s.serviceTo) : null,
+      dueDate: d(s.due),
+      taxMode: 'Standard',
+      introText: settings.invoiceIntroText,
+      closingText: settings.invoiceClosingText,
+      paymentTerms: null,
+      buyerReference: s.buyerReference ?? null,
+      internalNotes: s.internalNotes ?? null,
+      currency: 'EUR',
+      lineItems: buildLineItems(s.lines),
+      paidAmount: 0,
+      paidOn: null,
+      quotationId: s.quotation?.id ?? null,
+      quotationNumber: s.quotation?.number ?? null,
+      jobId: s.job?.id ?? null,
+      jobNumber: s.job?.number ?? null,
+      cancelledInvoiceId: null,
+      cancelledInvoiceNumber: null,
+      cancellationInvoiceId: null,
+      createdByUserId: creator.id,
+      createdAt,
+      updatedAt: createdAt,
+      issuedAt: null,
+      issuedByUserId: null,
+      sentAt: null,
+      cancelledAt: null,
+      cancellationReason: null,
+      lastReminderAt: null,
+      reminderCount: 0,
+      deletedAt: null,
+      rowVersion: rv(),
+    };
+    snapshotInvoiceRecipient(i, s.customer);
+    db.invoices.push(i);
+    const source = s.job ? `Aus Auftrag ${s.job.number}` : s.quotation ? `Aus Angebot ${s.quotation.number}` : null;
+    addInvoiceEvent(db, i, 'Created', 'User', creator.id, source, createdAt);
+    addAudit(db, elektro.id, creator.id, 'invoice.created', 'Invoice', i.id, source ? source.replace(/^Aus/, 'aus') : `${i.title} für ${i.recipientName}`, createdAt);
+    if (s.issued) {
+      const issuedAt = at(s.issue, 10, 5);
+      i.number = nextNumber(db, elektro.id, 'invoice', settings.invoicePrefix, Number(i.issueDate.slice(0, 4)));
+      i.status = 'Issued';
+      i.issuedAt = issuedAt;
+      i.issuedByUserId = lena.id;
+      i.updatedAt = issuedAt;
+      addInvoiceEvent(db, i, 'Issued', 'User', lena.id, i.number, issuedAt);
+      addAudit(db, elektro.id, lena.id, 'invoice.issued', 'Invoice', i.id, `${i.number} · ${formatEur(invoiceTotals(i).grossTotal)}`, issuedAt);
+    }
+    if (s.sent !== undefined && i.number) {
+      const sentAt = at(s.sent, 10, 20);
+      const to = i.recipientEmail ?? 'kunde@example.de';
+      i.sentAt = sentAt;
+      i.updatedAt = sentAt;
+      db.deliveries.push({
+        id: sid(), companyId: elektro.id, quotationId: null, invoiceId: i.id, kind: 'InvoiceSent', toAddress: to,
+        subject: `Ihre Rechnung ${i.number} von ${elektro.name}`, status: 'HandedOff', attempts: 1, createdAt: sentAt,
+        handedOffAt: new Date(new Date(sentAt).getTime() + 35_000).toISOString(), nextAttemptAt: null, lastError: null,
+      });
+      addInvoiceEvent(db, i, 'Sent', 'User', lena.id, `An ${to}`, sentAt);
+      addInvoiceEvent(db, i, 'EmailHandedOff', 'System', null, `An ${to}`, sentAt);
+      addAudit(db, elektro.id, lena.id, 'invoice.sent', 'Invoice', i.id, i.number, sentAt);
+    }
+    for (const offset of s.reminders ?? []) {
+      const remindedAt = at(offset, 9, 15);
+      const to = i.recipientEmail ?? 'kunde@example.de';
+      i.reminderCount += 1;
+      i.lastReminderAt = remindedAt;
+      i.updatedAt = remindedAt;
+      db.deliveries.push({
+        id: sid(), companyId: elektro.id, quotationId: null, invoiceId: i.id, kind: 'PaymentReminder', toAddress: to,
+        subject: `Zahlungserinnerung: Rechnung ${i.number ?? ''}`, status: 'HandedOff', attempts: 1, createdAt: remindedAt,
+        handedOffAt: new Date(new Date(remindedAt).getTime() + 30_000).toISOString(), nextAttemptAt: null, lastError: null,
+      });
+      addInvoiceEvent(db, i, 'ReminderQueued', 'User', lena.id, `Zahlungserinnerung an ${to}`, remindedAt);
+      addAudit(db, elektro.id, lena.id, 'invoice.reminder_sent', 'Invoice', i.id, i.number, remindedAt);
+    }
+    for (const p of s.payments ?? []) {
+      const recordedAt = at(p.on, 15, 30);
+      const amount = p.amount === 'full' ? Math.round((invoiceTotals(i).grossTotal - i.paidAmount) * 100) / 100 : p.amount;
+      db.invoicePayments.push({
+        id: newId(), companyId: elektro.id, invoiceId: i.id, amount, paidOn: d(p.on), method: p.method, note: p.note ?? null,
+        createdAt: recordedAt, createdByUserId: tobias.id,
+      });
+      applyInvoicePayments(db, i, recordedAt);
+      addInvoiceEvent(db, i, 'PaymentRecorded', 'User', tobias.id, `${formatEur(amount)} am ${formatDate(d(p.on))}`, recordedAt);
+      if (i.status === 'Paid') addInvoiceEvent(db, i, 'Paid', 'User', tobias.id, null, recordedAt);
+      addAudit(db, elektro.id, tobias.id, i.status === 'Paid' ? 'invoice.paid' : 'invoice.payment_recorded', 'Invoice', i.id, `${i.number ?? ''}: ${formatEur(amount)}`, recordedAt);
+    }
+    return i;
+  };
+
+  // Overdue and partially paid (with one payment reminder): RE-<Jahr>-0001.
+  invoice({
+    customer: gasthof, title: 'Notdienst-Einsatz Störungsbeseitigung Küche', created: -41, issue: -40, service: -43, due: -26, issued: true, sent: -40,
+    reminders: [-12],
+    payments: [{ amount: 400, on: -20, method: 'Überweisung', note: 'Teilzahlung laut Telefonat mit Herrn Obermaier' }],
+    lines: [
+      li('Notdienst-Pauschale Wochenende', 1, 'pauschal', 180),
+      li('Arbeitszeit Elektroniker', 6, 'Std.', 62),
+      li('FI-Schutzschalter 40 A / 30 mA Typ A', 2, 'Stk.', 89),
+      anfahrt,
+    ],
+  });
+  // Paid in full: RE-<Jahr>-0002.
+  invoice({
+    customer: schneider, title: 'Reparatur Notbeleuchtung Wartezimmer', created: -31, issue: -30, service: -32, due: -16, issued: true, sent: -30,
+    payments: [{ amount: 'full', on: -18, method: 'Überweisung' }],
+    lines: [
+      li('Arbeitszeit Elektroniker', 3, 'Std.', 62),
+      li('Ersatzakku Notleuchte NiCd 3,6 V', 4, 'Stk.', 38),
+      anfahrt,
+    ],
+  });
+  // Open, sent by email, service period: RE-<Jahr>-0003.
+  invoice({
+    customer: brauerei, title: 'Wartung Schaltanlagen Abfüllhalle', created: -6, issue: -5, service: -14, serviceTo: -8, due: 9, issued: true, sent: -5,
+    buyerReference: 'Bestellung 4500-2291',
+    lines: [
+      li('Thermografie-Prüfung Schaltschränke', 6, 'Stk.', 85),
+      li('Nachziehen Klemmverbindungen und Reinigung', 1, 'pauschal', 340),
+      li('Arbeitszeit Elektroniker', 9, 'Std.', 62),
+      doku,
+    ],
+  });
+  // Draft from the completed job (line items of its quotation).
+  invoice({
+    customer: huber, title: j1.title, created: -1, issue: 0, service: -42, due: elektro.settings.invoicePaymentDays, quotation: q1, job: j1,
+    lines: [...q1.lineItems].sort((a, b) => a.position - b.position),
+    internalNotes: 'Prüfprotokoll als Anlage mitschicken.',
+  });
 
   // ---------- templates ----------
   const template = (name: string, description: string, lines: TemplateLineItemInput[], updated: number) => {

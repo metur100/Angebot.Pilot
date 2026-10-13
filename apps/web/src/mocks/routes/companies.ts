@@ -16,7 +16,7 @@ import {
 } from '@angebotpilot/api-contracts';
 import type { HttpHandler } from 'msw';
 import { db } from '../db';
-import { addAudit, appLink, captureEmail, companyToday, expireDueQuotations } from '../domain';
+import { addAudit, appLink, captureEmail, companyToday, expireDueQuotations, invoiceDaysOverdue, invoiceOpenAmount, invoiceTotals, isInvoiceOpen } from '../domain';
 import { defaultSettings, newId, nextRowVersion, nowIso, randomToken, type CompanyRec, type MembershipRec } from '../model';
 import { ensureMemberCapacity, ensureWritable, planFor, subscriptionOf, toSubscriptionDto } from './billing';
 import {
@@ -39,7 +39,7 @@ import {
   validation,
   type CompanyCtx,
 } from './http';
-import { activeQuotations, activityOf, toActivity, toCompany, toInvitation, toMember, toQuotationListItem, totalsOf } from './mappers';
+import { activeInvoices, activeQuotations, activityOf, toActivity, toCompany, toInvitation, toInvoiceListItem, toMember, toQuotationListItem, totalsOf } from './mappers';
 
 const TAX_MODES: TaxMode[] = ['Standard', 'SmallBusiness', 'ReverseCharge'];
 const ROLES: MembershipRole[] = ['Employee', 'Admin', 'Owner'];
@@ -91,6 +91,14 @@ function validateSettings(s: Partial<CompanySettingsDto>): void {
     errors.add('secondReminderAfterDays', 'Die zweite Erinnerung muss nach der ersten kommen.');
   }
   if (s.replyToEmail && !EMAIL_RE.test(s.replyToEmail)) errors.add('replyToEmail', 'Bitte eine gültige E-Mail-Adresse angeben.');
+  // Invoice settings: omitted or null values are left unchanged.
+  if (s.invoicePrefix !== undefined && s.invoicePrefix !== null && !/^[A-Z0-9]{1,8}$/.test(s.invoicePrefix)) errors.add('invoicePrefix', '1–8 Großbuchstaben oder Ziffern.');
+  if (s.invoicePaymentDays !== undefined && s.invoicePaymentDays !== null && (!Number.isInteger(s.invoicePaymentDays) || s.invoicePaymentDays < 0 || s.invoicePaymentDays > 120)) {
+    errors.add('invoicePaymentDays', 'Bitte einen Wert zwischen 0 und 120 Tagen angeben.');
+  }
+  if (s.invoiceReminderAfterDays !== undefined && s.invoiceReminderAfterDays !== null && (!Number.isInteger(s.invoiceReminderAfterDays) || s.invoiceReminderAfterDays < 1 || s.invoiceReminderAfterDays > 60)) {
+    errors.add('invoiceReminderAfterDays', 'Bitte einen Wert zwischen 1 und 60 Tagen angeben.');
+  }
   errors.throwIfAny();
 }
 
@@ -107,6 +115,9 @@ function removeCompanyData(companyId: string): void {
   db.followUps = db.followUps.filter((f) => f.companyId !== companyId);
   db.templates = db.templates.filter((t) => t.companyId !== companyId);
   db.jobs = db.jobs.filter((j) => j.companyId !== companyId);
+  db.invoices = db.invoices.filter((i) => i.companyId !== companyId);
+  db.invoicePayments = db.invoicePayments.filter((p) => p.companyId !== companyId);
+  db.invoiceEvents = db.invoiceEvents.filter((e) => e.companyId !== companyId);
   db.notifications = db.notifications.filter((n) => n.companyId !== companyId);
   db.audit = db.audit.filter((a) => a.companyId !== companyId);
   db.subscriptions = db.subscriptions.filter((s) => s.companyId !== companyId);
@@ -142,6 +153,19 @@ function buildDashboard(company: CompanyRec, fromParam: string | null, toParam: 
     return q ? [{ quotationId: q.id, quotationNumber: q.number, customerName: q.recipientName, kind: f.kind, dueAt: f.dueAt }] : [];
   });
 
+  // Invoices: open/overdue are current state; invoiced and received amounts refer to the period.
+  const invoices = activeInvoices(company.id);
+  const openInvoices = invoices.filter(isInvoiceOpen);
+  const overdue = openInvoices.filter((i) => invoiceDaysOverdue(i, today) > 0).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const sum = (values: number[]) => Math.round(values.reduce((a, b) => a + b, 0) * 100) / 100;
+  const invoicedNet = sum(
+    invoices
+      .filter((i) => i.number !== null && i.issueDate >= from && i.issueDate <= to)
+      .map((i) => (i.kind === 'Cancellation' ? -1 : 1) * invoiceTotals(i).netTotal),
+  );
+  const invoiceIds = new Set(invoices.map((i) => i.id));
+  const paymentsReceived = sum(db.invoicePayments.filter((p) => invoiceIds.has(p.invoiceId) && p.paidOn >= from && p.paidOn <= to).map((p) => p.amount));
+
   return {
     from,
     to,
@@ -161,6 +185,13 @@ function buildDashboard(company: CompanyRec, fromParam: string | null, toParam: 
     upcomingFollowUps: upcoming,
     recentActivity: activityOf(company.id).slice(0, 8).map(toActivity),
     openJobsCount: db.jobs.filter((j) => j.companyId === company.id && (j.status === 'Open' || j.status === 'InProgress')).length,
+    openInvoicesCount: openInvoices.length,
+    openInvoicesAmount: sum(openInvoices.map(invoiceOpenAmount)),
+    overdueInvoicesCount: overdue.length,
+    overdueInvoicesAmount: sum(overdue.map(invoiceOpenAmount)),
+    invoicedNet,
+    paymentsReceived,
+    overdueInvoices: overdue.slice(0, 8).map(toInvoiceListItem),
   };
 }
 
@@ -293,6 +324,12 @@ export const companyHandlers: HttpHandler[] = [
       bankName: clean(s.bankName),
       emailSignature: clean(s.emailSignature),
       replyToEmail: clean(s.replyToEmail),
+      invoicePrefix: s.invoicePrefix?.trim().toUpperCase() ?? company.settings.invoicePrefix,
+      invoicePaymentDays: s.invoicePaymentDays ?? company.settings.invoicePaymentDays,
+      invoiceIntroText: s.invoiceIntroText === undefined || s.invoiceIntroText === null ? company.settings.invoiceIntroText : clean(s.invoiceIntroText),
+      invoiceClosingText: s.invoiceClosingText === undefined || s.invoiceClosingText === null ? company.settings.invoiceClosingText : clean(s.invoiceClosingText),
+      invoiceReminderEnabled: s.invoiceReminderEnabled ?? company.settings.invoiceReminderEnabled,
+      invoiceReminderAfterDays: s.invoiceReminderAfterDays ?? company.settings.invoiceReminderAfterDays,
     };
     touchCompany(company);
     addAudit(db, company.id, user.id, 'company.settings_updated', 'Company', company.id, null);

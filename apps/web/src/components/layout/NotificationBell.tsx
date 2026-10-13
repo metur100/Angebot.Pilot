@@ -21,6 +21,8 @@ export function notificationTarget(notification: Pick<NotificationDto, 'entityTy
       return `/angebote/${notification.entityId}`;
     case 'job':
       return `/auftraege/${notification.entityId}`;
+    case 'invoice':
+      return `/rechnungen/${notification.entityId}`;
     case 'customer':
       return `/kunden/${notification.entityId}`;
     default:

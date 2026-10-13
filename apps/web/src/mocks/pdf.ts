@@ -1,7 +1,7 @@
 // Tiny hand-written PDF 1.4 generator for the mock backend (Helvetica, A4, WinAnsiEncoding).
 // Produces a valid file with a correct xref table so pdf.js and browser viewers can render it.
-import { calculateTotals, formatDate, formatEur, formatPercent, formatQuantity } from '@angebotpilot/api-contracts';
-import type { CompanyRec, QuotationRec } from './model';
+import { calculateTotals, formatDate, formatEur, formatPercent, formatQuantity, type LineItemDto, type TaxMode } from '@angebotpilot/api-contracts';
+import type { CompanyRec, InvoiceRec, QuotationRec } from './model';
 
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
@@ -131,19 +131,119 @@ export function quotationPdfFileName(q: QuotationRec): string {
   return `Angebot_${q.number}.pdf`;
 }
 
+/** Layout-independent content of a business document (quotation or invoice). */
+interface DocumentPdfModel {
+  company: CompanyRec;
+  /** Grey note at the top of every page (e.g. draft marker). */
+  watermark: string | null;
+  heading: string;
+  continuation: string;
+  title: string;
+  meta: [string, string][];
+  recipientName: string;
+  recipientContact: string | null;
+  recipientAddress: string | null;
+  introText: string | null;
+  lineItems: LineItemDto[];
+  taxMode: TaxMode;
+  /** Cancellation invoices print all amounts negated. */
+  negate?: boolean;
+  /** Extra rows below the gross total (e.g. paid / open amount). */
+  extraTotals?: [string, string][];
+  blocks: (string | null)[];
+  showBank: boolean;
+}
+
 export function buildQuotationPdf({ company, quotation: q, draft }: QuotationPdfModel): Uint8Array<ArrayBuffer> {
+  const meta: [string, string][] = [
+    ['Angebotsnummer', q.number],
+    ['Datum', formatDate(q.issueDate)],
+    ['Gültig bis', formatDate(q.validUntil)],
+  ];
+  if (q.recipientVatId) meta.push(['USt-IdNr. Kunde', q.recipientVatId]);
+  return buildDocumentPdf({
+    company,
+    watermark: draft ? 'ENTWURF – nicht versendet' : null,
+    heading: `Angebot ${q.number}`,
+    continuation: `Angebot ${q.number} (Fortsetzung)`,
+    title: q.title,
+    meta,
+    recipientName: q.recipientName,
+    recipientContact: q.recipientContact,
+    recipientAddress: q.recipientAddress,
+    introText: q.introText,
+    lineItems: q.lineItems,
+    taxMode: q.taxMode,
+    blocks: [q.closingText, q.paymentTerms ? `Zahlungsbedingungen: ${q.paymentTerms}` : null, q.terms],
+    showBank: company.settings.showBankDetails,
+  });
+}
+
+export interface InvoicePdfModel {
+  company: CompanyRec;
+  invoice: InvoiceRec;
+}
+
+/** Invoice or cancellation invoice. Drafts carry an "ENTWURF" marker and no number (like the API preview). */
+export function buildInvoicePdf({ company, invoice: i }: InvoicePdfModel): Uint8Array<ArrayBuffer> {
+  const draft = i.status === 'Draft';
+  const cancellation = i.kind === 'Cancellation';
+  const label = cancellation ? 'Stornorechnung' : 'Rechnung';
+  const service = i.serviceDateTo ? `${formatDate(i.serviceDateFrom)} – ${formatDate(i.serviceDateTo)}` : formatDate(i.serviceDateFrom);
+  const meta: [string, string][] = [
+    ['Rechnungsnummer', i.number ?? 'wird beim Stellen vergeben'],
+    ['Rechnungsdatum', formatDate(i.issueDate)],
+    [i.serviceDateTo ? 'Leistungszeitraum' : 'Leistungsdatum', service],
+  ];
+  if (!cancellation) meta.push(['Fällig am', formatDate(i.dueDate)]);
+  if (i.buyerReference) meta.push(['Ihre Referenz', i.buyerReference]);
+  if (i.recipientVatId) meta.push(['USt-IdNr. Kunde', i.recipientVatId]);
+  const gross = calculateTotals(i.lineItems, i.taxMode).grossTotal;
+  const s = company.settings;
+  const payment = cancellation
+    ? null
+    : `${i.paymentTerms ? `${i.paymentTerms}\n` : ''}Bitte überweisen Sie den Betrag von ${formatEur(gross)} bis zum ${formatDate(i.dueDate)}${s.iban ? ` auf unser Konto IBAN ${s.iban}` : ''} unter Angabe der Rechnungsnummer.`;
+  return buildDocumentPdf({
+    company,
+    watermark: draft ? 'ENTWURF – noch nicht gestellt' : null,
+    heading: draft ? 'Rechnungsentwurf' : `${label} ${i.number ?? ''}`,
+    continuation: `${label} ${i.number ?? '(Entwurf)'} (Fortsetzung)`,
+    title: i.title,
+    meta,
+    recipientName: i.recipientName,
+    recipientContact: i.recipientContact,
+    recipientAddress: i.recipientAddress,
+    introText: i.introText,
+    lineItems: i.lineItems,
+    taxMode: i.taxMode,
+    negate: cancellation,
+    extraTotals:
+      !cancellation && i.paidAmount > 0
+        ? [
+            ['Bereits bezahlt', `– ${formatEur(i.paidAmount)}`],
+            ['Offener Betrag', formatEur(Math.round((gross - i.paidAmount) * 100) / 100)],
+          ]
+        : [],
+    blocks: [i.closingText, payment, draft ? null : 'Diese Rechnung enthält eine strukturierte E-Rechnung (ZUGFeRD, EN 16931).'],
+    showBank: Boolean(s.iban),
+  });
+}
+
+function buildDocumentPdf(doc: DocumentPdfModel): Uint8Array<ArrayBuffer> {
+  const { company } = doc;
   const [r, g, b] = hexToRgb(company.brandColor);
   const companyLine = [company.name, company.addressLine1, [company.postalCode, company.city].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+  const money = (value: number) => (doc.negate ? `– ${formatEur(value)}` : formatEur(value));
   let pageNo = 0;
 
   const w = new PageWriter((p) => {
     pageNo += 1;
     p.raw(`${r.toFixed(3)} ${g.toFixed(3)} ${b.toFixed(3)} rg 0 ${PAGE_HEIGHT - 12} ${PAGE_WIDTH} 12 re f`);
-    if (draft) p.text(MARGIN_LEFT, PAGE_HEIGHT - 34, 'ENTWURF – nicht versendet', 11, true, 0.55);
+    if (doc.watermark) p.text(MARGIN_LEFT, PAGE_HEIGHT - 34, doc.watermark, 11, true, 0.55);
     p.text(MARGIN_LEFT, 40, `${companyLine}`, 7, false, 0.4);
     p.textRight(MARGIN_RIGHT, 40, `Seite ${pageNo}`, 7);
     if (pageNo > 1) {
-      p.text(MARGIN_LEFT, PAGE_HEIGHT - 50, `Angebot ${q.number} (Fortsetzung)`, 9, true);
+      p.text(MARGIN_LEFT, PAGE_HEIGHT - 50, doc.continuation, 9, true);
       p.y = PAGE_HEIGHT - 75;
     }
   });
@@ -161,37 +261,31 @@ export function buildQuotationPdf({ company, quotation: q, draft }: QuotationPdf
   // Recipient and meta block
   w.y -= 18;
   const metaTop = w.y;
-  const recipientLines = [q.recipientName, q.recipientContact ? `z. Hd. ${q.recipientContact}` : null, ...(q.recipientAddress ?? '').split('\n')].filter(
+  const recipientLines = [doc.recipientName, doc.recipientContact ? `z. Hd. ${doc.recipientContact}` : null, ...(doc.recipientAddress ?? '').split('\n')].filter(
     (l): l is string => !!l && l.trim() !== '',
   );
   for (const line of recipientLines) {
     w.text(MARGIN_LEFT, w.y, line, 10);
     w.y -= 13;
   }
-  const meta: [string, string][] = [
-    ['Angebotsnummer', q.number],
-    ['Datum', formatDate(q.issueDate)],
-    ['Gültig bis', formatDate(q.validUntil)],
-  ];
-  if (q.recipientVatId) meta.push(['USt-IdNr. Kunde', q.recipientVatId]);
   let my = metaTop;
-  for (const [label, value] of meta) {
-    w.text(360, my, label, 9, false, 0.35);
+  for (const [label, value] of doc.meta) {
+    w.text(340, my, label, 9, false, 0.35);
     w.textRight(MARGIN_RIGHT, my, value, 9, true);
     my -= 13;
   }
   w.y = Math.min(w.y, my) - 22;
 
   // Title
-  w.text(MARGIN_LEFT, w.y, `Angebot ${q.number}`, 14, true);
+  w.text(MARGIN_LEFT, w.y, doc.heading, 14, true);
   w.y -= 18;
-  for (const line of wrap(q.title, 11, MARGIN_RIGHT - MARGIN_LEFT)) {
+  for (const line of wrap(doc.title, 11, MARGIN_RIGHT - MARGIN_LEFT)) {
     w.text(MARGIN_LEFT, w.y, line, 11);
     w.y -= 14;
   }
   w.y -= 6;
-  if (q.introText) {
-    for (const line of wrap(q.introText, 9, MARGIN_RIGHT - MARGIN_LEFT)) {
+  if (doc.introText) {
+    for (const line of wrap(doc.introText, 9, MARGIN_RIGHT - MARGIN_LEFT)) {
       w.ensure(12);
       w.text(MARGIN_LEFT, w.y, line, 9);
       w.y -= 12;
@@ -213,7 +307,7 @@ export function buildQuotationPdf({ company, quotation: q, draft }: QuotationPdf
     w.y -= 13;
   };
   header();
-  for (const item of q.lineItems) {
+  for (const item of doc.lineItems) {
     const titleLines = wrap(item.title, 9, 250);
     const descLines = item.description ? wrap(item.description, 8, 250) : [];
     const discount = item.discountPercent > 0 ? [`abzgl. ${formatPercent(item.discountPercent)} Rabatt`] : [];
@@ -226,7 +320,7 @@ export function buildQuotationPdf({ company, quotation: q, draft }: QuotationPdf
     w.textRight(360, w.y, formatQuantity(item.quantity), 9);
     w.text(366, w.y, item.unit, 9);
     w.textRight(470, w.y, formatEur(item.unitPriceNet), 9);
-    w.textRight(MARGIN_RIGHT, w.y, formatEur(item.lineNet), 9);
+    w.textRight(MARGIN_RIGHT, w.y, money(item.lineNet), 9);
     let ly = w.y;
     for (const line of titleLines) {
       w.text(80, ly, line, 9);
@@ -240,8 +334,8 @@ export function buildQuotationPdf({ company, quotation: q, draft }: QuotationPdf
   }
 
   // Totals
-  const totals = calculateTotals(q.lineItems, q.taxMode);
-  w.ensure(110);
+  const totals = calculateTotals(doc.lineItems, doc.taxMode);
+  w.ensure(130);
   w.line(330, w.y + 6, MARGIN_RIGHT, w.y + 6, 0.3);
   w.y -= 8;
   const totalRow = (label: string, value: string, bold = false, size = 9) => {
@@ -250,26 +344,27 @@ export function buildQuotationPdf({ company, quotation: q, draft }: QuotationPdf
     w.y -= size + 5;
   };
   if (totals.discountTotal > 0) {
-    totalRow('Zwischensumme', formatEur(totals.subtotalBeforeDiscount));
+    totalRow('Zwischensumme', money(totals.subtotalBeforeDiscount));
     totalRow('Rabatte', `– ${formatEur(totals.discountTotal)}`);
   }
-  totalRow('Summe netto', formatEur(totals.netTotal));
-  if (q.taxMode === 'Standard') {
-    for (const group of totals.taxGroups) totalRow(`zzgl. ${formatPercent(group.ratePercent)} USt.`, formatEur(group.taxAmount));
+  totalRow('Summe netto', money(totals.netTotal));
+  if (doc.taxMode === 'Standard') {
+    for (const group of totals.taxGroups) totalRow(`zzgl. ${formatPercent(group.ratePercent)} USt.`, money(group.taxAmount));
   }
   w.y -= 2;
-  totalRow('Gesamtbetrag brutto', formatEur(totals.grossTotal), true, 11);
-  if (q.taxMode === 'SmallBusiness') {
+  totalRow('Gesamtbetrag brutto', money(totals.grossTotal), true, 11);
+  for (const [label, value] of doc.extraTotals ?? []) totalRow(label, value);
+  if (doc.taxMode === 'SmallBusiness') {
     w.text(MARGIN_LEFT, w.y, 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.', 8, false, 0.35);
     w.y -= 12;
-  } else if (q.taxMode === 'ReverseCharge') {
+  } else if (doc.taxMode === 'ReverseCharge') {
     w.text(MARGIN_LEFT, w.y, 'Steuerschuldnerschaft des Leistungsempfängers (§ 13b UStG).', 8, false, 0.35);
     w.y -= 12;
   }
 
   // Texts
   w.y -= 10;
-  for (const block of [q.closingText, q.paymentTerms ? `Zahlungsbedingungen: ${q.paymentTerms}` : null, q.terms]) {
+  for (const block of doc.blocks) {
     if (!block) continue;
     for (const line of wrap(block, 8.5, MARGIN_RIGHT - MARGIN_LEFT)) {
       w.ensure(12);
@@ -279,9 +374,15 @@ export function buildQuotationPdf({ company, quotation: q, draft }: QuotationPdf
     w.y -= 6;
   }
   const s = company.settings;
-  if (s.showBankDetails && s.iban) {
+  if (doc.showBank && s.iban) {
     w.ensure(14);
     w.text(MARGIN_LEFT, w.y, `Bankverbindung: ${s.bankAccountHolder ?? company.name} · IBAN ${s.iban}${s.bic ? ` · BIC ${s.bic}` : ''}${s.bankName ? ` · ${s.bankName}` : ''}`, 7.5, false, 0.35);
+    w.y -= 11;
+  }
+  const taxLine = [company.taxNumber ? `Steuernummer ${company.taxNumber}` : null, company.vatId ? `USt-IdNr. ${company.vatId}` : null].filter(Boolean).join(' · ');
+  if (taxLine) {
+    w.ensure(12);
+    w.text(MARGIN_LEFT, w.y, taxLine, 7.5, false, 0.35);
     w.y -= 11;
   }
   w.flush();

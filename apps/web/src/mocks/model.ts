@@ -9,6 +9,9 @@ import {
   type EmailStatus,
   type FollowUpKind,
   type FollowUpStatus,
+  type InvoiceEventType,
+  type InvoiceKind,
+  type InvoiceStatus,
   type JobStatus,
   type LineItemDto,
   type LineItemInput,
@@ -184,6 +187,8 @@ export interface DeliveryRec {
   id: string;
   companyId: string;
   quotationId: string | null;
+  /** Invoice emails (InvoiceSent, PaymentReminder). Optional so older persisted snapshots stay valid. */
+  invoiceId?: string | null;
   kind: EmailKind;
   toAddress: string;
   subject: string;
@@ -240,6 +245,82 @@ export interface JobRec {
   completedAt: string | null;
   cancelledAt: string | null;
   rowVersion: string;
+}
+
+export interface InvoiceRec {
+  id: string;
+  companyId: string;
+  customerId: string;
+  /** Assigned when the invoice is issued; null for drafts. */
+  number: string | null;
+  kind: InvoiceKind;
+  status: InvoiceStatus;
+  title: string;
+  recipientName: string;
+  recipientContact: string | null;
+  recipientAddress: string | null;
+  recipientStreet: string | null;
+  recipientPostalCode: string | null;
+  recipientCity: string | null;
+  recipientEmail: string | null;
+  recipientVatId: string | null;
+  issueDate: string;
+  serviceDateFrom: string | null;
+  serviceDateTo: string | null;
+  dueDate: string;
+  taxMode: TaxMode;
+  introText: string | null;
+  closingText: string | null;
+  paymentTerms: string | null;
+  buyerReference: string | null;
+  internalNotes: string | null;
+  currency: string;
+  lineItems: LineItemDto[];
+  /** Sum of the recorded payments (kept in sync by the payment routes). */
+  paidAmount: number;
+  paidOn: string | null;
+  quotationId: string | null;
+  quotationNumber: string | null;
+  jobId: string | null;
+  jobNumber: string | null;
+  cancelledInvoiceId: string | null;
+  cancelledInvoiceNumber: string | null;
+  cancellationInvoiceId: string | null;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+  issuedAt: string | null;
+  issuedByUserId: string | null;
+  sentAt: string | null;
+  cancelledAt: string | null;
+  cancellationReason: string | null;
+  lastReminderAt: string | null;
+  reminderCount: number;
+  deletedAt: string | null;
+  rowVersion: string;
+}
+
+export interface InvoicePaymentRec {
+  id: string;
+  companyId: string;
+  invoiceId: string;
+  amount: number;
+  paidOn: string;
+  method: string | null;
+  note: string | null;
+  createdAt: string;
+  createdByUserId: string;
+}
+
+export interface InvoiceEventRec {
+  id: string;
+  companyId: string;
+  invoiceId: string;
+  type: InvoiceEventType;
+  occurredAt: string;
+  actorType: ActorType;
+  actorUserId: string | null;
+  details: string | null;
 }
 
 export interface NotificationRec {
@@ -310,6 +391,9 @@ export interface MockDb {
   followUps: FollowUpRec[];
   templates: TemplateRec[];
   jobs: JobRec[];
+  invoices: InvoiceRec[];
+  invoicePayments: InvoicePaymentRec[];
+  invoiceEvents: InvoiceEventRec[];
   notifications: NotificationRec[];
   audit: AuditRec[];
   subscriptions: SubscriptionRec[];
@@ -336,6 +420,9 @@ export function emptyDb(): MockDb {
     followUps: [],
     templates: [],
     jobs: [],
+    invoices: [],
+    invoicePayments: [],
+    invoiceEvents: [],
     notifications: [],
     audit: [],
     subscriptions: [],
@@ -457,8 +544,31 @@ export function buildTemplateLineItems(inputs: readonly TemplateLineItemInput[])
   }));
 }
 
-/** Next document number, e.g. AN-2026-0042. Numbers are never reused. */
-export function nextNumber(db: MockDb, companyId: string, kind: 'quotation' | 'job', prefix: string, year: number): string {
+/** Recipient snapshot of an invoice like InvoiceService.SnapshotRecipient of the API (incl. the structured address). */
+export function snapshotInvoiceRecipient(i: InvoiceRec, c: CustomerRec): void {
+  const withSalutation = [c.salutation, c.firstName, c.lastName].filter((s): s is string => !!s && s.trim() !== '').join(' ');
+  if (c.type === 'Business' && c.companyName && c.companyName.trim() !== '') {
+    i.recipientName = c.companyName;
+    i.recipientContact = withSalutation === '' ? null : withSalutation;
+  } else {
+    i.recipientName = withSalutation === '' ? customerDisplayName(c) : withSalutation;
+    i.recipientContact = null;
+  }
+  const trimmed = (v: string | null) => (v && v.trim() !== '' ? v.trim() : null);
+  i.recipientStreet = trimmed(c.billingStreet);
+  i.recipientPostalCode = trimmed(c.billingPostalCode);
+  i.recipientCity = trimmed(c.billingCity);
+  i.recipientAddress = formatAddress(
+    c.billingStreet,
+    [c.billingPostalCode, c.billingCity].filter((s): s is string => !!s && s.trim() !== '').join(' '),
+    c.billingCountry === 'DE' ? null : c.billingCountry,
+  ) || null;
+  i.recipientEmail = c.email;
+  i.recipientVatId = c.vatId;
+}
+
+/** Next document number, e.g. AN-2026-0042. Numbers are never reused (invoices: gap-free, assigned when issued). */
+export function nextNumber(db: MockDb, companyId: string, kind: 'quotation' | 'job' | 'invoice', prefix: string, year: number): string {
   const key = `${companyId}:${kind}:${year}`;
   const value = (db.sequences[key] ?? 0) + 1;
   db.sequences[key] = value;
@@ -490,6 +600,12 @@ export function defaultSettings(companyName: string, overrides: Partial<CompanyS
     expiryReminderDaysBefore: 3,
     attachPdfToEmails: true,
     notifyOnCustomerDecision: true,
+    invoicePrefix: 'RE',
+    invoicePaymentDays: 14,
+    invoiceIntroText: 'Sehr geehrte Damen und Herren,\n\nvielen Dank für Ihren Auftrag. Für unsere Leistungen erlauben wir uns, Folgendes in Rechnung zu stellen:',
+    invoiceClosingText: 'Vielen Dank für die gute Zusammenarbeit.\n\nMit freundlichen Grüßen',
+    invoiceReminderEnabled: false,
+    invoiceReminderAfterDays: 7,
     ...overrides,
   };
 }

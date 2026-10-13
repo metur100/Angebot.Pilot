@@ -53,12 +53,29 @@ public sealed class DashboardService(IAppDbContext db, TimeProvider clock)
             .ToListAsync(ct);
 
         var openJobs = await db.Jobs.CountAsync(j => j.Status == JobStatus.Open || j.Status == JobStatus.InProgress, ct);
+
+        // Invoices: open/overdue are current state; invoiced and received amounts refer to the period.
+        var openInvoices = db.Invoices.AsNoTracking().Where(i => i.Kind == InvoiceKind.Invoice && (i.Status == InvoiceStatus.Issued || i.Status == InvoiceStatus.PartiallyPaid));
+        var openStats = await openInvoices.GroupBy(_ => 1)
+            .Select(g => new { Count = g.Count(), Amount = g.Sum(i => i.GrossTotal - i.PaidAmount) }).FirstOrDefaultAsync(ct);
+        var overdueQuery = openInvoices.Where(i => i.DueDate < today);
+        var overdueStats = await overdueQuery.GroupBy(_ => 1)
+            .Select(g => new { Count = g.Count(), Amount = g.Sum(i => i.GrossTotal - i.PaidAmount) }).FirstOrDefaultAsync(ct);
+        var overdueList = await overdueQuery.OrderBy(i => i.DueDate).Take(8)
+            .Select(x => new InvoiceListItemDto(x.Id, x.Number, x.Kind, x.Status, x.Title, x.CustomerId, x.RecipientName, x.IssueDate, x.DueDate, x.NetTotal, x.GrossTotal,
+                x.PaidAmount, x.GrossTotal - x.PaidAmount, true, today.DayNumber - x.DueDate.DayNumber, x.SentAt, x.UpdatedAt))
+            .ToListAsync(ct);
+        var invoicedNet = await db.Invoices.AsNoTracking()
+            .Where(i => i.Number != null && i.IssueDate >= periodFrom && i.IssueDate <= periodTo)
+            .SumAsync(i => i.Kind == InvoiceKind.Cancellation ? -i.NetTotal : i.NetTotal, ct);
+        var received = await db.InvoicePayments.AsNoTracking().Where(p => p.PaidOn >= periodFrom && p.PaidOn <= periodTo).SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
         var activity = await ActivityAsync(member, 1, 8, ct);
 
         return new DashboardDto(
             periodFrom, periodTo, Count(QuotationStatus.Draft), Count(QuotationStatus.Sent), accepted, Count(QuotationStatus.Rejected), Count(QuotationStatus.Expired),
             expiringSoonCount, followUpsDue, quotedValue, Net(QuotationStatus.Accepted), conversion, ConversionDefinition,
-            awaiting, expiringSoon, upcoming, activity.Items, openJobs);
+            awaiting, expiringSoon, upcoming, activity.Items, openJobs,
+            openStats?.Count ?? 0, openStats?.Amount ?? 0m, overdueStats?.Count ?? 0, overdueStats?.Amount ?? 0m, invoicedNet, received, overdueList);
     }
 
     public async Task<PagedResult<ActivityDto>> ActivityAsync(CurrentMember member, int page, int pageSize, CancellationToken ct)
@@ -102,6 +119,16 @@ public sealed class DashboardService(IAppDbContext db, TimeProvider clock)
         ["quotation.expired"] = "Angebot abgelaufen",
         ["quotation.deleted"] = "Entwurf gelöscht",
         ["job.created"] = "Auftrag erstellt",
+        ["invoice.created"] = "Rechnungsentwurf erstellt",
+        ["invoice.issued"] = "Rechnung gestellt",
+        ["invoice.sent"] = "Rechnung per E-Mail versendet",
+        ["invoice.marked_sent"] = "Rechnung als versendet markiert",
+        ["invoice.payment_recorded"] = "Teilzahlung erfasst",
+        ["invoice.paid"] = "Rechnung bezahlt",
+        ["invoice.payment_removed"] = "Zahlung entfernt",
+        ["invoice.reminder_sent"] = "Zahlungserinnerung versendet",
+        ["invoice.cancelled"] = "Rechnung storniert",
+        ["invoice.deleted"] = "Rechnungsentwurf gelöscht",
         ["job.status_changed"] = "Auftragsstatus geändert",
         ["template.created"] = "Vorlage erstellt",
         ["member.invited"] = "Teammitglied eingeladen",

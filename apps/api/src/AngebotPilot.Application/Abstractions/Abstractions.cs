@@ -6,6 +6,7 @@ using AngebotPilot.Domain.Customers;
 using AngebotPilot.Domain.Emails;
 using AngebotPilot.Domain.Files;
 using AngebotPilot.Domain.FollowUps;
+using AngebotPilot.Domain.Invoices;
 using AngebotPilot.Domain.Jobs;
 using AngebotPilot.Domain.Notifications;
 using AngebotPilot.Domain.Quotations;
@@ -40,6 +41,10 @@ public interface IAppDbContext
     DbSet<EmailDelivery> EmailDeliveries { get; }
     DbSet<FollowUpSchedule> FollowUpSchedules { get; }
     DbSet<Job> Jobs { get; }
+    DbSet<Invoice> Invoices { get; }
+    DbSet<InvoiceLineItem> InvoiceLineItems { get; }
+    DbSet<InvoiceEvent> InvoiceEvents { get; }
+    DbSet<InvoicePayment> InvoicePayments { get; }
     DbSet<QuotationTemplate> Templates { get; }
     DbSet<StoredFile> Files { get; }
     DbSet<Notification> Notifications { get; }
@@ -170,6 +175,25 @@ public sealed record PdfQuotation(
 public interface IQuotationPdfRenderer
 {
     byte[] Render(PdfQuotation model);
+}
+
+/// <param name="GiroCode">EPC QR payload (GiroCode) for paying the invoice with a banking app, or <c>null</c>.</param>
+public sealed record PdfInvoice(
+    Invoice Invoice,
+    PdfCompany Company,
+    bool IsDraftPreview,
+    string? GiroCode);
+
+public interface IInvoicePdfRenderer
+{
+    /// <summary>Renders the invoice. Final documents are produced as PDF/A-3b so the e-invoice can be embedded.</summary>
+    byte[] Render(PdfInvoice model);
+
+    /// <summary>
+    /// Embeds the e-invoice XML as <c>factur-x.xml</c> with the Factur-X/ZUGFeRD XMP metadata, producing a hybrid
+    /// ZUGFeRD invoice (profile EN 16931). Returns <c>null</c> when embedding is not possible on this host.
+    /// </summary>
+    byte[]? EmbedEInvoice(byte[] pdf, byte[] xml, DateTimeOffset documentDate);
 }
 
 /// <summary>Either a redirect to the provider checkout, or (development mock only) a signed webhook to apply immediately.</summary>

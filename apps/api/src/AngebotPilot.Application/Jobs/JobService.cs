@@ -63,10 +63,12 @@ public sealed class JobService(IAppDbContext db, BillingService billing, IAuditL
         var j = await db.Jobs.AsNoTracking().Include(x => x.Quotation).Include(x => x.Customer).FirstOrDefaultAsync(x => x.Id == id, ct)
             ?? throw new NotFoundException("Der Auftrag wurde nicht gefunden.");
         var assignee = j.AssignedUserId is { } uid ? await db.Users.AsNoTracking().Where(u => u.Id == uid).Select(u => u.DisplayName).FirstOrDefaultAsync(ct) : null;
+        var invoices = await db.Invoices.AsNoTracking().Where(i => i.JobId == j.Id).OrderBy(i => i.CreatedAt)
+            .Select(i => new InvoiceLinkDto(i.Id, i.Number, i.Kind, i.Status, i.GrossTotal)).ToListAsync(ct);
         return new JobDto(
             j.Id, j.Number, j.Title, j.Description, j.Status, j.CustomerId, j.Customer?.DisplayName ?? j.Quotation!.RecipientName, j.QuotationId, j.Quotation!.Number,
             j.Quotation.NetTotal, j.Quotation.GrossTotal, j.PlannedStartDate, j.DueDate, j.AssignedUserId, assignee, j.Notes, j.CreatedAt, j.UpdatedAt,
-            j.StartedAt, j.CompletedAt, j.CancelledAt, AllStatuses.Where(s => Job.CanTransition(j.Status, s)).ToList(), RowVersions.Encode(j.RowVersion));
+            j.StartedAt, j.CompletedAt, j.CancelledAt, AllStatuses.Where(s => Job.CanTransition(j.Status, s)).ToList(), RowVersions.Encode(j.RowVersion), invoices);
     }
 
     public async Task<JobDto> UpdateAsync(CurrentMember member, Guid id, UpdateJobRequest request, CancellationToken ct)

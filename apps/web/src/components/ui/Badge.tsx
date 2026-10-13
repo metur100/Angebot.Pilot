@@ -2,27 +2,34 @@ import {
   emailStatusLabel,
   emailStatusTone,
   followUpStatusLabel,
+  invoiceDisplayStatus,
   jobStatusLabel,
   jobStatusTone,
   quotationStatusLabel,
   quotationStatusTone,
   type EmailStatus,
   type FollowUpStatus,
+  type InvoiceKind,
+  type InvoiceStatus,
   type JobStatus,
   type QuotationStatus,
   type Tone,
 } from '@angebotpilot/api-contracts';
 import {
+  AlarmClock,
   Ban,
   CircleCheck,
+  CircleDollarSign,
   CircleDashed,
   CircleDot,
   CircleX,
   Clock,
+  FileMinus,
   FilePen,
   Hammer,
   Hourglass,
   MailCheck,
+  ReceiptText,
   RotateCw,
   Send,
   type LucideIcon,
@@ -120,6 +127,33 @@ export function FollowUpStatusBadge({ status }: { status: FollowUpStatus }) {
   return (
     <Badge tone={followUpTone[status]} icon={followUpIcons[status]}>
       {followUpStatusLabel[status]}
+    </Badge>
+  );
+}
+
+const invoiceIcons: Record<InvoiceStatus, LucideIcon> = {
+  Draft: FilePen,
+  Issued: ReceiptText,
+  PartiallyPaid: CircleDollarSign,
+  Paid: CircleCheck,
+  Cancelled: Ban,
+};
+
+interface InvoiceStatusBadgeProps {
+  status: InvoiceStatus;
+  kind?: InvoiceKind;
+  /** Open invoices past their due date get the danger variant ("Überfällig"). */
+  isOverdue?: boolean;
+  size?: 'sm' | 'md';
+}
+
+/** Invoice status incl. the derived states "Überfällig" and "Stornorechnung" (see invoiceDisplayStatus). */
+export function InvoiceStatusBadge({ status, kind = 'Invoice', isOverdue = false, size }: InvoiceStatusBadgeProps) {
+  const display = invoiceDisplayStatus({ kind, status, isOverdue });
+  const icon = kind === 'Cancellation' ? FileMinus : isOverdue ? AlarmClock : invoiceIcons[status];
+  return (
+    <Badge tone={display.tone} icon={icon} size={size}>
+      {display.label}
     </Badge>
   );
 }

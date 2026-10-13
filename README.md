@@ -1,6 +1,6 @@
 # AngebotPilot
 
-Quotations (Angebote), customers, automated follow-ups (Nachfassen) and jobs (Aufträge) for small German businesses
+Quotations (Angebote), customers, automated follow-ups (Nachfassen), jobs (Aufträge) and invoices (Rechnungen) for small German businesses
 in trades and services. Web app, Android/iOS app and a .NET API in one monorepo.
 
 © 2026 Medin Turkes · Certi Development – proprietary, see [LICENSE](LICENSE).
@@ -12,7 +12,7 @@ in trades and services. Web app, Android/iOS app and a .NET API in one monorepo.
 - **Quotations** – line items with quantity, unit, price, discount and VAT rate; exact decimal calculation with VAT per
   rate; standard VAT, small-business rule (§ 19 UStG) or reverse charge (§ 13b UStG); concurrency-safe sequential
   numbers that are never reused; templates; duplicate; revisions that supersede the previous version.
-- **PDF** – A4 PDF with logo, company data, optional bank details and a QR code to the customer page; the sent PDF is
+- **PDF** – quotation PDFs: A4 with logo, company data, optional bank details and a QR code to the customer page; the sent PDF is
   frozen.
 - **Sending** – by email (PDF and/or customer link) or "mark as sent"; email outbox with retries and idempotency.
 - **Customer page** – customers view, accept (with name and binding confirmation) or reject online via a secret link;
@@ -20,6 +20,14 @@ in trades and services. Web app, Android/iOS app and a .NET API in one monorepo.
 - **Follow-ups** – reminders at 09:00 company time, minimum 48 h apart, never after validity, stopped automatically on
   decision, cancellation or expiry.
 - **Jobs** – convert an accepted quotation once into a job with status, dates and assignee.
+- **Invoices** – created from a job, from an accepted quotation or manually. Drafts are editable; issuing assigns a
+  gap-free number (per company and year, assigned in the same transaction as the documents) and freezes the invoice
+  (GoBD). Checks the § 14 UStG details (company address and tax number/VAT ID, customer address, date of supply or
+  service period, due date). The PDF is PDF/A-3b with the e-invoice embedded (ZUGFeRD 2 / Factur-X, profile
+  EN 16931; UN/CEFACT CII XML also downloadable) and an EPC GiroCode. Payments and partial payments, overdue status,
+  manual and optional automatic payment reminders, cancellation invoices (Stornorechnung), CSV export.
+  Validated with the Mustang ZUGFeRD validator (PDF/A-3b, EN 16931 schematron) for standard VAT, § 19, § 13b,
+  mixed rates and cancellations. XRechnung (public-sector CIUS) is not supported.
 - **Teams** – multiple companies per account; roles Owner, Admin, Employee; invitations.
 - **Dashboard and notifications**, activity history, GDPR exports (account and company), account deletion.
 - **Billing** – 30-day trial and plan limits; only a clearly labelled mock payment provider (no payments yet).

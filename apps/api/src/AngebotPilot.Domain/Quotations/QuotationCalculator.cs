@@ -1,5 +1,31 @@
 namespace AngebotPilot.Domain.Quotations;
 
+/// <summary>Common shape of quotation and invoice line items (used by document renderers).</summary>
+public interface IDocumentLineItem
+{
+    int Position { get; }
+
+    string Title { get; }
+
+    string? Description { get; }
+
+    decimal Quantity { get; }
+
+    string Unit { get; }
+
+    decimal UnitPriceNet { get; }
+
+    decimal DiscountPercent { get; }
+
+    decimal TaxRatePercent { get; }
+
+    decimal LineTotalBeforeDiscount { get; }
+
+    decimal LineDiscount { get; }
+
+    decimal LineNet { get; }
+}
+
 public readonly record struct LineInput(decimal Quantity, decimal UnitPriceNet, decimal DiscountPercent, decimal TaxRatePercent);
 
 public sealed record TaxGroup(decimal RatePercent, decimal NetAmount, decimal TaxAmount);

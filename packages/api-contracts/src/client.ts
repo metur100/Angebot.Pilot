@@ -208,6 +208,7 @@ export function createApiClient(options: ApiClientOptions) {
       delete: (companyId: string, id: string) => del<T.DeleteCustomerResponse>(`${c(companyId)}/customers/${id}`),
       quotations: (companyId: string, id: string) => get<T.QuotationListItemDto[]>(`${c(companyId)}/customers/${id}/quotations`),
       jobs: (companyId: string, id: string) => get<T.JobListItemDto[]>(`${c(companyId)}/customers/${id}/jobs`),
+      invoices: (companyId: string, id: string) => get<T.InvoiceListItemDto[]>(`${c(companyId)}/customers/${id}/invoices`),
       exportCsv: (companyId: string) => blob(`${c(companyId)}/customers/export.csv`),
     },
 
@@ -234,6 +235,8 @@ export function createApiClient(options: ApiClientOptions) {
       createPublicLink: (companyId: string, id: string) => post<T.PublicLinkResponse>(`${c(companyId)}/quotations/${id}/public-link`),
       revokePublicLink: (companyId: string, id: string) => del(`${c(companyId)}/quotations/${id}/public-link`),
       convertToJob: (companyId: string, id: string, body: T.ConvertToJobRequest = {}) => post<T.JobDto>(`${c(companyId)}/quotations/${id}/convert-to-job`, body),
+      /** Creates an invoice draft from an accepted quotation. */
+      createInvoice: (companyId: string, id: string) => post<T.InvoiceDto>(`${c(companyId)}/quotations/${id}/invoice`),
       saveAsTemplate: (companyId: string, id: string, body: T.SaveAsTemplateRequest) => post<T.TemplateDto>(`${c(companyId)}/quotations/${id}/save-as-template`, body),
       calculate: (companyId: string, body: T.CalculateRequest) => post<T.TotalsDto>(`${c(companyId)}/quotations/calculate`, body),
       /** Resolves a scanned public-link token to a quotation of the current company (404 otherwise). */
@@ -255,6 +258,34 @@ export function createApiClient(options: ApiClientOptions) {
       update: (companyId: string, id: string, body: T.UpdateJobRequest) => put<T.JobDto>(`${c(companyId)}/jobs/${id}`, body),
       changeStatus: (companyId: string, id: string, body: T.ChangeJobStatusRequest) => post<T.JobDto>(`${c(companyId)}/jobs/${id}/status`, body),
       exportCsv: (companyId: string) => blob(`${c(companyId)}/jobs/export.csv`),
+      /** Creates an invoice draft from the job (line items of its quotation). */
+      createInvoice: (companyId: string, id: string) => post<T.InvoiceDto>(`${c(companyId)}/jobs/${id}/invoice`),
+    },
+
+    invoices: {
+      list: (companyId: string, query: T.InvoiceListQuery = {}) => get<T.PagedResult<T.InvoiceListItemDto>>(`${c(companyId)}/invoices`, query as Query),
+      get: (companyId: string, id: string) => get<T.InvoiceDto>(`${c(companyId)}/invoices/${id}`),
+      create: (companyId: string, body: T.CreateInvoiceRequest) => post<T.InvoiceDto>(`${c(companyId)}/invoices`, body),
+      update: (companyId: string, id: string, body: T.UpdateInvoiceRequest) => put<T.InvoiceDto>(`${c(companyId)}/invoices/${id}`, body),
+      /** Drafts only. */
+      delete: (companyId: string, id: string) => del(`${c(companyId)}/invoices/${id}`),
+      duplicate: (companyId: string, id: string) => post<T.InvoiceDto>(`${c(companyId)}/invoices/${id}/duplicate`),
+      /** Finalises the draft: assigns the number and freezes PDF and e-invoice. Owner/Admin only. */
+      issue: (companyId: string, id: string) => post<T.InvoiceDto>(`${c(companyId)}/invoices/${id}/issue`),
+      send: (companyId: string, id: string, body: T.SendInvoiceRequest) => post<T.SendInvoiceResponse>(`${c(companyId)}/invoices/${id}/send`, body),
+      recordPayment: (companyId: string, id: string, body: T.RecordPaymentRequest) => post<T.InvoiceDto>(`${c(companyId)}/invoices/${id}/payments`, body),
+      removePayment: (companyId: string, id: string, paymentId: string) => del<T.InvoiceDto>(`${c(companyId)}/invoices/${id}/payments/${paymentId}`),
+      remind: (companyId: string, id: string, body: T.PaymentReminderRequest = {}) => post<T.SendInvoiceResponse>(`${c(companyId)}/invoices/${id}/remind`, body),
+      /** Creates a cancellation invoice (Stornorechnung) and returns the cancelled invoice. */
+      cancel: (companyId: string, id: string, body: T.CancelRequest = {}) => post<T.InvoiceDto>(`${c(companyId)}/invoices/${id}/cancel`, body),
+      pdfUrl: (companyId: string, id: string) => url(`${c(companyId)}/invoices/${id}/pdf`),
+      pdf: (companyId: string, id: string) => blob(`${c(companyId)}/invoices/${id}/pdf`),
+      /** E-invoice XML (UN/CEFACT CII, EN 16931). Issued invoices only. */
+      xmlUrl: (companyId: string, id: string) => url(`${c(companyId)}/invoices/${id}/xml`),
+      xml: (companyId: string, id: string) => blob(`${c(companyId)}/invoices/${id}/xml`),
+      events: (companyId: string, id: string) => get<T.InvoiceEventDto[]>(`${c(companyId)}/invoices/${id}/events`),
+      deliveries: (companyId: string, id: string) => get<T.EmailDeliveryDto[]>(`${c(companyId)}/invoices/${id}/deliveries`),
+      exportCsv: (companyId: string, query: T.InvoiceListQuery = {}) => blob(`${c(companyId)}/invoices/export.csv`, query as Query),
     },
 
     notifications: {

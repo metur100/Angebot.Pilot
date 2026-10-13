@@ -27,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddSingleton<IDistributedLock, SqlServerDistributedLock>();
         services.AddSingleton<IQuotationPdfRenderer, QuotationPdfRenderer>();
+        services.AddSingleton<IInvoicePdfRenderer, InvoicePdfRenderer>();
 
         // Object storage
         var storage = configuration.GetSection(StorageOptions.Section).Get<StorageOptions>() ?? new StorageOptions();

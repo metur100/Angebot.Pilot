@@ -258,7 +258,8 @@ OUTPUT inserted.LastValue;
 - Counters only increase. Deleted drafts are soft-deleted (`DeletedAt`) and their numbers are **never reused**.
 - Revisions do not consume a sequence value: `{rootNumber}-R{n}` (e.g. `AN-2026-0001-R1`), where `n` = max revision of
   the family (including soft-deleted rows) + 1.
-- Final guard: unique index `(CompanyId, Number)` on `Quotations` and `Jobs`.
+- Final guard: unique index `(CompanyId, Number)` on `Quotations` and `Jobs` (filtered to issued invoices on `Invoices`).
+- Invoices (`RE-2026-0001`, prefix `InvoicePrefix`) get their number only when issued, inside the issuing transaction.
 
 Tests: `QuotationTests.Concurrent_creation_never_produces_duplicate_numbers`.
 
@@ -404,6 +405,34 @@ Tests: `FollowUpPlannerTests`, `SendingAndFollowUpTests.Due_reminder_is_sent_onc
 `PublicQuotationTests.Customer_can_opt_out_of_reminders`.
 
 ---
+
+## 11a. Invoices
+
+- **Sources**: manual (`POST /invoices`), from a job (`POST /jobs/{id}/invoice`: line items of the job's quotation, date of
+  supply = completion date) or from an accepted quotation (`POST /quotations/{id}/invoice`).
+- **Drafts** have no number and are editable by every member. `InvoiceDto.issueProblems` lists what is missing for
+  § 14 UStG (company address and tax number/VAT ID; customer billing address; date of supply or service period; items;
+  net > 0; issue date not in the future; due date ≥ issue date; customer VAT ID for § 13b).
+- **Issuing** (`POST /invoices/{id}/issue`, Owner/Admin) runs in one transaction: next value of the
+  `DocumentSequenceKind.Invoice` sequence (`{InvoicePrefix}-{year}-{0000}`, year of the issue date), status `Issued`,
+  rendering and storing PDF and XML. A failure rolls the sequence back, so numbers stay gap-free. Issued invoices are
+  immutable (GoBD): drafts can be deleted, issued invoices only cancelled.
+- **Documents**: `InvoicePdfRenderer` (QuestPDF, PDF/A-3b) shares the quotation layout; `EInvoiceWriter` writes UN/CEFACT
+  CII for EN 16931 (TypeCode 380; cancellation 381 with `InvoiceReferencedDocument`; VAT categories S/Z, E for § 19,
+  AE for § 13b; UN/ECE unit codes; SEPA payment means; due date). The XML is embedded as `factur-x.xml` (relationship
+  Alternative, Factur-X XMP extension schema) via QuestPDF `DocumentOperation` (qpdf). If embedding fails on a host, the
+  plain PDF is stored and the XML stays downloadable (`GET /invoices/{id}/xml`). EPC GiroCode with the gross amount.
+  Validated with Mustang 2.26 (veraPDF PDF/A-3b and EN 16931 schematron: no errors, no warnings) for standard VAT,
+  § 19, § 13b, mixed rates and cancellations. XRechnung (public-sector CIUS) is not targeted.
+- **Payments**: `POST /payments` (≤ open amount) → `PartiallyPaid`/`Paid`; removable while not cancelled. Overdue is
+  derived (open and due date before the company-local date).
+- **Reminders**: manual `POST /remind`; optionally one automatic reminder `InvoiceReminderAfterDays` after the due date
+  for invoices that were e-mailed (`JobRunner.ProcessPaymentRemindersAsync`). Payment or cancellation cancels pending
+  reminder emails.
+- **Cancellation** (`POST /cancel`): creates and issues a `Cancellation` invoice with the next number and the same line
+  items (positive amounts, shown negated) and marks the original `Cancelled`.
+- Emails reference invoices via `EmailDeliveries.InvoiceId`; hand-off and failure are written to the invoice timeline.
+- Tests: `tests/api-unit/InvoiceTests.cs`, `tests/api-integration/InvoiceWorkflowTests.cs`.
 
 ## 12. Public customer link
 

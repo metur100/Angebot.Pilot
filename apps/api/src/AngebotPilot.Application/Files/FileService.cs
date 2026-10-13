@@ -67,6 +67,9 @@ public sealed class FileService(IAppDbContext db, IFileStorageService storage, T
     public Task<StoredFile> SavePdfAsync(Guid companyId, Guid? userId, string fileName, byte[] content, CancellationToken ct) =>
         StoreAsync(companyId, userId, FilePurpose.QuotationPdf, fileName, "application/pdf", content, ct);
 
+    public Task<StoredFile> SaveDocumentAsync(Guid companyId, Guid? userId, FilePurpose purpose, string fileName, string contentType, byte[] content, CancellationToken ct) =>
+        StoreAsync(companyId, userId, purpose, fileName, contentType, content, ct);
+
     public async Task<(StoredFile File, StoredObject Content)?> OpenAsync(Guid companyId, Guid fileId, CancellationToken ct)
     {
         var file = await db.Files.IgnoreQueryFilters()

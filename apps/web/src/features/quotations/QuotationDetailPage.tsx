@@ -1,11 +1,4 @@
-import {
-  emailKindLabel,
-  followUpKindLabel,
-  quotationEventLabel,
-  type ActorType,
-  type QuotationDto,
-  type QuotationEventType,
-} from '@angebotpilot/api-contracts';
+import { followUpKindLabel, quotationEventLabel, type QuotationDto, type QuotationEventType } from '@angebotpilot/api-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BellOff,
@@ -26,25 +19,25 @@ import {
   MoreHorizontal,
   Pencil,
   Ban,
+  ReceiptText,
   Send,
   Trash2,
-  User,
-  Bot,
   type LucideIcon,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useCompany } from '@/app/company';
-import { EmailStatusBadge, FollowUpStatusBadge, QuotationStatusBadge } from '@/components/ui/Badge';
+import { DeliveryTable, EventTimeline } from '@/components/domain/History';
+import { FollowUpStatusBadge, QuotationStatusBadge } from '@/components/ui/Badge';
 import { Button, ButtonLink, IconButton } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader, DetailList } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Alert, EmptyState, ErrorState, PageSkeleton, Spinner } from '@/components/ui/Feedback';
 import { HelpPopover, Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Menu';
-import { PageHeader, table } from '@/components/ui/Page';
+import { PageHeader } from '@/components/ui/Page';
 import { toast } from '@/components/ui/Toast';
+import { InvoiceLinkList, useCreateInvoiceFrom } from '@/features/invoices/shared';
 import { api } from '@/lib/api';
-import { cx } from '@/lib/cx';
 import { errorMessage } from '@/lib/errors';
 import { formatDate, formatDateTime, formatEur, formatRelative } from '@/lib/format';
 import { qk } from '@/lib/queryKeys';
@@ -84,108 +77,14 @@ const eventTone: Partial<Record<QuotationEventType, string>> = {
   ConvertedToJob: 'bg-success-bg text-success-text',
 };
 
-const actorLabel: Record<ActorType, string> = { User: 'Benutzer', Customer: 'Kunde', System: 'System' };
-const actorIcon: Record<ActorType, LucideIcon> = { User, Customer: User, System: Bot };
-
 function Timeline({ companyId, id }: { companyId: string; id: string }) {
   const events = useQuery({ queryKey: qk.quotationEvents(companyId, id), queryFn: () => api.quotations.events(companyId, id) });
-  if (events.isPending) return <Spinner className="p-5" />;
-  if (events.isError) return <ErrorState error={events.error} onRetry={() => void events.refetch()} />;
-  if (events.data.length === 0) return <EmptyState compact icon={History} title="Noch keine Ereignisse" />;
-  const sorted = [...events.data].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
-  return (
-    <ol className="px-5 py-4" aria-label="Verlauf">
-      {sorted.map((event, index) => {
-        const Icon = eventIcons[event.type] ?? History;
-        const ActorIcon = actorIcon[event.actorType];
-        return (
-          <li key={event.id} className="relative flex gap-3 pb-5 last:pb-0">
-            {index < sorted.length - 1 && <span aria-hidden className="absolute top-8 bottom-0 left-[15px] w-px bg-neutral-200" />}
-            <span className={cx('relative flex size-8 shrink-0 items-center justify-center rounded-full', eventTone[event.type] ?? 'bg-neutral-100 text-neutral-500')}>
-              <Icon aria-hidden size={15} />
-            </span>
-            <div className="min-w-0 pt-1">
-              <p className="text-sm font-medium text-neutral-900">{quotationEventLabel[event.type] ?? event.type}</p>
-              {event.details && <p className="mt-0.5 text-[13px] break-words text-neutral-600">{event.details}</p>}
-              <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-neutral-500">
-                <ActorIcon aria-hidden size={12} />
-                {event.actorName ?? actorLabel[event.actorType]}
-                <span aria-hidden>·</span>
-                <time dateTime={event.occurredAt} title={formatDateTime(event.occurredAt)}>
-                  {formatDateTime(event.occurredAt)}
-                </time>
-              </p>
-            </div>
-          </li>
-        );
-      })}
-    </ol>
-  );
+  return <EventTimeline query={events} labels={quotationEventLabel} icons={eventIcons} tones={eventTone} />;
 }
 
 function Deliveries({ companyId, id }: { companyId: string; id: string }) {
   const deliveries = useQuery({ queryKey: qk.quotationDeliveries(companyId, id), queryFn: () => api.quotations.deliveries(companyId, id) });
-  return (
-    <div>
-      <div className="flex items-start gap-2 border-b border-neutral-100 bg-neutral-25 px-5 py-3 text-[13px] text-neutral-600">
-        <span>
-          <strong className="font-medium text-neutral-800">„An Mailserver übergeben“</strong> heißt: Unser Mailserver hat die E-Mail angenommen. Das ist
-          keine Bestätigung, dass sie im Postfach angekommen ist (z. B. Spam-Filter).
-        </span>
-        <HelpPopover label="Erklärung der Versandstatus">
-          <ul className="space-y-1">
-            <li><strong>In Warteschlange</strong> – wird in Kürze versendet.</li>
-            <li><strong>An Mailserver übergeben</strong> – vom Mailserver angenommen; Zustellung ins Postfach nicht garantiert.</li>
-            <li><strong>Erneuter Versuch geplant</strong> – vorübergehender Fehler, wir versuchen es automatisch erneut.</li>
-            <li><strong>Fehlgeschlagen</strong> – endgültig nicht versendet, z. B. ungültige Adresse.</li>
-          </ul>
-        </HelpPopover>
-      </div>
-      {deliveries.isPending ? (
-        <Spinner className="p-5" />
-      ) : deliveries.isError ? (
-        <ErrorState error={deliveries.error} onRetry={() => void deliveries.refetch()} />
-      ) : deliveries.data.length === 0 ? (
-        <EmptyState compact icon={Mail} title="Noch keine E-Mails" description="Hier erscheinen Angebots- und Erinnerungs-E-Mails mit ihrem Versandstatus." />
-      ) : (
-        <div className={table.wrapper}>
-          <table className={table.table}>
-            <thead>
-              <tr>
-                <th scope="col" className={table.th}>Art</th>
-                <th scope="col" className={table.th}>Empfänger & Betreff</th>
-                <th scope="col" className={table.th}>Status</th>
-                <th scope="col" className={cx(table.th, 'text-right')}>Zeitpunkt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {deliveries.data.map((d) => (
-                <tr key={d.id} className={table.row}>
-                  <td className={cx(table.td, 'whitespace-nowrap')}>{emailKindLabel[d.kind]}</td>
-                  <td className={cx(table.td, 'max-w-[320px]')}>
-                    <p className="truncate">{d.toAddress}</p>
-                    <p className="truncate text-[13px] text-neutral-500">{d.subject}</p>
-                    {d.lastError && <p className="mt-0.5 text-[13px] text-danger-text">Fehler: {d.lastError}</p>}
-                  </td>
-                  <td className={table.td}>
-                    <EmailStatusBadge status={d.status} />
-                    {d.attempts > 1 && <p className="mt-1 text-xs text-neutral-500">{d.attempts} Versuche</p>}
-                  </td>
-                  <td className={cx(table.td, table.num, 'text-[13px] text-neutral-600')}>
-                    {d.handedOffAt
-                      ? formatDateTime(d.handedOffAt)
-                      : d.nextAttemptAt
-                        ? `nächster Versuch ${formatDateTime(d.nextAttemptAt)}`
-                        : formatDateTime(d.createdAt)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
+  return <DeliveryTable query={deliveries} emptyDescription="Hier erscheinen Angebots- und Erinnerungs-E-Mails mit ihrem Versandstatus." />;
 }
 
 function FollowUps({ companyId, id }: { companyId: string; id: string }) {
@@ -302,6 +201,7 @@ export default function QuotationDetailPage() {
     },
     onError: (error) => toast.error('Duplizieren fehlgeschlagen', errorMessage(error)),
   });
+  const createInvoice = useCreateInvoiceFrom({ type: 'quotation', id });
 
   if (quotation.isPending) return <PageSkeleton rows={10} />;
   if (quotation.isError) return <ErrorState error={quotation.error} onRetry={() => void quotation.refetch()} />;
@@ -336,14 +236,21 @@ export default function QuotationDetailPage() {
         </>
       );
     if (q.status === 'Accepted')
-      return q.jobId ? (
-        <ButtonLink to={`/auftraege/${q.jobId}`} variant="primary" icon={Hammer}>
-          Zum Auftrag
-        </ButtonLink>
-      ) : (
-        <Button variant="primary" icon={Hammer} onClick={() => setDialog('job')}>
-          In Auftrag umwandeln
-        </Button>
+      return (
+        <>
+          <Button icon={ReceiptText} loading={createInvoice.isPending} onClick={() => createInvoice.mutate()}>
+            Rechnung erstellen
+          </Button>
+          {q.jobId ? (
+            <ButtonLink to={`/auftraege/${q.jobId}`} variant="primary" icon={Hammer}>
+              Zum Auftrag
+            </ButtonLink>
+          ) : (
+            <Button variant="primary" icon={Hammer} onClick={() => setDialog('job')}>
+              In Auftrag umwandeln
+            </Button>
+          )}
+        </>
       );
     if (canRevise)
       return (
@@ -584,6 +491,15 @@ export default function QuotationDetailPage() {
                 <Link to={`/auftraege/${q.jobId}`} className="inline-flex items-center gap-2 text-sm font-medium text-brand-700 hover:underline">
                   <Hammer aria-hidden size={15} /> Zum Auftrag
                 </Link>
+              </CardBody>
+            </Card>
+          )}
+
+          {(q.status === 'Accepted' || q.invoices.length > 0) && (
+            <Card>
+              <CardHeader title="Rechnungen" />
+              <CardBody>
+                <InvoiceLinkList invoices={q.invoices} empty="Noch keine Rechnung zu diesem Angebot." />
               </CardBody>
             </Card>
           )}

@@ -110,7 +110,14 @@ public sealed record CompanySettingsDto(
     bool ExpiryReminderEnabled,
     int ExpiryReminderDaysBefore,
     bool AttachPdfToEmails,
-    bool NotifyOnCustomerDecision);
+    bool NotifyOnCustomerDecision,
+    // Invoice settings are optional on input so older clients that do not know them leave them unchanged.
+    string? InvoicePrefix = null,
+    int? InvoicePaymentDays = null,
+    string? InvoiceIntroText = null,
+    string? InvoiceClosingText = null,
+    bool? InvoiceReminderEnabled = null,
+    int? InvoiceReminderAfterDays = null);
 
 public sealed record TaxRateDto(Guid Id, string Name, decimal RatePercent, bool IsDefault, bool IsArchived);
 
@@ -305,7 +312,8 @@ public sealed record QuotationDto(
     bool HasActivePublicLink,
     DateTimeOffset? PublicLinkLastOpenedAt,
     IReadOnlyList<QuotationStatus> AllowedTransitions,
-    string RowVersion);
+    string RowVersion,
+    IReadOnlyList<InvoiceLinkDto> Invoices);
 
 public sealed record RevisionLinkDto(Guid Id, string Number, int RevisionNumber, QuotationStatus Status);
 
@@ -394,11 +402,130 @@ public sealed record JobDto(
     DateTimeOffset? CompletedAt,
     DateTimeOffset? CancelledAt,
     IReadOnlyList<JobStatus> AllowedTransitions,
-    string RowVersion);
+    string RowVersion,
+    IReadOnlyList<InvoiceLinkDto> Invoices);
 
 public sealed record UpdateJobRequest(string Title, string? Description, DateOnly? PlannedStartDate, DateOnly? DueDate, Guid? AssignedUserId, string? Notes, string RowVersion);
 
 public sealed record ChangeJobStatusRequest(JobStatus Status);
+
+// ---------- Invoices ----------
+public sealed record CreateInvoiceRequest(
+    Guid CustomerId,
+    string? Title,
+    DateOnly? IssueDate,
+    DateOnly? ServiceDateFrom,
+    DateOnly? ServiceDateTo,
+    DateOnly? DueDate,
+    TaxMode? TaxMode,
+    string? IntroText,
+    string? ClosingText,
+    string? PaymentTerms,
+    string? BuyerReference,
+    string? InternalNotes,
+    IReadOnlyList<LineItemInput>? LineItems);
+
+public sealed record UpdateInvoiceRequest(
+    Guid CustomerId,
+    string Title,
+    DateOnly IssueDate,
+    DateOnly? ServiceDateFrom,
+    DateOnly? ServiceDateTo,
+    DateOnly DueDate,
+    TaxMode TaxMode,
+    string? IntroText,
+    string? ClosingText,
+    string? PaymentTerms,
+    string? BuyerReference,
+    string? InternalNotes,
+    IReadOnlyList<LineItemInput> LineItems,
+    string RowVersion);
+
+public sealed record InvoiceListItemDto(
+    Guid Id,
+    string? Number,
+    InvoiceKind Kind,
+    InvoiceStatus Status,
+    string Title,
+    Guid CustomerId,
+    string CustomerName,
+    DateOnly IssueDate,
+    DateOnly DueDate,
+    decimal NetTotal,
+    decimal GrossTotal,
+    decimal PaidAmount,
+    decimal OpenAmount,
+    bool IsOverdue,
+    int DaysOverdue,
+    DateTimeOffset? SentAt,
+    DateTimeOffset UpdatedAt);
+
+public sealed record InvoiceLinkDto(Guid Id, string? Number, InvoiceKind Kind, InvoiceStatus Status, decimal GrossTotal);
+
+public sealed record InvoicePaymentDto(Guid Id, decimal Amount, DateOnly PaidOn, string? Method, string? Note, DateTimeOffset CreatedAt, string? CreatedByName);
+
+public sealed record InvoiceDto(
+    Guid Id,
+    string? Number,
+    InvoiceKind Kind,
+    InvoiceStatus Status,
+    string Title,
+    Guid CustomerId,
+    string CustomerName,
+    string RecipientName,
+    string? RecipientContact,
+    string? RecipientAddress,
+    string? RecipientEmail,
+    string? RecipientVatId,
+    DateOnly IssueDate,
+    DateOnly? ServiceDateFrom,
+    DateOnly? ServiceDateTo,
+    DateOnly DueDate,
+    TaxMode TaxMode,
+    string? IntroText,
+    string? ClosingText,
+    string? PaymentTerms,
+    string? BuyerReference,
+    string? InternalNotes,
+    string Currency,
+    IReadOnlyList<LineItemDto> LineItems,
+    TotalsDto Totals,
+    decimal PaidAmount,
+    decimal OpenAmount,
+    bool IsOverdue,
+    int DaysOverdue,
+    DateOnly? PaidOn,
+    IReadOnlyList<InvoicePaymentDto> Payments,
+    Guid? QuotationId,
+    string? QuotationNumber,
+    Guid? JobId,
+    string? JobNumber,
+    Guid? CancelledInvoiceId,
+    string? CancelledInvoiceNumber,
+    Guid? CancellationInvoiceId,
+    string? CancellationInvoiceNumber,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    DateTimeOffset? IssuedAt,
+    DateTimeOffset? SentAt,
+    DateTimeOffset? CancelledAt,
+    string? CancellationReason,
+    DateTimeOffset? LastReminderAt,
+    int ReminderCount,
+    bool HasEInvoice,
+    IReadOnlyList<string> IssueProblems,
+    IReadOnlyList<string> AllowedActions,
+    string RowVersion);
+
+public sealed record SendInvoiceRequest(SendMode Mode, string? RecipientEmail, string? Subject, string? Message);
+
+public sealed record SendInvoiceResponse(InvoiceDto Invoice, Guid? EmailDeliveryId);
+
+public sealed record RecordPaymentRequest(decimal Amount, DateOnly PaidOn, string? Method, string? Note);
+
+public sealed record PaymentReminderRequest(string? RecipientEmail, string? Message);
+
+public sealed record InvoiceEventDto(Guid Id, InvoiceEventType Type, DateTimeOffset OccurredAt, ActorType ActorType, string? ActorName, string? Details);
 
 // ---------- Templates ----------
 public sealed record TemplateLineItemDto(Guid Id, int Position, string Title, string? Description, decimal Quantity, string Unit, decimal UnitPriceNet, decimal DiscountPercent, decimal? TaxRatePercent);
@@ -432,7 +559,14 @@ public sealed record DashboardDto(
     IReadOnlyList<QuotationListItemDto> ExpiringSoon,
     IReadOnlyList<FollowUpDueDto> UpcomingFollowUps,
     IReadOnlyList<ActivityDto> RecentActivity,
-    int OpenJobsCount);
+    int OpenJobsCount,
+    int OpenInvoicesCount,
+    decimal OpenInvoicesAmount,
+    int OverdueInvoicesCount,
+    decimal OverdueInvoicesAmount,
+    decimal InvoicedNet,
+    decimal PaymentsReceived,
+    IReadOnlyList<InvoiceListItemDto> OverdueInvoices);
 
 public sealed record FollowUpDueDto(Guid QuotationId, string QuotationNumber, string CustomerName, FollowUpKind Kind, DateTimeOffset DueAt);
 
@@ -499,4 +633,4 @@ public sealed record PublicRejectRequest(string? FullName, string? Reason);
 public sealed record PublicDecisionResponse(QuotationStatus Status, DateTimeOffset DecidedAt, string Number, string CompanyName);
 
 // ---------- Jobs runner ----------
-public sealed record JobRunResult(int QuotationsExpired, int FollowUpsQueued, int FollowUpsCancelled, int EmailsHandedOff, int EmailsFailed, int EmailsRetrying, int OrphanFilesDeleted, bool SkippedBecauseLocked);
+public sealed record JobRunResult(int QuotationsExpired, int FollowUpsQueued, int FollowUpsCancelled, int EmailsHandedOff, int EmailsFailed, int EmailsRetrying, int OrphanFilesDeleted, bool SkippedBecauseLocked, int PaymentRemindersQueued = 0);

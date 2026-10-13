@@ -8,6 +8,7 @@ using AngebotPilot.Application.Customers;
 using AngebotPilot.Application.Dashboard;
 using AngebotPilot.Application.Emails;
 using AngebotPilot.Application.Files;
+using AngebotPilot.Application.Invoices;
 using AngebotPilot.Application.Jobs;
 using AngebotPilot.Application.Public;
 using AngebotPilot.Application.Quotations;
@@ -41,6 +42,8 @@ public static class DependencyInjection
         services.AddScoped<NotificationService>();
         services.AddScoped<QuotationService>();
         services.AddScoped<JobService>();
+        services.AddScoped<InvoiceDocuments>();
+        services.AddScoped<InvoiceService>();
         services.AddScoped<TemplateService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<PublicQuotationService>();

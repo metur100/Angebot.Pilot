@@ -1,7 +1,7 @@
 import { formatPercent, formatQuantity, type TaxMode, type TotalsDto } from '@angebotpilot/api-contracts';
 import { cx } from '@/lib/cx';
 import { formatDate, formatEur } from '@/lib/format';
-import { TotalsList } from './Totals';
+import { signedEur, TotalsList } from './Totals';
 
 export interface DocumentLine {
   position: number;
@@ -38,8 +38,8 @@ export interface DocumentData {
   footer?: string | null;
 }
 
-/** Line items table shared by the HTML preview and the public customer page. */
-export function DocumentLineItems({ lines, taxMode, brandColor }: { lines: DocumentLine[]; taxMode: TaxMode; brandColor?: string }) {
+/** Line items table shared by the HTML preview, the public customer page and invoices (negate: cancellation invoices). */
+export function DocumentLineItems({ lines, taxMode, brandColor, negate = false }: { lines: DocumentLine[]; taxMode: TaxMode; brandColor?: string; negate?: boolean }) {
   const showVat = taxMode === 'Standard';
   const hasDiscount = lines.some((l) => l.discountPercent > 0);
   return (
@@ -73,7 +73,7 @@ export function DocumentLineItems({ lines, taxMode, brandColor }: { lines: Docum
                 <td className="py-2.5 pr-3 text-right whitespace-nowrap tabular">{line.discountPercent > 0 ? formatPercent(line.discountPercent) : '–'}</td>
               )}
               {showVat && <td className="py-2.5 pr-3 text-right whitespace-nowrap tabular">{formatPercent(line.taxRatePercent)}</td>}
-              <td className="py-2.5 text-right font-medium whitespace-nowrap tabular">{formatEur(line.lineNet)}</td>
+              <td className="py-2.5 text-right font-medium whitespace-nowrap tabular">{signedEur(line.lineNet, negate)}</td>
             </tr>
           ))}
         </tbody>
@@ -87,7 +87,7 @@ export function DocumentLineItems({ lines, taxMode, brandColor }: { lines: Docum
                 <span className="mr-1.5 text-neutral-500 tabular">{line.position}.</span>
                 {line.title}
               </p>
-              <p className="font-medium whitespace-nowrap tabular">{formatEur(line.lineNet)}</p>
+              <p className="font-medium whitespace-nowrap tabular">{signedEur(line.lineNet, negate)}</p>
             </div>
             {line.description && <p className="mt-0.5 whitespace-pre-line text-[13px] text-neutral-600">{line.description}</p>}
             <p className="mt-1 text-[13px] text-neutral-500 tabular">

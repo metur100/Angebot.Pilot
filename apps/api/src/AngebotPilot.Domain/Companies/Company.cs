@@ -103,6 +103,20 @@ public sealed class CompanySettings
     public bool AttachPdfToEmails { get; set; } = true;
 
     public bool NotifyOnCustomerDecision { get; set; } = true;
+
+    public string InvoicePrefix { get; set; } = "RE";
+
+    /// <summary>Default payment term in days; the due date of a new invoice is the issue date plus this value.</summary>
+    public int InvoicePaymentDays { get; set; } = 14;
+
+    public string? InvoiceIntroText { get; set; } = "vielen Dank für Ihren Auftrag. Für unsere Leistungen erlauben wir uns, Folgendes in Rechnung zu stellen:";
+
+    public string? InvoiceClosingText { get; set; } = "Vielen Dank für die gute Zusammenarbeit.";
+
+    /// <summary>Sends one friendly payment reminder automatically when an invoice that was e-mailed is overdue.</summary>
+    public bool InvoiceReminderEnabled { get; set; }
+
+    public int InvoiceReminderAfterDays { get; set; } = 7;
 }
 
 public sealed class CompanyMembership : Entity

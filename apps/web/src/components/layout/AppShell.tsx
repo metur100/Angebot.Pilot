@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu as MenuIcon,
   Plus,
+  ReceiptText,
   Settings,
   UserRound,
   Users,
@@ -42,6 +43,7 @@ const mainNav: NavItem[] = [
   { to: '/angebote', label: 'Angebote', icon: FileText },
   { to: '/kunden', label: 'Kunden', icon: Users },
   { to: '/auftraege', label: 'Aufträge', icon: Hammer },
+  { to: '/rechnungen', label: 'Rechnungen', icon: ReceiptText },
   { to: '/vorlagen', label: 'Vorlagen', icon: LayoutTemplate },
 ];
 

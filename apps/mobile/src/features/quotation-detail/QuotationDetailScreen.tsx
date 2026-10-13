@@ -10,6 +10,7 @@ import { Alert, Pressable, Share, StyleSheet, View } from 'react-native';
 
 import { Button, IconButton } from '@/components/Button';
 import { Card, Divider, KeyValue, SectionHeader } from '@/components/Card';
+import { InvoiceLinkCard } from '@/components/EntityCards';
 import { ContentScroll, Screen } from '@/components/Layout';
 import { OptionSheet } from '@/components/Sheet';
 import { EmailStatusBadge, QuotationStatusBadge } from '@/components/StatusBadge';
@@ -17,7 +18,7 @@ import { ErrorState, ListSkeleton } from '@/components/States';
 import { Text } from '@/components/Text';
 import { useToast } from '@/components/Toast';
 import { shareQuotationPdf } from '@/lib/pdf';
-import { keys, useQuotation, useQuotationDeliveries, useQuotationEvents, useQuotationFollowUps } from '@/lib/queries';
+import { invalidateInvoiceData, keys, useQuotation, useQuotationDeliveries, useQuotationEvents, useQuotationFollowUps } from '@/lib/queries';
 import { api, useCompanyId } from '@/lib/session';
 import { colors, space, touch } from '@/theme';
 
@@ -234,6 +235,15 @@ export default function QuotationDetailScreen() {
           },
         ]);
         return;
+      case 'createInvoice':
+        void run('createInvoice', async () => {
+          const draft = await api.quotations.createInvoice(companyId, q.id);
+          invalidateInvoiceData(queryClient, companyId, draft);
+          refreshAll();
+          toast('Rechnungsentwurf angelegt');
+          router.push({ pathname: '/invoice-editor', params: { id: draft.id, created: '1' } });
+        });
+        return;
       case 'cancelFollowUps':
         void run('cancelFollowUps', async () => {
           await api.quotations.cancelFollowUps(companyId, q.id);
@@ -354,6 +364,28 @@ export default function QuotationDetailScreen() {
 
         {q.jobId ? (
           <Button label="Zugehörigen Auftrag öffnen" icon="briefcase-outline" variant="ghost" onPress={() => router.push(`/job/${q.jobId}`)} />
+        ) : null}
+
+        {q.status === 'Accepted' || q.invoices.length > 0 ? (
+          <>
+            <SectionHeader title={`Rechnungen (${q.invoices.length})`} />
+            <View style={styles.actions} testID="quotation-invoices">
+              {q.invoices.map((inv) => (
+                <InvoiceLinkCard key={inv.id} item={inv} />
+              ))}
+              {q.status === 'Accepted' ? (
+                <Button
+                  label="Rechnung erstellen"
+                  icon="receipt-outline"
+                  variant="outline"
+                  onPress={() => handle('createInvoice')}
+                  loading={busy === 'createInvoice'}
+                  accessibilityHint="Legt einen Rechnungsentwurf mit den Positionen dieses Angebots an"
+                  testID="action-createInvoice"
+                />
+              ) : null}
+            </View>
+          </>
         ) : null}
 
         <SectionHeader title={`Positionen (${q.lineItems.length})`} />

@@ -1,7 +1,7 @@
 // In-memory database of the mock backend (MSW). In the browser (not under Vitest) the whole database is persisted
 // to localStorage after every request, so dev reloads keep their state. `resetMockDb()` restores the seed.
 import { IS_TEST } from './domain';
-import { emptyDb, SCHEMA_VERSION, type MockDb } from './model';
+import { defaultSettings, emptyDb, SCHEMA_VERSION, type MockDb } from './model';
 import { seedDemo, seedEmpty } from './seed';
 
 export type MockScenario = 'seeded' | 'empty';
@@ -46,8 +46,10 @@ function loadPersisted(): MockDb | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<MockDb> | null;
     if (!parsed || parsed.schemaVersion !== SCHEMA_VERSION) return null;
-    // Fill collections added later so old snapshots keep working.
-    return { ...emptyDb(), ...parsed };
+    // Fill collections and settings added later so old snapshots keep working.
+    const restored: MockDb = { ...emptyDb(), ...parsed };
+    for (const company of restored.companies) company.settings = { ...defaultSettings(company.name), ...company.settings };
+    return restored;
   } catch {
     return null;
   }

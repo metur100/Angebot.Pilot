@@ -258,7 +258,7 @@ public sealed class Quotation : Entity, ICompanyOwned
     }
 }
 
-public sealed class QuotationLineItem : Entity
+public sealed class QuotationLineItem : Entity, IDocumentLineItem
 {
     public Guid QuotationId { get; set; }
 

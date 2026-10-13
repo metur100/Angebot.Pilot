@@ -1,16 +1,83 @@
 import {
-  customerTypeLabel, formatDate, formatEur, jobStatusLabel, quotationStatusLabel,
-  type CustomerListItemDto, type JobListItemDto, type QuotationListItemDto,
+  customerTypeLabel, formatDate, formatEur, invoiceDisplayStatus, jobStatusLabel, quotationStatusLabel,
+  type CustomerListItemDto, type InvoiceLinkDto, type InvoiceListItemDto, type JobListItemDto, type QuotationListItemDto,
 } from '@angebotpilot/api-contracts';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
+import { formatInvoiceAmount, invoiceLabel } from '@/lib/invoices';
 import { colors, space } from '@/theme';
 
 import { PressableCard } from './Card';
-import { JobStatusBadge, QuotationStatusBadge } from './StatusBadge';
+import { InvoiceStatusBadge, JobStatusBadge, QuotationStatusBadge } from './StatusBadge';
 import { Text } from './Text';
+
+export function InvoiceCard({ item }: { item: InvoiceListItemDto }) {
+  const router = useRouter();
+  const status = invoiceDisplayStatus(item);
+  const amount = formatInvoiceAmount(item.grossTotal, item.kind);
+  const isOpen = item.kind === 'Invoice' && (item.status === 'Issued' || item.status === 'PartiallyPaid');
+  const due = item.status === 'Draft' ? null
+    : item.isOverdue ? `${item.daysOverdue} ${item.daysOverdue === 1 ? 'Tag' : 'Tage'} überfällig (fällig ${formatDate(item.dueDate)})`
+      : isOpen ? `fällig ${formatDate(item.dueDate)}`
+        : `vom ${formatDate(item.issueDate)}`;
+  return (
+    <PressableCard
+      onPress={() => router.push(`/invoice/${item.id}`)}
+      accessibilityLabel={`${item.number ? `Rechnung ${invoiceLabel(item)}` : 'Rechnungsentwurf'}, ${item.title}, ${item.customerName}, ${status.label}, ${amount}${due ? `, ${due}` : ''}`}
+      testID={`invoice-card-${item.id}`}
+    >
+      <View style={styles.topRow}>
+        <Text variant="caption" tone="secondary" style={styles.flex} numberOfLines={1}>
+          {invoiceLabel(item)}
+        </Text>
+        <InvoiceStatusBadge invoice={item} />
+      </View>
+      <Text variant="bodyStrong" numberOfLines={2} style={styles.title}>
+        {item.title || 'Ohne Betreff'}
+      </Text>
+      <Text variant="caption" tone="secondary" numberOfLines={1}>
+        {item.customerName}
+      </Text>
+      <View style={styles.bottomRow}>
+        <Text variant="caption" tone={item.isOverdue ? 'danger' : 'muted'} style={styles.flex} testID={`invoice-due-${item.id}`}>
+          {due ?? 'Nummer wird beim Stellen vergeben'}
+        </Text>
+        <Text variant="bodyStrong">{amount}</Text>
+      </View>
+      {item.status === 'PartiallyPaid' ? (
+        <Text variant="small" tone="muted">
+          offen {formatEur(item.openAmount)} von {formatEur(item.grossTotal)}
+        </Text>
+      ) : null}
+    </PressableCard>
+  );
+}
+
+/** Compact row for invoices linked from a job or quotation (InvoiceLinkDto). */
+export function InvoiceLinkCard({ item }: { item: InvoiceLinkDto }) {
+  const router = useRouter();
+  const amount = formatInvoiceAmount(item.grossTotal, item.kind);
+  const status = invoiceDisplayStatus({ ...item, isOverdue: false });
+  return (
+    <PressableCard
+      onPress={() => router.push(`/invoice/${item.id}`)}
+      accessibilityLabel={`${item.number ? `Rechnung ${invoiceLabel(item)}` : 'Rechnungsentwurf'}, ${status.label}, ${amount}`}
+      testID={`invoice-link-${item.id}`}
+    >
+      <View style={styles.topRow}>
+        <Text variant="bodyStrong" style={styles.flex} numberOfLines={1}>
+          {invoiceLabel(item)}
+        </Text>
+        <Text variant="bodyStrong">{amount}</Text>
+      </View>
+      <View style={styles.badgeRow}>
+        <InvoiceStatusBadge invoice={item} />
+      </View>
+    </PressableCard>
+  );
+}
 
 export function QuotationCard({ item }: { item: QuotationListItemDto }) {
   const router = useRouter();
@@ -110,6 +177,7 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
   title: { marginTop: space[1] },
   bottomRow: { flexDirection: 'row', alignItems: 'center', marginTop: space[2], gap: space[2] },
+  badgeRow: { marginTop: space[1] },
   customerRow: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   avatar: {
     width: 40, height: 40, borderRadius: 20, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center',

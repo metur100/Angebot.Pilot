@@ -3,10 +3,12 @@ using AngebotPilot.Application.Common;
 using AngebotPilot.Application.Contracts;
 using AngebotPilot.Application.Emails;
 using AngebotPilot.Application.Files;
+using AngebotPilot.Application.Invoices;
 using AngebotPilot.Application.Quotations;
 using AngebotPilot.Domain;
 using AngebotPilot.Domain.Emails;
 using AngebotPilot.Domain.FollowUps;
+using AngebotPilot.Domain.Invoices;
 using AngebotPilot.Domain.Quotations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -50,9 +52,10 @@ public sealed class JobRunner(
 
         var expired = await ExpireQuotationsAsync(ct);
         var (queued, cancelled) = await ProcessFollowUpsAsync(ct);
+        var paymentReminders = await ProcessPaymentRemindersAsync(ct);
         var (handedOff, failed, retrying) = await DispatchEmailsAsync(ct);
         var orphans = await CleanupAsync(ct);
-        return new JobRunResult(expired, queued, cancelled, handedOff, failed, retrying, orphans, SkippedBecauseLocked: false);
+        return new JobRunResult(expired, queued, cancelled, handedOff, failed, retrying, orphans, SkippedBecauseLocked: false, paymentReminders);
     }
 
     /// <summary>Only dispatches the outbox; used right after a user action queued an email.</summary>
@@ -159,6 +162,52 @@ public sealed class JobRunner(
         return (queued, cancelled);
     }
 
+    /// <summary>
+    /// Sends one automatic payment reminder for overdue invoices that were e-mailed, when the company enabled it.
+    /// Manual reminders count too: an invoice that was already reminded is skipped.
+    /// </summary>
+    public async Task<int> ProcessPaymentRemindersAsync(CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
+        var bound = DateOnly.FromDateTime(now.UtcDateTime);
+        var candidates = await db.Invoices.IgnoreQueryFilters()
+            .Where(i => i.DeletedAt == null && i.Kind == InvoiceKind.Invoice && (i.Status == InvoiceStatus.Issued || i.Status == InvoiceStatus.PartiallyPaid)
+                && i.ReminderCount == 0 && i.SentAt != null && i.RecipientEmail != null && i.DueDate < bound)
+            .Join(db.Companies, i => i.CompanyId, c => c.Id, (i, c) => new { Invoice = i, Company = c, Settings = c.Settings! })
+            .Where(x => x.Settings.InvoiceReminderEnabled)
+            .OrderBy(x => x.Invoice.DueDate)
+            .Take(100)
+            .ToListAsync(ct);
+        var queued = 0;
+        foreach (var item in candidates)
+        {
+            var invoice = item.Invoice;
+            var company = item.Company;
+            var settings = item.Settings;
+            var today = CompanyTime.Today(now, company.TimeZone);
+            if (today.DayNumber - invoice.DueDate.DayNumber < settings.InvoiceReminderAfterDays)
+            {
+                continue;
+            }
+
+            var sentBy = await db.EmailDeliveries.AsNoTracking().Where(e => e.InvoiceId == invoice.Id && e.Kind == EmailKind.InvoiceSent)
+                .OrderBy(e => e.CreatedAt).Select(e => e.CreatedByUserId).FirstOrDefaultAsync(ct);
+            var replyTo = settings.ReplyToEmail ?? company.Email
+                ?? (sentBy is { } uid ? await db.Users.AsNoTracking().Where(u => u.Id == uid).Select(u => u.Email).FirstOrDefaultAsync(ct) : null);
+            invoice.MarkReminderSent(now);
+            await outbox.EnqueueAsync(new EnqueueEmail(
+                invoice.CompanyId, null, EmailKind.PaymentReminder, $"invoice-reminder:{invoice.Id:N}:{invoice.ReminderCount}", invoice.RecipientEmail!,
+                EmailTemplates.PaymentReminder(invoice, company.Name, null, settings.EmailSignature, company.BrandColor),
+                replyTo, company.Name, invoice.PdfFileId, InvoiceDocuments.PdfFileName(invoice), sentBy, invoice.Id), ct);
+            invoice.AddEvent(InvoiceEventType.ReminderQueued, now, ActorType.System, null, $"Automatische Zahlungserinnerung an {invoice.RecipientEmail}");
+            audit.Record(invoice.CompanyId, null, "invoice.reminder_sent", "Invoice", invoice.Id, $"{invoice.Number} (automatisch)");
+            await db.SaveChangesAsync(ct);
+            queued++;
+        }
+
+        return queued;
+    }
+
     public async Task<(int HandedOff, int Failed, int Retrying)> DispatchEmailsAsync(CancellationToken ct)
     {
         var now = clock.GetUtcNow();
@@ -187,7 +236,7 @@ public sealed class JobRunner(
                 var bytes = await ReadFileAsync(companyId, fileId, ct);
                 if (bytes is not null)
                 {
-                    attachments.Add(new EmailAttachment(delivery.AttachmentFileName ?? "Angebot.pdf", "application/pdf", bytes));
+                    attachments.Add(new EmailAttachment(delivery.AttachmentFileName ?? (delivery.InvoiceId is null ? "Angebot.pdf" : "Rechnung.pdf"), "application/pdf", bytes));
                 }
             }
 
@@ -206,6 +255,7 @@ public sealed class JobRunner(
             delivery.Attempts++;
             delivery.LockedUntil = null;
             Quotation? quotation = delivery.QuotationId is { } qid ? await db.Quotations.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == qid, ct) : null;
+            Invoice? invoice = delivery.InvoiceId is { } iid ? await db.Invoices.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == iid, ct) : null;
             switch (result.Outcome)
             {
                 case EmailSendOutcome.HandedOff:
@@ -218,6 +268,8 @@ public sealed class JobRunner(
                     {
                         quotation?.AddEvent(QuotationEventType.EmailHandedOff, attemptAt, ActorType.System, null, $"{KindLabel(delivery.Kind)} an {delivery.ToAddress}");
                     }
+
+                    invoice?.AddEvent(InvoiceEventType.EmailHandedOff, attemptAt, ActorType.System, null, $"{KindLabel(delivery.Kind)} an {delivery.ToAddress}");
 
                     handedOff++;
                     break;
@@ -238,6 +290,16 @@ public sealed class JobRunner(
                         {
                             await notifications.NotifyAsync(quotation.CompanyId, [notifyUser], "email.failed",
                                 $"E-Mail zu Angebot {quotation.Number} konnte nicht versendet werden", delivery.LastError, "Quotation", quotation.Id, ct);
+                        }
+                    }
+
+                    if (invoice is not null)
+                    {
+                        invoice.AddEvent(InvoiceEventType.EmailFailed, attemptAt, ActorType.System, null, $"{KindLabel(delivery.Kind)} an {delivery.ToAddress}");
+                        if ((delivery.CreatedByUserId ?? invoice.IssuedByUserId) is { } notifyInvoiceUser)
+                        {
+                            await notifications.NotifyAsync(invoice.CompanyId, [notifyInvoiceUser], "email.failed",
+                                $"E-Mail zu Rechnung {invoice.Number} konnte nicht versendet werden", delivery.LastError, "Invoice", invoice.Id, ct);
                         }
                     }
 
@@ -334,6 +396,8 @@ public sealed class JobRunner(
         EmailKind.FirstReminder => "1. Erinnerung",
         EmailKind.SecondReminder => "2. Erinnerung",
         EmailKind.ExpiryReminder => "Erinnerung vor Ablauf",
+        EmailKind.InvoiceSent => "Rechnungs-E-Mail",
+        EmailKind.PaymentReminder => "Zahlungserinnerung",
         _ => "E-Mail",
     };
 

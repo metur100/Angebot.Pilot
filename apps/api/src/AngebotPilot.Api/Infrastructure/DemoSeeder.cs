@@ -4,6 +4,7 @@ using AngebotPilot.Application.Background;
 using AngebotPilot.Application.Companies;
 using AngebotPilot.Application.Contracts;
 using AngebotPilot.Application.Customers;
+using AngebotPilot.Application.Invoices;
 using AngebotPilot.Application.Quotations;
 using AngebotPilot.Application.Templates;
 using AngebotPilot.Domain;
@@ -95,7 +96,7 @@ public static class DemoSeeder
         ]), default);
         await quotations.SendAsync(member, q1.Id, new SendQuotationRequest(SendMode.Email, null, null, null, true, true, true), default);
         await quotations.RecordDecisionAsync(member, q1.Id, true, "Telefonisch zugesagt", default);
-        await quotations.ConvertToJobAsync(member, q1.Id, new ConvertToJobRequest(null, "Arbeiten vor Ladenöffnung (ab 5 Uhr)", today.AddDays(5), today.AddDays(12), user.Id, null), default);
+        var job1 = await quotations.ConvertToJobAsync(member, q1.Id, new ConvertToJobRequest(null, "Arbeiten vor Ladenöffnung (ab 5 Uhr)", today.AddDays(5), today.AddDays(12), user.Id, null), default);
 
         // Sent, awaiting decision, follow-ups scheduled
         var q2 = await quotations.CreateAsync(member, Quote(cOffice.Id, "LED-Umrüstung Büroflächen 2. OG", today.AddDays(-3),
@@ -143,6 +144,29 @@ public static class DemoSeeder
         ]), default);
 
         db.ChangeTracker.Clear();
+        // Invoices: a draft from the job, a paid invoice and an overdue, partly paid one.
+        var invoices = sp.GetRequiredService<InvoiceService>();
+        await invoices.CreateFromJobAsync(member, job1.Id, default);
+        var paid = await invoices.CreateAsync(member, new CreateInvoiceRequest(cOffice.Id, "Prüfung ortsfester Anlagen (DGUV V3)", today.AddDays(-12), today.AddDays(-15), null, null,
+            null, null, null, null, "Bestellung 2026-118", null,
+        [
+            new LineItemInput("Prüfung ortsfeste Anlage Bürofläche", "inkl. Prüfprotokoll", 1, "pauschal", 420m, 0, 19),
+            new LineItemInput("Austausch defekter FI-Schutzschalter", null, 2, "Stk.", 68.5m, 0, 19),
+        ]), default);
+        await invoices.IssueAsync(member, paid.Id, default);
+        await invoices.SendAsync(member, paid.Id, new SendInvoiceRequest(SendMode.Manual, null, null, null), default);
+        await invoices.RecordPaymentAsync(member, paid.Id, new RecordPaymentRequest(paid.Totals.GrossTotal, today.AddDays(-2), "Überweisung", null), default);
+        var overdue = await invoices.CreateAsync(member, new CreateInvoiceRequest(cSchool.Id, "Wartung Notbeleuchtung", today.AddDays(-30), today.AddDays(-33), today.AddDays(-31), null,
+            null, null, null, null, null, null,
+        [
+            new LineItemInput("Wartung Sicherheitsbeleuchtung", "Funktions- und Dauerprüfung, 18 Leuchten", 18, "Stk.", 14.5m, 0, 19),
+            new LineItemInput("Ersatzakku Notleuchte", null, 4, "Stk.", 32m, 0, 19),
+            new LineItemInput("Anfahrt", null, 1, "pauschal", 35m, 0, 19),
+        ]), default);
+        await invoices.IssueAsync(member, overdue.Id, default);
+        await invoices.SendAsync(member, overdue.Id, new SendInvoiceRequest(SendMode.Manual, null, null, null), default);
+        await invoices.RecordPaymentAsync(member, overdue.Id, new RecordPaymentRequest(150m, today.AddDays(-5), "Überweisung", "Teilzahlung"), default);
+
         await sp.GetRequiredService<JobRunner>().RunAllAsync(default);
         logger.LogWarning("Demo data created. Login: {Email} / {Password}{Hint}", DemoEmail, generated ? password : "(DEMO_PASSWORD)", generated ? " (generated – store it now)" : string.Empty);
     }

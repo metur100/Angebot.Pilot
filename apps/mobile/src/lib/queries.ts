@@ -1,7 +1,8 @@
 import type {
-  CustomerListQuery, JobListQuery, JobStatus, PagedResult, QuotationListQuery, QuotationStatus,
+  CustomerListQuery, InvoiceDto, InvoiceListQuery, InvoiceStatus, JobListQuery, JobStatus, PagedResult, QuotationListQuery,
+  QuotationStatus,
 } from '@angebotpilot/api-contracts';
-import { useInfiniteQuery, useQuery, type InfiniteData } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, type InfiniteData, type QueryClient } from '@tanstack/react-query';
 
 import { api, useCompanyId } from './session';
 
@@ -18,6 +19,7 @@ export const keys = {
   customer: (companyId: string, id: string) => ['c', companyId, 'customers', 'detail', id] as const,
   customerQuotations: (companyId: string, id: string) => ['c', companyId, 'customers', 'detail', id, 'quotations'] as const,
   customerJobs: (companyId: string, id: string) => ['c', companyId, 'customers', 'detail', id, 'jobs'] as const,
+  customerInvoices: (companyId: string, id: string) => ['c', companyId, 'customers', 'detail', id, 'invoices'] as const,
   quotations: (companyId: string) => ['c', companyId, 'quotations'] as const,
   quotationList: (companyId: string, q: QuotationListQuery) => ['c', companyId, 'quotations', 'list', q] as const,
   quotation: (companyId: string, id: string) => ['c', companyId, 'quotations', 'detail', id] as const,
@@ -27,6 +29,10 @@ export const keys = {
   jobs: (companyId: string) => ['c', companyId, 'jobs'] as const,
   jobList: (companyId: string, q: JobListQuery) => ['c', companyId, 'jobs', 'list', q] as const,
   job: (companyId: string, id: string) => ['c', companyId, 'jobs', 'detail', id] as const,
+  invoices: (companyId: string) => ['c', companyId, 'invoices'] as const,
+  invoiceList: (companyId: string, q: InvoiceListQuery) => ['c', companyId, 'invoices', 'list', q] as const,
+  invoice: (companyId: string, id: string) => ['c', companyId, 'invoices', 'detail', id] as const,
+  invoiceEvents: (companyId: string, id: string) => ['c', companyId, 'invoices', 'detail', id, 'events'] as const,
   templates: (companyId: string) => ['c', companyId, 'templates'] as const,
   template: (companyId: string, id: string) => ['c', companyId, 'templates', id] as const,
   notifications: (companyId: string) => ['c', companyId, 'notifications'] as const,
@@ -88,6 +94,11 @@ export function useCustomerJobs(id: string) {
   return useQuery({ queryKey: keys.customerJobs(companyId, id), queryFn: () => api.customers.jobs(companyId, id), enabled: !!id });
 }
 
+export function useCustomerInvoices(id: string) {
+  const companyId = useCompanyId();
+  return useQuery({ queryKey: keys.customerInvoices(companyId, id), queryFn: () => api.customers.invoices(companyId, id), enabled: !!id });
+}
+
 export function useQuotationList(query: { search?: string; status?: QuotationStatus[]; customerId?: string }) {
   const companyId = useCompanyId();
   const q: QuotationListQuery = { ...query, sort: '-updatedAt' };
@@ -135,6 +146,43 @@ export function useJobList(query: { search?: string; status?: JobStatus[] }) {
 export function useJob(id: string | undefined) {
   const companyId = useCompanyId();
   return useQuery({ queryKey: keys.job(companyId, id ?? ''), queryFn: () => api.jobs.get(companyId, id!), enabled: !!companyId && !!id });
+}
+
+export function useInvoiceList(query: { search?: string; status?: InvoiceStatus[]; overdue?: boolean; customerId?: string }) {
+  const companyId = useCompanyId();
+  const q: InvoiceListQuery = { ...query, sort: '-updatedAt' };
+  return useInfiniteQuery({
+    queryKey: keys.invoiceList(companyId, q),
+    queryFn: ({ pageParam }) => api.invoices.list(companyId, { ...q, page: pageParam, pageSize: PAGE_SIZE }),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
+    enabled: !!companyId,
+  });
+}
+
+export function useInvoice(id: string | undefined) {
+  const companyId = useCompanyId();
+  return useQuery({ queryKey: keys.invoice(companyId, id ?? ''), queryFn: () => api.invoices.get(companyId, id!), enabled: !!companyId && !!id });
+}
+
+export function useInvoiceEvents(id: string) {
+  const companyId = useCompanyId();
+  return useQuery({ queryKey: keys.invoiceEvents(companyId, id), queryFn: () => api.invoices.events(companyId, id), enabled: !!companyId && !!id });
+}
+
+type InvoiceRef = Pick<InvoiceDto, 'id' | 'customerId' | 'jobId' | 'quotationId'>;
+
+/**
+ * After any invoice mutation: store the returned invoice (when a full DTO is passed) and refresh everything that shows
+ * invoices – lists, dashboard KPIs, the source job/quotation and the customer's invoice list.
+ */
+export function invalidateInvoiceData(queryClient: QueryClient, companyId: string, invoice?: InvoiceRef | InvoiceDto) {
+  if (invoice && 'rowVersion' in invoice) queryClient.setQueryData(keys.invoice(companyId, invoice.id), invoice);
+  void queryClient.invalidateQueries({ queryKey: keys.invoices(companyId) });
+  void queryClient.invalidateQueries({ queryKey: keys.dashboard(companyId) });
+  if (invoice?.jobId) void queryClient.invalidateQueries({ queryKey: keys.job(companyId, invoice.jobId) });
+  if (invoice?.quotationId) void queryClient.invalidateQueries({ queryKey: keys.quotation(companyId, invoice.quotationId) });
+  if (invoice?.customerId) void queryClient.invalidateQueries({ queryKey: keys.customerInvoices(companyId, invoice.customerId) });
 }
 
 export function useTemplates() {

@@ -19,7 +19,7 @@ export type QuotationEventType =
   | 'EmailFailed' | 'FollowUpsCancelled' | 'Duplicated' | 'CustomerOptedOut';
 export type EmailKind =
   | 'QuotationSent' | 'FirstReminder' | 'SecondReminder' | 'ExpiryReminder' | 'Invitation'
-  | 'PasswordReset' | 'EmailVerification' | 'DecisionNotification';
+  | 'PasswordReset' | 'EmailVerification' | 'DecisionNotification' | 'InvoiceSent' | 'PaymentReminder';
 /** HandedOff = accepted by the outgoing mail server. It is NOT proof of inbox delivery. */
 export type EmailStatus = 'Pending' | 'Sending' | 'HandedOff' | 'RetryScheduled' | 'Failed' | 'Cancelled';
 export type FollowUpKind = 'FirstReminder' | 'SecondReminder' | 'ExpiryReminder';
@@ -29,6 +29,15 @@ export type ClientKind = 'Web' | 'Mobile';
 export type SubscriptionPlan = 'Trial' | 'Starter' | 'Team' | 'Business';
 export type SubscriptionStatus = 'Trialing' | 'Active' | 'PastDue' | 'Canceled' | 'Expired';
 export type SendMode = 'Email' | 'Manual';
+/** Issued = open (finalised, numbered, awaiting payment). "Overdue" is derived, see InvoiceListItemDto.isOverdue. */
+export type InvoiceStatus = 'Draft' | 'Issued' | 'PartiallyPaid' | 'Paid' | 'Cancelled';
+/** Cancellation = Stornorechnung. Its amounts are positive in the API and shown negated. */
+export type InvoiceKind = 'Invoice' | 'Cancellation';
+export type InvoiceEventType =
+  | 'Created' | 'Updated' | 'Issued' | 'Sent' | 'MarkedAsSent' | 'PaymentRecorded' | 'PaymentRemoved'
+  | 'Paid' | 'Cancelled' | 'CancellationCreated' | 'ReminderQueued' | 'EmailHandedOff' | 'EmailFailed' | 'Duplicated';
+/** Actions the current member may perform on an invoice (computed by the server from status and role). */
+export type InvoiceAction = 'edit' | 'delete' | 'duplicate' | 'issue' | 'send' | 'recordPayment' | 'removePayment' | 'remind' | 'cancel';
 
 export interface PagedResult<T> {
   items: T[];
@@ -108,6 +117,9 @@ export interface CompanySettingsDto {
   secondReminderEnabled: boolean; secondReminderAfterDays: number;
   expiryReminderEnabled: boolean; expiryReminderDaysBefore: number;
   attachPdfToEmails: boolean; notifyOnCustomerDecision: boolean;
+  /** Invoice settings: always returned. On PUT, omitted or null values are left unchanged. */
+  invoicePrefix: string; invoicePaymentDays: number; invoiceIntroText: string | null; invoiceClosingText: string | null;
+  invoiceReminderEnabled: boolean; invoiceReminderAfterDays: number;
 }
 export interface TaxRateDto { id: Guid; name: string; ratePercent: number; isDefault: boolean; isArchived: boolean }
 export interface UpsertTaxRateRequest { name: string; ratePercent: number; isDefault: boolean; isArchived: boolean }
@@ -184,6 +196,8 @@ export interface QuotationDto {
   decisionNote: string | null; expiredAt: IsoDateTime | null; cancelledAt: IsoDateTime | null; cancellationReason: string | null;
   jobId: Guid | null; hasActivePublicLink: boolean; publicLinkLastOpenedAt: IsoDateTime | null;
   allowedTransitions: QuotationStatus[]; rowVersion: string;
+  /** Invoices created from this quotation (drafts included). */
+  invoices: InvoiceLinkDto[];
 }
 export interface QuotationListQuery {
   search?: string; status?: QuotationStatus[]; customerId?: Guid; from?: IsoDate; to?: IsoDate;
@@ -223,6 +237,8 @@ export interface JobDto {
   plannedStartDate: IsoDate | null; dueDate: IsoDate | null; assignedUserId: Guid | null; assignedUserName: string | null;
   notes: string | null; createdAt: IsoDateTime; updatedAt: IsoDateTime; startedAt: IsoDateTime | null;
   completedAt: IsoDateTime | null; cancelledAt: IsoDateTime | null; allowedTransitions: JobStatus[]; rowVersion: string;
+  /** Invoices created from this job (drafts included). */
+  invoices: InvoiceLinkDto[];
 }
 export interface UpdateJobRequest {
   title: string; description?: string | null; plannedStartDate?: IsoDate | null; dueDate?: IsoDate | null;
@@ -233,6 +249,56 @@ export interface JobListQuery {
   search?: string; status?: JobStatus[]; assignedUserId?: Guid; customerId?: Guid;
   sort?: 'dueDate' | '-dueDate' | 'createdAt' | '-createdAt' | 'number' | '-number'; page?: number; pageSize?: number;
 }
+
+// ---------- Invoices ----------
+export interface InvoiceLinkDto { id: Guid; number: string | null; kind: InvoiceKind; status: InvoiceStatus; grossTotal: number }
+export interface CreateInvoiceRequest {
+  customerId: Guid; title?: string | null; issueDate?: IsoDate | null; serviceDateFrom?: IsoDate | null; serviceDateTo?: IsoDate | null;
+  dueDate?: IsoDate | null; taxMode?: TaxMode | null; introText?: string | null; closingText?: string | null; paymentTerms?: string | null;
+  buyerReference?: string | null; internalNotes?: string | null; lineItems?: LineItemInput[] | null;
+}
+export interface UpdateInvoiceRequest {
+  customerId: Guid; title: string; issueDate: IsoDate; serviceDateFrom: IsoDate | null; serviceDateTo: IsoDate | null; dueDate: IsoDate;
+  taxMode: TaxMode; introText?: string | null; closingText?: string | null; paymentTerms?: string | null; buyerReference?: string | null;
+  internalNotes?: string | null; lineItems: LineItemInput[]; rowVersion: string;
+}
+export interface InvoiceListItemDto {
+  /** number is null for drafts: it is assigned when the invoice is issued. */
+  id: Guid; number: string | null; kind: InvoiceKind; status: InvoiceStatus; title: string; customerId: Guid; customerName: string;
+  issueDate: IsoDate; dueDate: IsoDate; netTotal: number; grossTotal: number; paidAmount: number; openAmount: number;
+  isOverdue: boolean; daysOverdue: number; sentAt: IsoDateTime | null; updatedAt: IsoDateTime;
+}
+export interface InvoicePaymentDto { id: Guid; amount: number; paidOn: IsoDate; method: string | null; note: string | null; createdAt: IsoDateTime; createdByName: string | null }
+export interface InvoiceDto {
+  id: Guid; number: string | null; kind: InvoiceKind; status: InvoiceStatus; title: string; customerId: Guid; customerName: string;
+  recipientName: string; recipientContact: string | null; recipientAddress: string | null; recipientEmail: string | null; recipientVatId: string | null;
+  issueDate: IsoDate; serviceDateFrom: IsoDate | null; serviceDateTo: IsoDate | null; dueDate: IsoDate; taxMode: TaxMode;
+  introText: string | null; closingText: string | null; paymentTerms: string | null; buyerReference: string | null; internalNotes: string | null;
+  currency: string; lineItems: LineItemDto[]; totals: TotalsDto;
+  paidAmount: number; openAmount: number; isOverdue: boolean; daysOverdue: number; paidOn: IsoDate | null; payments: InvoicePaymentDto[];
+  quotationId: Guid | null; quotationNumber: string | null; jobId: Guid | null; jobNumber: string | null;
+  /** Set on a cancellation invoice: the invoice it reverses. */
+  cancelledInvoiceId: Guid | null; cancelledInvoiceNumber: string | null;
+  /** Set on a cancelled invoice: its cancellation invoice. */
+  cancellationInvoiceId: Guid | null; cancellationInvoiceNumber: string | null;
+  createdAt: IsoDateTime; updatedAt: IsoDateTime; issuedAt: IsoDateTime | null; sentAt: IsoDateTime | null;
+  cancelledAt: IsoDateTime | null; cancellationReason: string | null; lastReminderAt: IsoDateTime | null; reminderCount: number;
+  /** True once issued: the PDF embeds the ZUGFeRD/Factur-X XML and the XML can be downloaded separately. */
+  hasEInvoice: boolean;
+  /** Drafts only: what is still missing before the invoice can be issued (empty = ready). */
+  issueProblems: string[];
+  allowedActions: InvoiceAction[]; rowVersion: string;
+}
+export interface InvoiceListQuery {
+  search?: string; status?: InvoiceStatus[]; overdue?: boolean; customerId?: Guid; from?: IsoDate; to?: IsoDate;
+  sort?: 'updatedAt' | '-updatedAt' | 'number' | '-number' | 'issueDate' | '-issueDate' | 'dueDate' | '-dueDate' | 'grossTotal' | '-grossTotal';
+  page?: number; pageSize?: number;
+}
+export interface SendInvoiceRequest { mode: SendMode; recipientEmail?: string | null; subject?: string | null; message?: string | null }
+export interface SendInvoiceResponse { invoice: InvoiceDto; emailDeliveryId: Guid | null }
+export interface RecordPaymentRequest { amount: number; paidOn: IsoDate; method?: string | null; note?: string | null }
+export interface PaymentReminderRequest { recipientEmail?: string | null; message?: string | null }
+export interface InvoiceEventDto { id: Guid; type: InvoiceEventType; occurredAt: IsoDateTime; actorType: ActorType; actorName: string | null; details: string | null }
 
 // ---------- Templates ----------
 export interface TemplateLineItemInput {
@@ -262,6 +328,13 @@ export interface DashboardDto {
   conversionRateDefinition: string;
   awaitingDecision: QuotationListItemDto[]; expiringSoon: QuotationListItemDto[]; upcomingFollowUps: FollowUpDueDto[];
   recentActivity: ActivityDto[]; openJobsCount: number;
+  /** Current state, not limited to the period. */
+  openInvoicesCount: number; openInvoicesAmount: number; overdueInvoicesCount: number; overdueInvoicesAmount: number;
+  /** Net amount invoiced in the period (cancellations subtracted). */
+  invoicedNet: number;
+  /** Payments received in the period. */
+  paymentsReceived: number;
+  overdueInvoices: InvoiceListItemDto[];
 }
 export interface NotificationDto { id: Guid; type: string; title: string; body: string | null; entityType: string | null; entityId: Guid | null; createdAt: IsoDateTime; isRead: boolean }
 
