@@ -21,12 +21,18 @@ import { defaultTaxRateOf, liveTotals } from '@/features/quotations/QuotationEdi
 import { api } from '@/lib/api';
 import { applyServerErrors, errorMessage, hasFieldErrors } from '@/lib/errors';
 import { formatEur } from '@/lib/format';
+import { tr } from '@/lib/i18n';
 import { qk } from '@/lib/queryKeys';
 
-const optionalText = (max: number) => z.string().trim().max(max, `Maximal ${max} Zeichen.`);
+// Validation messages are resolved when validating (zod v4 `error` callbacks), so they follow the current UI language.
+const optionalText = (max: number) => z.string().trim().max(max, { error: () => tr(`Maximal ${max} Zeichen.`, `At most ${max} characters.`) });
 
 const templateSchema = z.object({
-  name: z.string().trim().min(1, 'Bitte Namen angeben.').max(200),
+  name: z
+    .string()
+    .trim()
+    .min(1, { error: () => tr('Bitte Namen angeben.', 'Please enter a name.') })
+    .max(200),
   description: optionalText(500),
   taxMode: z.enum(['', 'Standard', 'SmallBusiness', 'ReverseCharge']),
   introText: optionalText(4000),
@@ -34,7 +40,7 @@ const templateSchema = z.object({
   terms: optionalText(4000),
   lineItems: z
     .array(lineItemSchema.extend({ taxRatePercent: z.number().min(0).max(100).nullable() }))
-    .min(1, 'Mindestens eine Position.')
+    .min(1, { error: () => tr('Mindestens eine Position.', 'At least one line item.') })
     .max(200),
 });
 type TemplateFormInput = z.input<typeof templateSchema>;
@@ -124,7 +130,7 @@ function TemplateForm({ template }: { template: TemplateDto | null }) {
         queryClient.setQueryData(qk.template(companyId, saved.id), saved);
         void queryClient.invalidateQueries({ queryKey: qk.templates(companyId) });
         reset(toForm(saved));
-        toast.success(template ? 'Vorlage gespeichert' : 'Vorlage angelegt', saved.name);
+        toast.success(template ? tr('Vorlage gespeichert', 'Template saved') : tr('Vorlage angelegt', 'Template created'), saved.name);
         if (!template) {
           bypass.current = true;
           void navigate(`/vorlagen/${saved.id}`, { replace: true });
@@ -134,24 +140,24 @@ function TemplateForm({ template }: { template: TemplateDto | null }) {
         if (rest.length > 0 || !hasFieldErrors(error)) setFormError(rest.join(' ') || errorMessage(error));
       }
     },
-    () => toast.error('Bitte prüfen Sie die markierten Felder.'),
+    () => toast.error(tr('Bitte prüfen Sie die markierten Felder.', 'Please check the highlighted fields.')),
   )(event);
 
   return (
     <>
       <PageHeader
-        title={template ? template.name : 'Neue Vorlage'}
-        documentTitle={template ? `Vorlage ${template.name}` : 'Neue Vorlage'}
-        back={{ to: '/vorlagen', label: 'Vorlagen' }}
-        description="Wiederverwendbare Texte und Positionen für typische Angebote."
+        title={template ? template.name : tr('Neue Vorlage', 'New template')}
+        documentTitle={template ? tr(`Vorlage ${template.name}`, `Template ${template.name}`) : tr('Neue Vorlage', 'New template')}
+        back={{ to: '/vorlagen', label: tr('Vorlagen', 'Templates') }}
+        description={tr('Wiederverwendbare Texte und Positionen für typische Angebote.', 'Reusable texts and line items for typical quotations.')}
         actions={
           template && (
             <>
               <Button variant="dangerGhost" icon={Trash2} onClick={() => setConfirmDelete(true)}>
-                Löschen
+                {tr('Löschen', 'Delete')}
               </Button>
               <ButtonLink to={`/angebote/neu?vorlage=${template.id}`} icon={FilePlus2}>
-                Angebot daraus erstellen
+                {tr('Angebot daraus erstellen', 'Create quotation from it')}
               </ButtonLink>
             </>
           )
@@ -164,26 +170,36 @@ function TemplateForm({ template }: { template: TemplateDto | null }) {
           </Alert>
         )}
         <Card>
-          <CardHeader title="Allgemein" />
+          <CardHeader title={tr('Allgemein', 'General')} />
           <CardBody className="grid gap-4 md:grid-cols-2">
-            <Field label="Name" error={errors.name?.message} required>
-              <Input placeholder="z. B. Zählerschrank-Modernisierung" {...register('name')} />
+            <Field label={tr('Name', 'Name')} error={errors.name?.message} required>
+              <Input placeholder={tr('z. B. Zählerschrank-Modernisierung', 'e.g. meter cabinet upgrade')} {...register('name')} />
             </Field>
-            <Field label="Besteuerung" error={errors.taxMode?.message} hint="Optional: überschreibt beim Erstellen die Firmenvorgabe.">
+            <Field
+              label={tr('Besteuerung', 'Taxation')}
+              error={errors.taxMode?.message}
+              hint={tr('Optional: überschreibt beim Erstellen die Firmenvorgabe.', 'Optional: overrides the company default when creating a quotation.')}
+            >
               <Select {...register('taxMode')}>
-                <option value="">Keine Vorgabe (Firmenstandard)</option>
-                <option value="Standard">Regelbesteuerung</option>
-                <option value="SmallBusiness">Kleinunternehmer (§ 19 UStG)</option>
-                <option value="ReverseCharge">Reverse Charge (§ 13b UStG)</option>
+                <option value="">{tr('Keine Vorgabe (Firmenstandard)', 'No preset (company default)')}</option>
+                <option value="Standard">{tr('Regelbesteuerung', 'Standard taxation')}</option>
+                <option value="SmallBusiness">{tr('Kleinunternehmer (§ 19 UStG)', 'Small business (§ 19 UStG)')}</option>
+                <option value="ReverseCharge">{tr('Reverse Charge (§ 13b UStG)', 'Reverse charge (§ 13b UStG)')}</option>
               </Select>
             </Field>
-            <Field label="Beschreibung" error={errors.description?.message} optional className="md:col-span-2">
-              <Input placeholder="Wofür ist die Vorlage gedacht?" {...register('description')} />
+            <Field label={tr('Beschreibung', 'Description')} error={errors.description?.message} optional className="md:col-span-2">
+              <Input placeholder={tr('Wofür ist die Vorlage gedacht?', 'What is the template for?')} {...register('description')} />
             </Field>
           </CardBody>
         </Card>
         <Card>
-          <CardHeader title="Positionen" description="Ohne Steuersatz („Standard“) gilt beim Erstellen der Standardsatz Ihrer Firma." />
+          <CardHeader
+            title={tr('Positionen', 'Line items')}
+            description={tr(
+              'Ohne Steuersatz („Standard“) gilt beim Erstellen der Standardsatz Ihrer Firma.',
+              'Without a VAT rate (“Standard”), your company’s standard rate applies when creating a quotation.',
+            )}
+          />
           <CardBody>
             <LineItemsEditor
               control={control}
@@ -195,31 +211,31 @@ function TemplateForm({ template }: { template: TemplateDto | null }) {
             />
             <div className="mt-4 flex justify-end text-sm">
               <div className="rounded-lg border border-neutral-200 bg-neutral-25 px-4 py-3">
-                <span className="text-neutral-600">Summe netto: </span>
+                <span className="text-neutral-600">{tr('Summe netto: ', 'Net total: ')}</span>
                 <span className="font-semibold text-neutral-900 tabular">{formatEur(net)}</span>
-                <p className="mt-1 text-xs text-neutral-500">Die Umsatzsteuer wird im Angebot berechnet.</p>
+                <p className="mt-1 text-xs text-neutral-500">{tr('Die Umsatzsteuer wird im Angebot berechnet.', 'VAT is calculated in the quotation.')}</p>
               </div>
             </div>
           </CardBody>
         </Card>
         <Card>
-          <CardHeader title="Texte" />
+          <CardHeader title={tr('Texte', 'Texts')} />
           <CardBody className="space-y-4">
-            <Field label="Einleitung" error={errors.introText?.message} optional>
+            <Field label={tr('Einleitung', 'Introduction')} error={errors.introText?.message} optional>
               <Textarea rows={3} {...register('introText')} />
             </Field>
-            <Field label="Schlusstext" error={errors.closingText?.message} optional>
+            <Field label={tr('Schlusstext', 'Closing text')} error={errors.closingText?.message} optional>
               <Textarea rows={3} {...register('closingText')} />
             </Field>
-            <Field label="Bedingungen" error={errors.terms?.message} optional>
+            <Field label={tr('Bedingungen', 'Terms')} error={errors.terms?.message} optional>
               <Textarea rows={3} {...register('terms')} />
             </Field>
           </CardBody>
         </Card>
         <div className="sticky bottom-0 z-10 -mx-4 flex justify-end gap-2 border-t border-neutral-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-          <ButtonLink to="/vorlagen">Abbrechen</ButtonLink>
+          <ButtonLink to="/vorlagen">{tr('Abbrechen', 'Cancel')}</ButtonLink>
           <Button type="submit" variant="primary" icon={Save} loading={isSubmitting}>
-            {template ? 'Vorlage speichern' : 'Vorlage anlegen'}
+            {template ? tr('Vorlage speichern', 'Save template') : tr('Vorlage anlegen', 'Create template')}
           </Button>
         </div>
       </form>
@@ -228,14 +244,14 @@ function TemplateForm({ template }: { template: TemplateDto | null }) {
         <ConfirmDialog
           open={confirmDelete}
           onOpenChange={setConfirmDelete}
-          title={`Vorlage „${template.name}“ löschen?`}
-          description="Bereits erstellte Angebote bleiben unverändert."
-          confirmLabel="Löschen"
+          title={tr(`Vorlage „${template.name}“ löschen?`, `Delete template “${template.name}”?`)}
+          description={tr('Bereits erstellte Angebote bleiben unverändert.', 'Quotations already created remain unchanged.')}
+          confirmLabel={tr('Löschen', 'Delete')}
           variant="danger"
           onConfirm={async () => {
             await api.templates.delete(companyId, template.id);
             void queryClient.invalidateQueries({ queryKey: qk.templates(companyId) });
-            toast.success('Vorlage gelöscht');
+            toast.success(tr('Vorlage gelöscht', 'Template deleted'));
             bypass.current = true;
             void navigate('/vorlagen', { replace: true });
           }}

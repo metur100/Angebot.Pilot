@@ -90,6 +90,7 @@ export const authHandlers: HttpHandler[] = [
       password: body.password ?? '',
       displayName: clean(body.displayName) ?? '',
       emailVerified: false,
+      language: body.language === 'en' ? 'en' : 'de',
       createdAt: nowIso(),
     };
     db.users.push(user);
@@ -176,6 +177,7 @@ export const authHandlers: HttpHandler[] = [
     const name = clean(body.displayName);
     if (!name) throw badRequest('validation_failed', 'Bitte prüfen Sie Ihre Eingaben.', { displayName: ['Bitte geben Sie Ihren Namen ein.'] });
     user.displayName = name;
+    if (body.language === 'de' || body.language === 'en') user.language = body.language;
     return json(toMe(user));
   }),
 

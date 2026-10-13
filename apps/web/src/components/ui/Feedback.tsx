@@ -2,6 +2,7 @@ import { CircleAlert, CircleCheck, Info, Loader2, RefreshCw, TriangleAlert, type
 import type { ReactNode } from 'react';
 import { errorMessage } from '@/lib/errors';
 import { cx } from '@/lib/cx';
+import { tr } from '@/lib/i18n';
 import { Button } from './Button';
 
 type AlertTone = 'info' | 'success' | 'warning' | 'danger' | 'neutral';
@@ -40,7 +41,7 @@ export function Alert({ tone = 'info', title, children, actions, className, icon
   );
 }
 
-export function Spinner({ label = 'Wird geladen …', className }: { label?: string; className?: string }) {
+export function Spinner({ label = tr('Wird geladen …', 'Loading …'), className }: { label?: string; className?: string }) {
   return (
     <span role="status" className={cx('inline-flex items-center gap-2 text-sm text-neutral-500', className)}>
       <Loader2 aria-hidden size={16} className="animate-spin" />
@@ -56,7 +57,7 @@ export function Skeleton({ className }: { className?: string }) {
 /** Generic loading placeholder for a page body. */
 export function PageSkeleton({ rows = 6 }: { rows?: number }) {
   return (
-    <div role="status" aria-label="Inhalt wird geladen" className="space-y-4">
+    <div role="status" aria-label={tr('Inhalt wird geladen', 'Loading content')} className="space-y-4">
       <Skeleton className="h-8 w-64" />
       <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
         <div className="space-y-3">
@@ -72,7 +73,7 @@ export function PageSkeleton({ rows = 6 }: { rows?: number }) {
 /** Table skeleton with a given number of rows/columns. */
 export function TableSkeleton({ rows = 6, columns = 5 }: { rows?: number; columns?: number }) {
   return (
-    <div role="status" aria-label="Liste wird geladen" className="divide-y divide-neutral-100">
+    <div role="status" aria-label={tr('Liste wird geladen', 'Loading list')} className="divide-y divide-neutral-100">
       {Array.from({ length: rows }, (_, r) => (
         <div key={r} className="flex items-center gap-4 px-5 py-3.5">
           {Array.from({ length: columns }, (_, c) => (
@@ -106,7 +107,7 @@ export function EmptyState({ icon: Icon, title, description, action, className, 
   );
 }
 
-export function ErrorState({ error, onRetry, title = 'Daten konnten nicht geladen werden', className }: { error: unknown; onRetry?: () => void; title?: string; className?: string }) {
+export function ErrorState({ error, onRetry, title = tr('Daten konnten nicht geladen werden', 'Could not load the data'), className }: { error: unknown; onRetry?: () => void; title?: string; className?: string }) {
   return (
     <div role="alert" className={cx('flex flex-col items-center px-6 py-12 text-center', className)}>
       <div className="mb-3 flex size-11 items-center justify-center rounded-xl border border-danger-border bg-danger-bg text-danger-text">
@@ -116,7 +117,7 @@ export function ErrorState({ error, onRetry, title = 'Daten konnten nicht gelade
       <p className="mt-1 max-w-md text-sm text-neutral-600">{errorMessage(error)}</p>
       {onRetry && (
         <Button className="mt-4" icon={RefreshCw} onClick={onRetry}>
-          Erneut versuchen
+          {tr('Erneut versuchen', 'Try again')}
         </Button>
       )}
     </div>

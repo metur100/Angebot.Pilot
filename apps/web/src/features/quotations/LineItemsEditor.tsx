@@ -21,6 +21,7 @@ import { NumberInput } from '@/components/ui/NumberInput';
 import { cx } from '@/lib/cx';
 import { formatEur } from '@/lib/format';
 import { useMediaQuery } from '@/lib/hooks';
+import { tr } from '@/lib/i18n';
 
 export interface LineItemValue {
   title: string;
@@ -108,14 +109,14 @@ export function LineItemsEditor<T extends WithLineItems>({
         return (
           <Select
             inputSize={small ? 'sm' : 'md'}
-            aria-label={small ? `USt.-Satz, Position ${index + 1}` : undefined}
+            aria-label={small ? tr(`USt.-Satz, Position ${index + 1}`, `VAT rate, line item ${index + 1}`) : undefined}
             value={value === null || value === undefined ? '' : String(value)}
             onChange={(event) => field.onChange(event.target.value === '' ? null : Number(event.target.value))}
             onBlur={field.onBlur}
             disabled={disabled || !vatEnabled}
-            title={!vatEnabled ? 'In dieser Besteuerungsart wird keine USt. ausgewiesen.' : undefined}
+            title={!vatEnabled ? tr('In dieser Besteuerungsart wird keine USt. ausgewiesen.', 'No VAT is shown with this tax mode.') : undefined}
           >
-            {taxRateOptional && <option value="">Standard</option>}
+            {taxRateOptional && <option value="">{tr('Standard', 'Default')}</option>}
             {rateOptions(value).map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
@@ -134,7 +135,7 @@ export function LineItemsEditor<T extends WithLineItems>({
       render={({ field: f }) => (
         <NumberInput
           inputSize={small ? 'sm' : 'md'}
-          aria-label={small ? `${label}, Position ${index + 1}` : undefined}
+          aria-label={small ? tr(`${label}, Position ${index + 1}`, `${label}, line item ${index + 1}`) : undefined}
           aria-invalid={err(index, field) ? true : undefined}
           value={f.value}
           onValueChange={f.onChange}
@@ -152,19 +153,19 @@ export function LineItemsEditor<T extends WithLineItems>({
 
   const rowActions = (index: number) => (
     <div className="flex items-center gap-0.5">
-      <IconButton size="sm" icon={ArrowUp} label={`Position ${index + 1} nach oben verschieben`} disabled={disabled || index === 0} onClick={() => move(index, index - 1)} />
+      <IconButton size="sm" icon={ArrowUp} label={tr(`Position ${index + 1} nach oben verschieben`, `Move line item ${index + 1} up`)} disabled={disabled || index === 0} onClick={() => move(index, index - 1)} />
       <IconButton
         size="sm"
         icon={ArrowDown}
-        label={`Position ${index + 1} nach unten verschieben`}
+        label={tr(`Position ${index + 1} nach unten verschieben`, `Move line item ${index + 1} down`)}
         disabled={disabled || index === fields.length - 1}
         onClick={() => move(index, index + 1)}
       />
-      <IconButton size="sm" icon={Copy} label={`Position ${index + 1} duplizieren`} disabled={disabled} onClick={() => duplicate(index)} />
+      <IconButton size="sm" icon={Copy} label={tr(`Position ${index + 1} duplizieren`, `Duplicate line item ${index + 1}`)} disabled={disabled} onClick={() => duplicate(index)} />
       <IconButton
         size="sm"
         icon={Trash2}
-        label={`Position ${index + 1} entfernen`}
+        label={tr(`Position ${index + 1} entfernen`, `Remove line item ${index + 1}`)}
         disabled={disabled || fields.length <= 1}
         onClick={() => remove(index)}
         className="hover:bg-danger-bg! hover:text-danger-text!"
@@ -186,19 +187,19 @@ export function LineItemsEditor<T extends WithLineItems>({
       </datalist>
 
       {wide ? (
-        <table className="w-full border-collapse text-sm" aria-label="Positionen">
+        <table className="w-full border-collapse text-sm" aria-label={tr('Positionen', 'Line items')}>
           <thead>
             <tr className="text-left text-xs text-neutral-500">
-              <th scope="col" className="w-10 pb-2 font-medium">Pos.</th>
-              <th scope="col" className="pb-2 pl-2 font-medium">Bezeichnung</th>
-              <th scope="col" className="w-[96px] pb-2 pl-2 text-right font-medium">Menge</th>
-              <th scope="col" className="w-[104px] pb-2 pl-2 font-medium">Einheit</th>
-              <th scope="col" className="w-[132px] pb-2 pl-2 text-right font-medium">Einzelpreis netto</th>
-              <th scope="col" className="w-[84px] pb-2 pl-2 text-right font-medium">Rabatt</th>
-              <th scope="col" className="w-[96px] pb-2 pl-2 font-medium">USt.</th>
-              <th scope="col" className="w-[120px] pb-2 pl-2 text-right font-medium">Gesamt netto</th>
+              <th scope="col" className="w-10 pb-2 font-medium">{tr('Pos.', 'No.')}</th>
+              <th scope="col" className="pb-2 pl-2 font-medium">{tr('Bezeichnung', 'Item')}</th>
+              <th scope="col" className="w-[96px] pb-2 pl-2 text-right font-medium">{tr('Menge', 'Quantity')}</th>
+              <th scope="col" className="w-[104px] pb-2 pl-2 font-medium">{tr('Einheit', 'Unit')}</th>
+              <th scope="col" className="w-[132px] pb-2 pl-2 text-right font-medium">{tr('Einzelpreis netto', 'Net unit price')}</th>
+              <th scope="col" className="w-[84px] pb-2 pl-2 text-right font-medium">{tr('Rabatt', 'Discount')}</th>
+              <th scope="col" className="w-[96px] pb-2 pl-2 font-medium">{tr('USt.', 'VAT')}</th>
+              <th scope="col" className="w-[120px] pb-2 pl-2 text-right font-medium">{tr('Gesamt netto', 'Net total')}</th>
               <th scope="col" className="w-[132px] pb-2 pl-2">
-                <span className="sr-only">Aktionen</span>
+                <span className="sr-only">{tr('Aktionen', 'Actions')}</span>
               </th>
             </tr>
           </thead>
@@ -213,26 +214,26 @@ export function LineItemsEditor<T extends WithLineItems>({
                   <td className="pt-3 pl-2">
                     <Input
                       inputSize="sm"
-                      aria-label={`Bezeichnung, Position ${index + 1}`}
+                      aria-label={tr(`Bezeichnung, Position ${index + 1}`, `Item, line item ${index + 1}`)}
                       aria-invalid={err(index, 'title') ? true : undefined}
-                      placeholder="z. B. Montage Unterverteilung"
+                      placeholder={tr('z. B. Montage Unterverteilung', 'e.g. Installation of sub-distribution board')}
                       disabled={disabled}
                       {...register(p(index, 'title'))}
                     />
                   </td>
-                  <td className="pt-3 pl-2">{numberField(index, 'quantity', true, 'Menge')}</td>
+                  <td className="pt-3 pl-2">{numberField(index, 'quantity', true, tr('Menge', 'Quantity'))}</td>
                   <td className="pt-3 pl-2">
                     <Input
                       inputSize="sm"
                       list={datalistId}
-                      aria-label={`Einheit, Position ${index + 1}`}
+                      aria-label={tr(`Einheit, Position ${index + 1}`, `Unit, line item ${index + 1}`)}
                       aria-invalid={err(index, 'unit') ? true : undefined}
                       disabled={disabled}
                       {...register(p(index, 'unit'))}
                     />
                   </td>
-                  <td className="pt-3 pl-2">{numberField(index, 'unitPriceNet', true, 'Einzelpreis netto')}</td>
-                  <td className="pt-3 pl-2">{numberField(index, 'discountPercent', true, 'Rabatt in Prozent')}</td>
+                  <td className="pt-3 pl-2">{numberField(index, 'unitPriceNet', true, tr('Einzelpreis netto', 'Net unit price'))}</td>
+                  <td className="pt-3 pl-2">{numberField(index, 'discountPercent', true, tr('Rabatt in Prozent', 'Discount in percent'))}</td>
                   <td className="pt-3 pl-2">{taxSelect(index, true)}</td>
                   <td className="pt-3 pl-2 text-right">
                     <span className="inline-flex h-8 items-center">
@@ -246,8 +247,8 @@ export function LineItemsEditor<T extends WithLineItems>({
                   <td colSpan={6} className="pt-1.5 pb-3 pl-2">
                     <Textarea
                       rows={1}
-                      aria-label={`Beschreibung, Position ${index + 1}`}
-                      placeholder="Beschreibung (optional) – Details, Material, Leistungsumfang"
+                      aria-label={tr(`Beschreibung, Position ${index + 1}`, `Description, line item ${index + 1}`)}
+                      placeholder={tr('Beschreibung (optional) – Details, Material, Leistungsumfang', 'Description (optional) – details, materials, scope of work')}
                       disabled={disabled}
                       className="min-h-8! resize-y py-1.5 text-[13px]"
                       {...register(p(index, 'description'))}
@@ -267,39 +268,39 @@ export function LineItemsEditor<T extends WithLineItems>({
           })}
         </table>
       ) : (
-        <ol className="space-y-3" aria-label="Positionen">
+        <ol className="space-y-3" aria-label={tr('Positionen', 'Line items')}>
           {fields.map((item, index) => (
             <li key={item.id} className="rounded-lg border border-neutral-200 bg-neutral-25 p-3.5 sm:p-4" data-testid="line-item">
               <div className="mb-3 flex items-center justify-between gap-2">
-                <p className="text-[13px] font-semibold text-neutral-700">Position {index + 1}</p>
+                <p className="text-[13px] font-semibold text-neutral-700">{tr(`Position ${index + 1}`, `Line item ${index + 1}`)}</p>
                 {rowActions(index)}
               </div>
               <div className="space-y-3">
-                <Field label="Bezeichnung" error={err(index, 'title')} required>
-                  <Input placeholder="z. B. Montage Unterverteilung" disabled={disabled} {...register(p(index, 'title'))} />
+                <Field label={tr('Bezeichnung', 'Item')} error={err(index, 'title')} required>
+                  <Input placeholder={tr('z. B. Montage Unterverteilung', 'e.g. Installation of sub-distribution board')} disabled={disabled} {...register(p(index, 'title'))} />
                 </Field>
-                <Field label="Beschreibung" error={err(index, 'description')} optional>
+                <Field label={tr('Beschreibung', 'Description')} error={err(index, 'description')} optional>
                   <Textarea rows={2} disabled={disabled} {...register(p(index, 'description'))} />
                 </Field>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                  <Field label="Menge" error={err(index, 'quantity')}>
-                    {numberField(index, 'quantity', false, 'Menge')}
+                  <Field label={tr('Menge', 'Quantity')} error={err(index, 'quantity')}>
+                    {numberField(index, 'quantity', false, tr('Menge', 'Quantity'))}
                   </Field>
-                  <Field label="Einheit" error={err(index, 'unit')}>
+                  <Field label={tr('Einheit', 'Unit')} error={err(index, 'unit')}>
                     <Input list={datalistId} disabled={disabled} {...register(p(index, 'unit'))} />
                   </Field>
-                  <Field label="Einzelpreis netto" error={err(index, 'unitPriceNet')} className="col-span-2 sm:col-span-1">
-                    {numberField(index, 'unitPriceNet', false, 'Einzelpreis netto')}
+                  <Field label={tr('Einzelpreis netto', 'Net unit price')} error={err(index, 'unitPriceNet')} className="col-span-2 sm:col-span-1">
+                    {numberField(index, 'unitPriceNet', false, tr('Einzelpreis netto', 'Net unit price'))}
                   </Field>
-                  <Field label="Rabatt" error={err(index, 'discountPercent')}>
-                    {numberField(index, 'discountPercent', false, 'Rabatt')}
+                  <Field label={tr('Rabatt', 'Discount')} error={err(index, 'discountPercent')}>
+                    {numberField(index, 'discountPercent', false, tr('Rabatt', 'Discount'))}
                   </Field>
-                  <Field label="USt." error={err(index, 'taxRatePercent')}>
+                  <Field label={tr('USt.', 'VAT')} error={err(index, 'taxRatePercent')}>
                     {taxSelect(index, false)}
                   </Field>
                 </div>
                 <div className="flex items-center justify-between border-t border-neutral-200 pt-2.5 text-sm">
-                  <span className="text-neutral-600">Gesamt netto</span>
+                  <span className="text-neutral-600">{tr('Gesamt netto', 'Net total')}</span>
                   <LineNet control={control} index={index} />
                 </div>
               </div>
@@ -315,9 +316,13 @@ export function LineItemsEditor<T extends WithLineItems>({
       )}
       <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-neutral-100 pt-3">
         <Button icon={Plus} onClick={add} disabled={disabled || fields.length >= 200}>
-          Position hinzufügen
+          {tr('Position hinzufügen', 'Add line item')}
         </Button>
-        {!vatEnabled && <p className="text-[13px] text-neutral-500">Bei dieser Besteuerungsart wird keine Umsatzsteuer ausgewiesen.</p>}
+        {!vatEnabled && (
+          <p className="text-[13px] text-neutral-500">
+            {tr('Bei dieser Besteuerungsart wird keine Umsatzsteuer ausgewiesen.', 'No VAT is shown with this tax mode.')}
+          </p>
+        )}
       </div>
     </div>
   );

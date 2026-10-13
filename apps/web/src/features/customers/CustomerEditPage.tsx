@@ -9,6 +9,7 @@ import { Alert, ErrorState, PageSkeleton } from '@/components/ui/Feedback';
 import { PageHeader } from '@/components/ui/Page';
 import { toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api';
+import { tr } from '@/lib/i18n';
 import { qk } from '@/lib/queryKeys';
 import { CustomerForm } from './CustomerForm';
 import type { UpsertCustomerRequest } from '@angebotpilot/api-contracts';
@@ -35,26 +36,28 @@ export default function CustomerEditPage() {
     onSuccess: (saved) => {
       void queryClient.invalidateQueries({ queryKey: qk.customers(companyId) });
       queryClient.setQueryData(qk.customer(companyId, saved.id), saved);
-      toast.success(isNew ? 'Kunde angelegt' : 'Änderungen gespeichert', saved.displayName);
+      toast.success(isNew ? tr('Kunde angelegt', 'Customer created') : tr('Änderungen gespeichert', 'Changes saved'), saved.displayName);
       const returnTo = params.get('zurueck');
       void navigate(returnTo && returnTo.startsWith('/') ? returnTo.replace(':kunde', saved.id) : `/kunden/${saved.id}`, { replace: isNew });
     },
   });
 
-  const title = isNew ? 'Neuer Kunde' : 'Kunde bearbeiten';
-  const back = isNew ? { to: '/kunden', label: 'Kunden' } : { to: `/kunden/${id}`, label: customer.data?.displayName ?? 'Kunde' };
+  const title = isNew ? tr('Neuer Kunde', 'New customer') : tr('Kunde bearbeiten', 'Edit customer');
+  const back = isNew
+    ? { to: '/kunden', label: tr('Kunden', 'Customers') }
+    : { to: `/kunden/${id}`, label: customer.data?.displayName ?? tr('Kunde', 'Customer') };
 
   if (!isNew && customer.isPending) return <PageSkeleton />;
   if (!isNew && customer.isError) return <ErrorState error={customer.error} onRetry={() => void customer.refetch()} />;
 
   return (
     <>
-      <PageHeader title={title} back={back} description={isNew ? 'Pflichtfelder sind mit * markiert.' : customer.data?.displayName} />
+      <PageHeader title={title} back={back} description={isNew ? tr('Pflichtfelder sind mit * markiert.', 'Required fields are marked with *.') : customer.data?.displayName} />
       {conflict && (
         <Alert
           tone="warning"
           className="mb-4"
-          title="Der Kunde wurde zwischenzeitlich geändert"
+          title={tr('Der Kunde wurde zwischenzeitlich geändert', 'The customer has been changed in the meantime')}
           actions={
             <Button
               size="sm"
@@ -65,11 +68,14 @@ export default function CustomerEditPage() {
                 setFormKey((k) => k + 1);
               }}
             >
-              Neu laden (eigene Änderungen verwerfen)
+              {tr('Neu laden (eigene Änderungen verwerfen)', 'Reload (discard your changes)')}
             </Button>
           }
         >
-          Jemand anderes hat diesen Kunden gespeichert, während Sie ihn bearbeitet haben. Laden Sie die aktuelle Fassung neu.
+          {tr(
+            'Jemand anderes hat diesen Kunden gespeichert, während Sie ihn bearbeitet haben. Laden Sie die aktuelle Fassung neu.',
+            'Someone else saved this customer while you were editing it. Reload the current version.',
+          )}
         </Alert>
       )}
       <Card>
@@ -83,9 +89,9 @@ export default function CustomerEditPage() {
           />
         </CardBody>
         <CardFooter>
-          <Button onClick={() => void navigate(back.to)}>Abbrechen</Button>
+          <Button onClick={() => void navigate(back.to)}>{tr('Abbrechen', 'Cancel')}</Button>
           <Button type="submit" form="customer-form" variant="primary" loading={save.isPending}>
-            {isNew ? 'Kunde anlegen' : 'Speichern'}
+            {isNew ? tr('Kunde anlegen', 'Create customer') : tr('Speichern', 'Save')}
           </Button>
         </CardFooter>
       </Card>

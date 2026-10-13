@@ -3,6 +3,7 @@ import { Dialog as RadixDialog } from 'radix-ui';
 import { useState, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
 import { errorMessage } from '@/lib/errors';
+import { tr } from '@/lib/i18n';
 import { Button, type ButtonVariant } from './Button';
 import { Alert } from './Feedback';
 
@@ -24,7 +25,7 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
-        <RadixDialog.Overlay className="ap-overlay fixed inset-0 z-50 bg-neutral-900/45 backdrop-blur-[2px]" />
+        <RadixDialog.Overlay className="ap-overlay fixed inset-0 z-50 bg-neutral-900/45 backdrop-blur-[2px] dark:bg-[rgb(0_0_0/0.6)]" />
         <RadixDialog.Content
           onPointerDownOutside={dismissible ? undefined : (event) => event.preventDefault()}
           className={cx(
@@ -45,7 +46,7 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
             <RadixDialog.Close asChild>
               <button
                 type="button"
-                aria-label="Schließen"
+                aria-label={tr('Schließen', 'Close')}
                 className="-mt-1 -mr-1 inline-flex size-8 shrink-0 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
               >
                 <X aria-hidden size={18} />
@@ -86,7 +87,7 @@ export function ConfirmDialog({
   description,
   children,
   confirmLabel,
-  cancelLabel = 'Abbrechen',
+  cancelLabel = tr('Abbrechen', 'Cancel'),
   variant = 'primary',
   onConfirm,
   confirmDisabled,

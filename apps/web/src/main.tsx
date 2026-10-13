@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from '@/app/App';
+import { initTheme } from '@/lib/theme';
 import './styles/index.css';
 
 async function enableMocks() {
@@ -11,9 +12,12 @@ async function enableMocks() {
   await startMockWorker();
 }
 
+// index.html already applied the stored theme before the first paint; this keeps it in sync with the OS setting.
+initTheme();
+
 void enableMocks().then(() => {
   const root = document.getElementById('root');
-  if (!root) throw new Error('#root fehlt');
+  if (!root) throw new Error('#root missing');
   createRoot(root).render(
     <StrictMode>
       <App />

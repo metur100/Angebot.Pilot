@@ -10,8 +10,10 @@ import { PageHeader } from '@/components/ui/Page';
 import { toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api';
 import { downloadBlob } from '@/lib/download';
+import { tr } from '@/lib/i18n';
 import { qk } from '@/lib/queryKeys';
 
+/** File name of the (German) quotation PDF; stays German like the document itself. */
 export function pdfFileName(number: string) {
   return `Angebot-${number.replace(/[^A-Za-z0-9_-]/g, '_')}.pdf`;
 }
@@ -42,10 +44,10 @@ export default function QuotationPdfPage() {
         actions={
           <>
             <ButtonLink to={`/angebote/${q.id}/vorschau`} icon={Eye}>
-              HTML-Vorschau
+              {tr('HTML-Vorschau', 'HTML preview')}
             </ButtonLink>
             <Button icon={Printer} disabled={!pdf.data} onClick={() => window.print()}>
-              Drucken
+              {tr('Drucken', 'Print')}
             </Button>
             <Button
               variant="primary"
@@ -54,28 +56,31 @@ export default function QuotationPdfPage() {
               onClick={() => {
                 if (!pdf.data) return;
                 downloadBlob(pdf.data, pdfFileName(q.number));
-                toast.success('PDF heruntergeladen', pdfFileName(q.number));
+                toast.success(tr('PDF heruntergeladen', 'PDF downloaded'), pdfFileName(q.number));
               }}
             >
-              Herunterladen
+              {tr('Herunterladen', 'Download')}
             </Button>
           </>
         }
       />
       {q.status === 'Draft' && (
         <Alert tone="info" className="mb-6">
-          Entwürfe erhalten im PDF ein Wasserzeichen „Entwurf“. Es entfällt automatisch, sobald Sie das Angebot versenden.
+          {tr(
+            'Entwürfe erhalten im PDF ein Wasserzeichen „Entwurf“. Es entfällt automatisch, sobald Sie das Angebot versenden.',
+            'Drafts get an “ENTWURF” (draft) watermark in the PDF. It disappears automatically as soon as you send the quotation.',
+          )}
         </Alert>
       )}
       <div className="ap-print-area rounded-xl bg-neutral-100 px-3 py-6 sm:px-8 sm:py-10">
         {pdf.isPending ? (
           <div className="flex justify-center py-16">
-            <Spinner label="PDF wird erzeugt …" />
+            <Spinner label={tr('PDF wird erzeugt …', 'Generating PDF …')} />
           </div>
         ) : pdf.isError ? (
-          <ErrorState error={pdf.error} title="PDF konnte nicht erzeugt werden" onRetry={() => void pdf.refetch()} />
+          <ErrorState error={pdf.error} title={tr('PDF konnte nicht erzeugt werden', 'PDF could not be generated')} onRetry={() => void pdf.refetch()} />
         ) : (
-          <PdfViewer data={pdf.data} label={`Angebot ${q.number}`} />
+          <PdfViewer data={pdf.data} label={tr(`Angebot ${q.number}`, `Quotation ${q.number}`)} />
         )}
       </div>
     </>

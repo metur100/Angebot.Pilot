@@ -16,6 +16,7 @@ import { cx } from '@/lib/cx';
 import { fileStamp } from '@/lib/download';
 import { daysUntil, formatDate, formatEur, getDisplayTimeZone } from '@/lib/format';
 import { useDebouncedValue } from '@/lib/hooks';
+import { tr } from '@/lib/i18n';
 import { compactQuery, useListParams } from '@/lib/listParams';
 import { qk } from '@/lib/queryKeys';
 import { ADMIN_ONLY_HINT } from '@/lib/roles';
@@ -60,12 +61,12 @@ export function isJobOverdue(job: Pick<JobListItemDto, 'dueDate' | 'status'>, to
 
 function DueDate({ job, today, compact }: { job: JobListItemDto; today: string; compact?: boolean }) {
   if (!job.dueDate) return <span className="text-neutral-500">–</span>;
-  if (!isJobOverdue(job, today)) return <span>{compact ? `fällig ${formatDate(job.dueDate)}` : formatDate(job.dueDate)}</span>;
+  if (!isJobOverdue(job, today)) return <span>{compact ? tr(`fällig ${formatDate(job.dueDate)}`, `due ${formatDate(job.dueDate)}`) : formatDate(job.dueDate)}</span>;
   return (
     <span className="inline-flex items-center gap-1 font-medium text-danger-text">
       <AlarmClock aria-hidden size={13} />
-      {compact ? `fällig ${formatDate(job.dueDate)}` : formatDate(job.dueDate)}
-      <span className="text-xs">· überfällig</span>
+      {compact ? tr(`fällig ${formatDate(job.dueDate)}`, `due ${formatDate(job.dueDate)}`) : formatDate(job.dueDate)}
+      <span className="text-xs">{tr('· überfällig', '· overdue')}</span>
     </span>
   );
 }
@@ -97,13 +98,13 @@ export default function JobListPage() {
   return (
     <>
       <PageHeader
-        title="Aufträge"
-        description="Aus angenommenen Angeboten entstandene Aufträge mit Zuständigkeit und Terminen."
+        title={tr('Aufträge', 'Jobs')}
+        description={tr('Aus angenommenen Angeboten entstandene Aufträge mit Zuständigkeit und Terminen.', 'Jobs created from accepted quotations, with assignees and dates.')}
         actions={
           <ExportButton
             allowed={can.exportCsv}
             hint={ADMIN_ONLY_HINT}
-            fileName={`auftraege-${fileStamp()}.csv`}
+            fileName={`${tr('auftraege', 'jobs')}-${fileStamp()}.csv`}
             load={() => api.jobs.exportCsv(companyId)}
           />
         }
@@ -114,13 +115,13 @@ export default function JobListPage() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <div className="min-w-0 flex-1 lg:max-w-sm">
               <label htmlFor="job-search" className="sr-only">
-                Aufträge suchen
+                {tr('Aufträge suchen', 'Search jobs')}
               </label>
               <Input
                 id="job-search"
                 type="search"
                 icon={Search}
-                placeholder="Nummer, Titel, Angebot oder Kunde …"
+                placeholder={tr('Nummer, Titel, Angebot oder Kunde …', 'Number, title, quotation or customer …')}
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
@@ -129,7 +130,7 @@ export default function JobListPage() {
               {showAssignee && (
                 <>
                   <label htmlFor="job-assignee" className="sr-only">
-                    Zuständig
+                    {tr('Zuständig', 'Assignee')}
                   </label>
                   <Select
                     id="job-assignee"
@@ -138,33 +139,33 @@ export default function JobListPage() {
                     value={params.assignee}
                     onChange={(e) => update({ assignee: e.target.value })}
                   >
-                    <option value="">Alle Zuständigen</option>
+                    <option value="">{tr('Alle Zuständigen', 'All assignees')}</option>
                     {memberOptions.map((m) => (
                       <option key={m.userId} value={m.userId}>
                         {m.displayName}
-                        {m.status === 'Deactivated' ? ' (deaktiviert)' : ''}
+                        {m.status === 'Deactivated' ? tr(' (deaktiviert)', ' (deactivated)') : ''}
                       </option>
                     ))}
                     {params.assignee && !memberOptions.some((m) => m.userId === params.assignee) && (
-                      <option value={params.assignee}>Ausgewählte Person</option>
+                      <option value={params.assignee}>{tr('Ausgewählte Person', 'Selected person')}</option>
                     )}
                   </Select>
                 </>
               )}
               <label htmlFor="job-sort" className="sr-only">
-                Sortierung
+                {tr('Sortierung', 'Sort order')}
               </label>
               <Select id="job-sort" inputSize="sm" className="w-[200px]" value={params.sort} onChange={(e) => update({ sort: e.target.value })}>
-                <option value="dueDate">Fälligkeit (früheste)</option>
-                <option value="-dueDate">Fälligkeit (späteste)</option>
-                <option value="-createdAt">Neueste zuerst</option>
-                <option value="createdAt">Älteste zuerst</option>
-                <option value="number">Nummer aufsteigend</option>
-                <option value="-number">Nummer absteigend</option>
+                <option value="dueDate">{tr('Fälligkeit (früheste)', 'Due date (earliest)')}</option>
+                <option value="-dueDate">{tr('Fälligkeit (späteste)', 'Due date (latest)')}</option>
+                <option value="-createdAt">{tr('Neueste zuerst', 'Newest first')}</option>
+                <option value="createdAt">{tr('Älteste zuerst', 'Oldest first')}</option>
+                <option value="number">{tr('Nummer aufsteigend', 'Number ascending')}</option>
+                <option value="-number">{tr('Nummer absteigend', 'Number descending')}</option>
               </Select>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Nach Status filtern">
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={tr('Nach Status filtern', 'Filter by status')}>
             {statuses.map((status) => (
               <FilterChip key={status} selected={selectedStatuses.has(status)} onClick={() => update({ status: toggleJobStatus(params.status, status) })}>
                 {jobStatusLabel[status]}
@@ -172,7 +173,7 @@ export default function JobListPage() {
             ))}
             {filtered && (
               <Button variant="ghost" size="sm" onClick={resetFilters} className="ml-auto">
-                Filter zurücksetzen
+                {tr('Filter zurücksetzen', 'Reset filters')}
               </Button>
             )}
           </div>
@@ -186,18 +187,21 @@ export default function JobListPage() {
           filtered ? (
             <EmptyState
               icon={Search}
-              title="Keine Aufträge gefunden"
-              description="Für diese Filter gibt es keine Aufträge."
-              action={<Button onClick={resetFilters}>Filter zurücksetzen</Button>}
+              title={tr('Keine Aufträge gefunden', 'No jobs found')}
+              description={tr('Für diese Filter gibt es keine Aufträge.', 'There are no jobs for these filters.')}
+              action={<Button onClick={resetFilters}>{tr('Filter zurücksetzen', 'Reset filters')}</Button>}
             />
           ) : (
             <EmptyState
               icon={Hammer}
-              title="Noch keine Aufträge"
-              description="Aufträge entstehen aus angenommenen Angeboten. Angenommene Angebote können Sie mit einem Klick in Aufträge umwandeln."
+              title={tr('Noch keine Aufträge', 'No jobs yet')}
+              description={tr(
+                'Aufträge entstehen aus angenommenen Angeboten. Angenommene Angebote können Sie mit einem Klick in Aufträge umwandeln.',
+                'Jobs are created from accepted quotations. You can turn accepted quotations into jobs with one click.',
+              )}
               action={
                 <ButtonLink to="/angebote?status=Accepted" variant="primary" icon={FileCheck2}>
-                  Angenommene Angebote anzeigen
+                  {tr('Angenommene Angebote anzeigen', 'Show accepted quotations')}
                 </ButtonLink>
               }
             />
@@ -208,23 +212,23 @@ export default function JobListPage() {
               <table className={table.table}>
                 <thead>
                   <tr>
-                    <th scope="col" className={table.th}>Nummer</th>
-                    <th scope="col" className={table.th}>Titel & Kunde</th>
-                    <th scope="col" className={table.th}>Status</th>
-                    <th scope="col" className={table.th}>Zuständig</th>
-                    <th scope="col" className={cx(table.th, 'text-right')}>Geplanter Start</th>
-                    <th scope="col" className={cx(table.th, 'text-right')}>Fällig</th>
-                    <th scope="col" className={cx(table.th, 'text-right')}>Wert netto</th>
+                    <th scope="col" className={table.th}>{tr('Nummer', 'Number')}</th>
+                    <th scope="col" className={table.th}>{tr('Titel & Kunde', 'Title & customer')}</th>
+                    <th scope="col" className={table.th}>{tr('Status', 'Status')}</th>
+                    <th scope="col" className={table.th}>{tr('Zuständig', 'Assignee')}</th>
+                    <th scope="col" className={cx(table.th, 'text-right')}>{tr('Geplanter Start', 'Planned start')}</th>
+                    <th scope="col" className={cx(table.th, 'text-right')}>{tr('Fällig', 'Due')}</th>
+                    <th scope="col" className={cx(table.th, 'text-right')}>{tr('Wert netto', 'Net value')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {list.data.items.map((j) => (
                     <tr key={j.id} className={table.row}>
                       <td className={cx(table.td, 'whitespace-nowrap')}>
-                        <Link to={`/auftraege/${j.id}`} className="font-medium text-neutral-900 hover:text-brand-700 hover:underline">
+                        <Link to={`/auftraege/${j.id}`} className="font-medium text-neutral-900 hover:text-brand-700 dark:hover:text-brand-800 hover:underline">
                           {j.number}
                         </Link>
-                        <p className="text-xs text-neutral-500">aus {j.quotationNumber}</p>
+                        <p className="text-xs text-neutral-500">{tr(`aus ${j.quotationNumber}`, `from ${j.quotationNumber}`)}</p>
                       </td>
                       <td className={cx(table.td, 'max-w-[340px]')}>
                         <p className="truncate font-medium text-neutral-800">{j.title}</p>
@@ -234,7 +238,7 @@ export default function JobListPage() {
                         <JobStatusBadge status={j.status} />
                       </td>
                       <td className={cx(table.td, 'max-w-[180px] truncate')}>
-                        {j.assignedUserName ?? <span className="text-neutral-500">Niemand</span>}
+                        {j.assignedUserName ?? <span className="text-neutral-500">{tr('Niemand', 'Nobody')}</span>}
                       </td>
                       <td className={cx(table.td, table.num, 'text-neutral-600')}>
                         {j.plannedStartDate ? formatDate(j.plannedStartDate) : <span className="text-neutral-500">–</span>}
@@ -267,7 +271,7 @@ export default function JobListPage() {
                         <DueDate job={j} today={today} compact />
                       </span>
                     </div>
-                    {j.assignedUserName && <p className="mt-1.5 text-xs text-neutral-500">Zuständig: {j.assignedUserName}</p>}
+                    {j.assignedUserName && <p className="mt-1.5 text-xs text-neutral-500">{tr('Zuständig', 'Assignee')}: {j.assignedUserName}</p>}
                   </Link>
                 </li>
               ))}
@@ -277,7 +281,7 @@ export default function JobListPage() {
               pageSize={list.data.pageSize}
               totalCount={list.data.totalCount}
               onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
-              noun={['Auftrag', 'Aufträgen']}
+              noun={[tr('Auftrag', 'job'), tr('Aufträgen', 'jobs')]}
             />
           </div>
         )}

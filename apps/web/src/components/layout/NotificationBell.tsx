@@ -11,6 +11,7 @@ import { api } from '@/lib/api';
 import { cx } from '@/lib/cx';
 import { errorMessage } from '@/lib/errors';
 import { formatRelative } from '@/lib/format';
+import { tr } from '@/lib/i18n';
 import { qk } from '@/lib/queryKeys';
 
 /** Route for the entity a notification refers to. */
@@ -38,7 +39,7 @@ export function useNotificationActions() {
   const markAll = useMutation({
     mutationFn: () => api.notifications.markAllRead(companyId),
     onSuccess: invalidate,
-    onError: (error) => toast.error('Aktion fehlgeschlagen', errorMessage(error)),
+    onError: (error) => toast.error(tr('Aktion fehlgeschlagen', 'Action failed'), errorMessage(error)),
   });
   return { markRead, markAll };
 }
@@ -72,7 +73,11 @@ export function NotificationBell() {
       <Popover.Trigger asChild>
         <button
           type="button"
-          aria-label={count > 0 ? `Benachrichtigungen, ${count} ungelesen` : 'Benachrichtigungen'}
+          aria-label={
+            count > 0
+              ? tr(`Benachrichtigungen, ${count} ungelesen`, `Notifications, ${count} unread`)
+              : tr('Benachrichtigungen', 'Notifications')
+          }
           className="relative inline-flex size-9 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
         >
           <Bell aria-hidden size={18} />
@@ -91,15 +96,15 @@ export function NotificationBell() {
           className="ap-popover z-50 w-[min(380px,calc(100vw-16px))] rounded-xl border border-neutral-200 bg-white shadow-lg focus:outline-none"
         >
           <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
-            <p className="text-sm font-semibold text-neutral-900">Benachrichtigungen</p>
+            <p className="text-sm font-semibold text-neutral-900">{tr('Benachrichtigungen', 'Notifications')}</p>
             <button
               type="button"
               onClick={() => markAll.mutate()}
               disabled={count === 0 || markAll.isPending}
-              className="inline-flex items-center gap-1 rounded text-[13px] font-medium text-brand-600 hover:text-brand-700 disabled:cursor-not-allowed disabled:text-neutral-400"
+              className="inline-flex items-center gap-1 rounded text-[13px] font-medium text-brand-600 dark:text-brand-700 hover:text-brand-700 dark:hover:text-brand-800 disabled:cursor-not-allowed disabled:text-neutral-400"
             >
               <CheckCheck aria-hidden size={14} />
-              Alle als gelesen
+              {tr('Alle als gelesen', 'Mark all as read')}
             </button>
           </div>
           <div className="max-h-[380px] overflow-y-auto">
@@ -110,7 +115,7 @@ export function NotificationBell() {
             ) : list.isError ? (
               <p className="px-4 py-6 text-sm text-danger-text">{errorMessage(list.error)}</p>
             ) : list.data.items.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-neutral-500">Keine Benachrichtigungen – alles erledigt.</p>
+              <p className="px-4 py-8 text-center text-sm text-neutral-500">{tr('Keine Benachrichtigungen – alles erledigt.', 'No notifications – all caught up.')}</p>
             ) : (
               <ul className="divide-y divide-neutral-100">
                 {list.data.items.map((n) => (
@@ -127,7 +132,7 @@ export function NotificationBell() {
                       <span className="min-w-0 flex-1">
                         <span className={cx('block text-sm', n.isRead ? 'text-neutral-700' : 'font-medium text-neutral-900')}>
                           {n.title}
-                          {!n.isRead && <span className="sr-only"> (ungelesen)</span>}
+                          {!n.isRead && <span className="sr-only">{tr(' (ungelesen)', ' (unread)')}</span>}
                         </span>
                         {n.body && <span className="mt-0.5 line-clamp-2 block text-[13px] text-neutral-500">{n.body}</span>}
                         <span className="mt-1 block text-xs text-neutral-500">{formatRelative(n.createdAt)}</span>
@@ -142,9 +147,9 @@ export function NotificationBell() {
             <Link
               to="/benachrichtigungen"
               onClick={() => setOpen(false)}
-              className="text-[13px] font-medium text-brand-600 hover:text-brand-700"
+              className="text-[13px] font-medium text-brand-600 dark:text-brand-700 hover:text-brand-700 dark:hover:text-brand-800"
             >
-              Alle Benachrichtigungen anzeigen
+              {tr('Alle Benachrichtigungen anzeigen', 'View all notifications')}
             </Link>
           </div>
         </Popover.Content>

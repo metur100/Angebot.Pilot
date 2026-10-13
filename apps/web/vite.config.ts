@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath, URL } from 'node:url';
@@ -22,7 +23,7 @@ function originOf(value: string | undefined): string | null {
  * Only injected into production builds: the dev server needs inline scripts (React Refresh preamble).
  * Note: frame-ancestors cannot be set via <meta>; clickjacking protection would require a real header.
  */
-function contentSecurityPolicy(apiBaseUrl: string | undefined): Plugin {
+function contentSecurityPolicy(apiBaseUrl: string | undefined): Plugin[] {
   // Only the API this build talks to (production: angebotpilot.runasp.net; E2E builds: the local API).
   const api = originOf(apiBaseUrl) ?? 'https://angebotpilot.runasp.net';
   const policy = [
@@ -30,23 +31,41 @@ function contentSecurityPolicy(apiBaseUrl: string | undefined): Plugin {
     `connect-src 'self' ${api}`,
     `img-src 'self' data: blob: ${api}`,
     "worker-src 'self' blob:",
-    "script-src 'self'",
+    `script-src 'self' ${INLINE_SCRIPT_HASHES}`,
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
   ].join('; ');
-  return {
-    name: 'angebotpilot-csp',
-    apply: 'build',
-    transformIndexHtml: {
-      order: 'pre',
-      handler: (html) =>
-        html.replace('<!--app-csp-->', `<meta http-equiv="Content-Security-Policy" content="${policy}" />`),
+  return [
+    {
+      name: 'angebotpilot-csp',
+      apply: 'build',
+      transformIndexHtml: {
+        order: 'pre',
+        handler: (html) =>
+          html.replace('<!--app-csp-->', `<meta http-equiv="Content-Security-Policy" content="${policy}" />`),
+      },
     },
-  };
+    {
+      // Allows the small inline pre-paint script (theme/language, see index.html) by hash, computed on the final HTML.
+      name: 'angebotpilot-csp-inline-hashes',
+      apply: 'build',
+      transformIndexHtml: {
+        order: 'post',
+        handler: (html) => {
+          const hashes = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(
+            (match) => `'sha256-${createHash('sha256').update(match[1] ?? '').digest('base64')}'`,
+          );
+          return html.replace(` ${INLINE_SCRIPT_HASHES}`, hashes.length ? ` ${hashes.join(' ')}` : '');
+        },
+      },
+    },
+  ];
 }
+
+const INLINE_SCRIPT_HASHES = '__INLINE_SCRIPT_HASHES__';
 
 /** Serves the MSW service worker in dev mock mode only, so it is never part of a production build. */
 function mockServiceWorker(): Plugin {

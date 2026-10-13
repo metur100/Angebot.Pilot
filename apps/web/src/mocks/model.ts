@@ -33,6 +33,8 @@ export interface UserRec {
   password: string;
   displayName: string;
   emailVerified: boolean;
+  /** UI language (MeDto.language); German when unset. */
+  language?: 'de' | 'en';
   createdAt: string;
 }
 

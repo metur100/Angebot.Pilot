@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router';
 import { useCompany } from '@/app/company';
 import { PageHeader } from '@/components/ui/Page';
 import { cx } from '@/lib/cx';
+import { tr } from '@/lib/i18n';
 
 interface SettingsSection {
   to: string;
@@ -12,30 +13,34 @@ interface SettingsSection {
   restricted: boolean;
 }
 
-const sections: SettingsSection[] = [
-  { to: 'firma', label: 'Firma', icon: Building2, restricted: true },
-  { to: 'dokumente', label: 'Branding & Dokumente', icon: Palette, restricted: true },
-  { to: 'benachrichtigungen', label: 'Erinnerungen', icon: BellRing, restricted: true },
-  { to: 'abo', label: 'Abo & Tarif', icon: CreditCard, restricted: true },
-  { to: 'konto', label: 'Mein Konto', icon: UserRound, restricted: false },
+const settingsSections = (): SettingsSection[] => [
+  { to: 'firma', label: tr('Firma', 'Company'), icon: Building2, restricted: true },
+  { to: 'dokumente', label: tr('Branding & Dokumente', 'Branding & documents'), icon: Palette, restricted: true },
+  { to: 'benachrichtigungen', label: tr('Erinnerungen', 'Reminders'), icon: BellRing, restricted: true },
+  { to: 'abo', label: tr('Abo & Tarif', 'Subscription & plan'), icon: CreditCard, restricted: true },
+  { to: 'konto', label: tr('Mein Konto', 'My account'), icon: UserRound, restricted: false },
 ];
 
 export default function SettingsLayout() {
   const { can, membership } = useCompany();
   const { pathname } = useLocation();
   const readOnly = !can.manageCompany;
+  const sections = settingsSections();
   const active = sections.find((section) => pathname.startsWith(`/einstellungen/${section.to}`));
 
   return (
     <>
       <PageHeader
-        title="Einstellungen"
-        documentTitle={active ? `${active.label} – Einstellungen` : 'Einstellungen'}
-        description={`Firma, Dokumente, Erinnerungen, Abo und Ihr persönliches Konto für ${membership.companyName}.`}
+        title={tr('Einstellungen', 'Settings')}
+        documentTitle={active ? tr(`${active.label} – Einstellungen`, `${active.label} – Settings`) : tr('Einstellungen', 'Settings')}
+        description={tr(
+          `Firma, Dokumente, Erinnerungen, Abo und Ihr persönliches Konto für ${membership.companyName}.`,
+          `Company, documents, reminders, subscription and your personal account for ${membership.companyName}.`,
+        )}
       />
       <div className="grid gap-6 lg:grid-cols-[232px_minmax(0,1fr)] lg:gap-8">
         <div className="min-w-0">
-          <nav aria-label="Einstellungsbereiche" className="-mx-4 sm:mx-0 lg:sticky lg:top-6">
+          <nav aria-label={tr('Einstellungsbereiche', 'Settings sections')} className="-mx-4 sm:mx-0 lg:sticky lg:top-6">
             <ul className="flex gap-1 overflow-x-auto border-b border-neutral-200 px-4 [scrollbar-width:none] sm:px-0 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:border-b-0">
               {sections.map((section) => {
                 const locked = readOnly && section.restricted;
@@ -57,12 +62,12 @@ export default function SettingsLayout() {
                     >
                       {({ isActive }) => (
                         <>
-                          <section.icon aria-hidden size={16} className={cx('hidden shrink-0 lg:block', isActive ? 'text-brand-600' : 'text-neutral-400')} />
+                          <section.icon aria-hidden size={16} className={cx('hidden shrink-0 lg:block', isActive ? 'text-brand-600 dark:text-brand-700' : 'text-neutral-400')} />
                           <span className="lg:min-w-0 lg:flex-1 lg:truncate">{section.label}</span>
                           {locked && (
                             <>
                               <Lock aria-hidden size={13} className="shrink-0 text-neutral-400" />
-                              <span className="sr-only">(nur lesen)</span>
+                              <span className="sr-only">{tr('(nur lesen)', '(read only)')}</span>
                             </>
                           )}
                         </>
@@ -76,8 +81,10 @@ export default function SettingsLayout() {
               <p className="mt-3 flex items-start gap-2 px-4 text-[13px] leading-[18px] text-neutral-600 sm:px-0 lg:mt-4">
                 <Lock aria-hidden size={13} className="mt-[3px] shrink-0" />
                 <span>
-                  Als Mitarbeiter:in können Sie Firma, Branding, Erinnerungen und Abo nur ansehen. Ihr eigenes Konto verwalten Sie unter
-                  „Mein Konto“.
+                  {tr(
+                    'Als Mitarbeiter:in können Sie Firma, Branding, Erinnerungen und Abo nur ansehen. Ihr eigenes Konto verwalten Sie unter „Mein Konto“.',
+                    'As an employee you can only view company, branding, reminders and subscription. You manage your own account under “My account”.',
+                  )}
                 </span>
               </p>
             )}

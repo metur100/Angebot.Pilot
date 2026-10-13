@@ -12,6 +12,7 @@ import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { legalLinks } from '@/lib/env';
 import { applyServerErrors, errorMessage, hasFieldErrors } from '@/lib/errors';
+import { tr } from '@/lib/i18n';
 import { AuthLayout, PasswordHints, PasswordInput } from './AuthLayout';
 
 type RegisterInput = z.input<typeof registerSchema>;
@@ -39,7 +40,7 @@ export default function RegisterPage() {
       await registerAccount(values);
     } catch (error) {
       if (error instanceof ApiError && error.code === 'email_taken') {
-        setError('email', { message: 'Für diese E-Mail-Adresse gibt es bereits ein Konto. Bitte melden Sie sich an.' }, { shouldFocus: true });
+        setError('email', { message: tr('Für diese E-Mail-Adresse gibt es bereits ein Konto. Bitte melden Sie sich an.', 'An account already exists for this email address. Please sign in.') }, { shouldFocus: true });
         return;
       }
       const rest = applyServerErrors(error, setError, ['displayName', 'email', 'password', 'acceptTerms']);
@@ -52,16 +53,19 @@ export default function RegisterPage() {
   const next = params.get('next');
   return (
     <AuthLayout
-      title="Konto erstellen"
-      description="Starten Sie mit einer kostenlosen Testphase. Für den Test sind keine Zahlungsdaten nötig."
+      title={tr('Konto erstellen', 'Create account')}
+      description={tr(
+        'Starten Sie mit einer kostenlosen Testphase. Für den Test sind keine Zahlungsdaten nötig.',
+        'Start with a free trial. No payment details are required for the trial.',
+      )}
       footer={
         <>
-          Bereits registriert?{' '}
+          {tr('Bereits registriert?', 'Already registered?')}{' '}
           <Link
             to={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}
-            className="font-medium text-brand-600 hover:text-brand-700 hover:underline"
+            className="font-medium text-brand-600 dark:text-brand-700 hover:text-brand-700 dark:hover:text-brand-800 hover:underline"
           >
-            Anmelden
+            {tr('Anmelden', 'Sign in')}
           </Link>
         </>
       }
@@ -72,35 +76,35 @@ export default function RegisterPage() {
             {formError}
           </Alert>
         )}
-        <Field label="Ihr Name" error={errors.displayName?.message} required>
-          <Input autoComplete="name" className="h-10" placeholder="Vor- und Nachname" {...register('displayName')} />
+        <Field label={tr('Ihr Name', 'Your name')} error={errors.displayName?.message} required>
+          <Input autoComplete="name" className="h-10" placeholder={tr('Vor- und Nachname', 'First and last name')} {...register('displayName')} />
         </Field>
-        <Field label="E-Mail-Adresse" error={errors.email?.message} required>
+        <Field label={tr('E-Mail-Adresse', 'Email address')} error={errors.email?.message} required>
           <Input type="email" autoComplete="email" className="h-10" {...register('email')} />
         </Field>
-        <Field label="Passwort" error={errors.password?.message} required>
+        <Field label={tr('Passwort', 'Password')} error={errors.password?.message} required>
           <PasswordInput autoComplete="new-password" {...register('password')} />
         </Field>
         <PasswordHints password={password} />
         <Checkbox
           label={
             <>
-              Ich akzeptiere die{' '}
-              <a href={legalLinks.agb} target="_blank" rel="noopener noreferrer" className="font-medium text-brand-600 underline">
-                AGB
+              {tr('Ich akzeptiere die', 'I accept the')}{' '}
+              <a href={legalLinks.agb} target="_blank" rel="noopener noreferrer" className="font-medium text-brand-600 dark:text-brand-700 underline">
+                {tr('AGB', 'Terms')}
               </a>{' '}
-              und habe die{' '}
-              <a href={legalLinks.datenschutz} target="_blank" rel="noopener noreferrer" className="font-medium text-brand-600 underline">
-                Datenschutzerklärung
-              </a>{' '}
-              gelesen.
+              {tr('und habe die', 'and have read the')}{' '}
+              <a href={legalLinks.datenschutz} target="_blank" rel="noopener noreferrer" className="font-medium text-brand-600 dark:text-brand-700 underline">
+                {tr('Datenschutzerklärung', 'Privacy policy')}
+              </a>
+              {tr(' gelesen.', '.')}
             </>
           }
           error={errors.acceptTerms?.message}
           {...register('acceptTerms')}
         />
         <Button type="submit" variant="primary" size="lg" className="w-full" loading={isSubmitting}>
-          Konto erstellen
+          {tr('Konto erstellen', 'Create account')}
         </Button>
       </form>
     </AuthLayout>

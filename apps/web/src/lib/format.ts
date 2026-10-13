@@ -1,4 +1,5 @@
 import { formatDateTime as formatDateTimeTz } from '@angebotpilot/api-contracts';
+import { currentIntlLocale, tr } from './i18n';
 
 export { formatDate, formatEur, formatPercent, formatQuantity } from '@angebotpilot/api-contracts';
 
@@ -23,14 +24,13 @@ export function formatDateTime(iso: string | null | undefined): string {
   return formatDateTimeTz(iso, displayTimeZone);
 }
 
-const relative = new Intl.RelativeTimeFormat('de-DE', { numeric: 'auto' });
-
-/** "vor 5 Minuten", "gestern", "in 3 Tagen" */
+/** "vor 5 Minuten", "gestern", "in 3 Tagen" (de) / "5 minutes ago", "yesterday", "in 3 days" (en) */
 export function formatRelative(iso: string | null | undefined, now: Date = new Date()): string {
   if (!iso) return '–';
+  const relative = new Intl.RelativeTimeFormat(currentIntlLocale(), { numeric: 'auto' });
   const diffSeconds = (new Date(iso).getTime() - now.getTime()) / 1000;
   const abs = Math.abs(diffSeconds);
-  if (abs < 60) return 'gerade eben';
+  if (abs < 60) return tr('gerade eben', 'just now');
   if (abs < 3600) return relative.format(Math.round(diffSeconds / 60), 'minute');
   if (abs < 86400) return relative.format(Math.round(diffSeconds / 3600), 'hour');
   if (abs < 86400 * 30) return relative.format(Math.round(diffSeconds / 86400), 'day');
@@ -46,14 +46,14 @@ export function daysUntil(isoDate: string, today: string): number {
   return Math.round((toUtc(isoDate) - toUtc(today)) / 86_400_000);
 }
 
-const fileSize = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 });
 export function formatFileSize(bytes: number): string {
+  const fileSize = new Intl.NumberFormat(currentIntlLocale(), { maximumFractionDigits: 1 });
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${fileSize.format(bytes / 1024)} KB`;
   return `${fileSize.format(bytes / 1024 / 1024)} MB`;
 }
 
-/** German plural helper: plural(3, 'Angebot', 'Angebote') → "3 Angebote". */
+/** Plural helper: plural(3, tr('Angebot', 'quotation'), tr('Angebote', 'quotations')) → "3 Angebote" / "3 quotations". */
 export function plural(count: number, one: string, many: string): string {
-  return `${count.toLocaleString('de-DE')} ${count === 1 ? one : many}`;
+  return `${count.toLocaleString(currentIntlLocale())} ${count === 1 ? one : many}`;
 }

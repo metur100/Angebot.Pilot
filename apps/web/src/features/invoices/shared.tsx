@@ -10,18 +10,19 @@ import { api } from '@/lib/api';
 import { safeFileName } from '@/lib/download';
 import { errorMessage } from '@/lib/errors';
 import { formatDate, formatEur } from '@/lib/format';
+import { tr } from '@/lib/i18n';
 import { qk } from '@/lib/queryKeys';
 
 /** Heading of an invoice: its number, or "Rechnungsentwurf" for drafts (numbers are assigned when issued). */
 export function invoiceTitle(i: { number: string | null; kind: InvoiceKind }): string {
-  if (!i.number) return 'Rechnungsentwurf';
+  if (!i.number) return tr('Rechnungsentwurf', 'Invoice draft');
   return i.number;
 }
 
 /** Plain-text name for document titles, toasts and dialogs, e.g. "Rechnung RE-2026-0001". */
 export function invoiceName(i: { number: string | null; kind: InvoiceKind }): string {
-  if (!i.number) return 'Rechnungsentwurf';
-  return `${i.kind === 'Cancellation' ? 'Stornorechnung' : 'Rechnung'} ${i.number}`;
+  if (!i.number) return tr('Rechnungsentwurf', 'Invoice draft');
+  return i.kind === 'Cancellation' ? tr(`Stornorechnung ${i.number}`, `Cancellation invoice ${i.number}`) : tr(`Rechnung ${i.number}`, `Invoice ${i.number}`);
 }
 
 /** Amount as shown in the UI: cancellation invoices are negated ("− 1.190,00 €"). */
@@ -29,13 +30,18 @@ export function invoiceAmount(value: number, kind: InvoiceKind): string {
   return signedEur(value, kind === 'Cancellation');
 }
 
+/** Download file names follow the UI language ("Rechnung-RE-2026-0001.pdf" / "Invoice-RE-2026-0001.pdf"). */
+function documentFileStem(kind: InvoiceKind): string {
+  return kind === 'Cancellation' ? tr('Stornorechnung', 'Cancellation-invoice') : tr('Rechnung', 'Invoice');
+}
+
 export function invoicePdfFileName(i: { number: string | null; kind: InvoiceKind }): string {
-  if (!i.number) return 'Rechnung-Entwurf.pdf';
-  return `${i.kind === 'Cancellation' ? 'Stornorechnung' : 'Rechnung'}-${safeFileName(i.number)}.pdf`;
+  if (!i.number) return tr('Rechnung-Entwurf.pdf', 'Invoice-draft.pdf');
+  return `${documentFileStem(i.kind)}-${safeFileName(i.number)}.pdf`;
 }
 
 export function invoiceXmlFileName(i: { number: string | null; kind: InvoiceKind }): string {
-  return `${i.kind === 'Cancellation' ? 'Stornorechnung' : 'Rechnung'}-${safeFileName(i.number ?? 'Entwurf')}.xml`;
+  return `${documentFileStem(i.kind)}-${safeFileName(i.number ?? tr('Entwurf', 'draft'))}.xml`;
 }
 
 /** "12.10.2026" or "01.10.2026 – 12.10.2026". */
@@ -46,12 +52,12 @@ export function servicePeriodText(from: string | null, to: string | null): strin
 
 /** "1 Tag" / "3 Tage". */
 export function daysText(days: number): string {
-  return `${days} ${days === 1 ? 'Tag' : 'Tage'}`;
+  return days === 1 ? tr('1 Tag', '1 day') : tr(`${days} Tage`, `${days} days`);
 }
 
 /** Dative after "seit": "seit 1 Tag" / "seit 3 Tagen". */
 export function sinceDaysText(days: number): string {
-  return `${days} ${days === 1 ? 'Tag' : 'Tagen'}`;
+  return days === 1 ? tr('1 Tag', '1 day') : tr(`${days} Tagen`, `${days} days`);
 }
 
 /** Keeps every view of an invoice fresh after a mutation (lists, detail, dashboard, linked job/quotation/customer). */
@@ -77,10 +83,16 @@ export function useCreateInvoiceFrom(source: { type: 'job' | 'quotation'; id: st
     mutationFn: () => (source.type === 'job' ? api.jobs.createInvoice(companyId, source.id) : api.quotations.createInvoice(companyId, source.id)),
     onSuccess: (invoice) => {
       invalidate(invoice);
-      toast.success('Rechnungsentwurf erstellt', `${invoice.title} · ${formatEur(invoice.totals.grossTotal)} – Positionen wurden übernommen.`);
+      toast.success(
+        tr('Rechnungsentwurf erstellt', 'Invoice draft created'),
+        tr(
+          `${invoice.title} · ${formatEur(invoice.totals.grossTotal)} – Positionen wurden übernommen.`,
+          `${invoice.title} · ${formatEur(invoice.totals.grossTotal)} – line items have been copied.`,
+        ),
+      );
       void navigate(`/rechnungen/${invoice.id}/bearbeiten`);
     },
-    onError: (error) => toast.error('Rechnung konnte nicht erstellt werden', errorMessage(error)),
+    onError: (error) => toast.error(tr('Rechnung konnte nicht erstellt werden', 'Invoice could not be created'), errorMessage(error)),
   });
 }
 
@@ -93,7 +105,7 @@ export function InvoiceLinkList({ invoices, empty }: { invoices: InvoiceLinkDto[
         <li key={i.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-3 py-2.5">
           <Link to={`/rechnungen/${i.id}`} className="inline-flex min-w-0 items-center gap-2 text-sm font-medium text-brand-700 hover:underline">
             <ReceiptText aria-hidden size={15} className="shrink-0" />
-            <span className="truncate">{i.number ?? 'Entwurf'}</span>
+            <span className="truncate">{i.number ?? tr('Entwurf', 'Draft')}</span>
           </Link>
           <span className="flex items-center gap-2">
             <InvoiceStatusBadge status={i.status} kind={i.kind} />

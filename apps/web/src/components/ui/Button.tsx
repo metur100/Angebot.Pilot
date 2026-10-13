@@ -12,13 +12,14 @@ const base =
   'disabled:cursor-not-allowed disabled:opacity-55 aria-disabled:cursor-not-allowed aria-disabled:opacity-55 select-none';
 
 const variants: Record<ButtonVariant, string> = {
-  primary: 'bg-brand-600 text-white shadow-sm hover:bg-brand-700 active:bg-brand-800 disabled:hover:bg-brand-600',
+  primary: 'bg-brand-600 text-on-brand shadow-sm hover:bg-brand-solid-hover active:bg-brand-solid-active disabled:hover:bg-brand-600',
   secondary:
     'border border-neutral-300 bg-white text-neutral-800 shadow-sm hover:bg-neutral-50 hover:border-neutral-400 active:bg-neutral-100',
   ghost: 'text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 active:bg-neutral-200',
+  // 'white' is the surface token: light text on dark red in light mode, dark text on light red in dark mode (both AA).
   danger: 'bg-danger-text text-white shadow-sm hover:brightness-95 active:brightness-90',
   dangerGhost: 'text-danger-text hover:bg-danger-bg',
-  link: 'text-brand-600 underline-offset-4 hover:underline hover:text-brand-700 px-0! h-auto!',
+  link: 'text-brand-600 dark:text-brand-700 underline-offset-4 hover:underline hover:text-brand-700 dark:hover:text-brand-800 px-0! h-auto!',
 };
 
 const sizes: Record<ButtonSize, string> = {

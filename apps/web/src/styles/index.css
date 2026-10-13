@@ -15,9 +15,29 @@
  * The Tailwind theme is derived exclusively from the brand tokens (packages/brand/tokens.css).
  * The default Tailwind palette is removed so that no off-brand colours can creep in.
  */
+/* Dark mode is driven by <html data-theme="dark"> (src/lib/theme.ts), not by the media query alone. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/*
+ * Web-only state colours for filled brand buttons. In dark mode brand-700/800 are light text colours, so hovering a
+ * filled button must go to a slightly deeper blue that still carries white text (WCAG AA).
+ */
+:root {
+  --ap-brand-solid-hover: var(--ap-brand-700);
+  --ap-brand-solid-active: var(--ap-brand-800);
+}
+:root[data-theme='dark'] {
+  --ap-brand-solid-hover: #4356E0;
+  --ap-brand-solid-active: #3A4CC8;
+}
+
 @theme inline {
   --color-*: initial;
+  /* 'white' is the raised surface colour (dark in dark mode); text on filled brand/solid colours uses 'on-brand'. */
   --color-white: var(--ap-neutral-0);
+  --color-on-brand: var(--ap-on-brand);
+  --color-brand-solid-hover: var(--ap-brand-solid-hover);
+  --color-brand-solid-active: var(--ap-brand-solid-active);
   --color-brand-50: var(--ap-brand-50);
   --color-brand-100: var(--ap-brand-100);
   --color-brand-200: var(--ap-brand-200);
@@ -93,6 +113,23 @@
   }
   ::selection {
     background: var(--ap-brand-100);
+  }
+  [data-theme='dark'] ::selection {
+    background: var(--ap-brand-300);
+    color: var(--ap-on-brand);
+  }
+  /* Scrollbars and native widgets (date pickers, selects) follow the theme. */
+  html {
+    color-scheme: light;
+    scrollbar-color: var(--ap-neutral-300) transparent;
+  }
+  html[data-theme='dark'] {
+    color-scheme: dark;
+  }
+  /* A light island inside the dark UI (document previews, QR codes): light tokens, light text and widgets. */
+  [data-theme='light']:not(html) {
+    color: var(--ap-neutral-900);
+    color-scheme: light;
   }
   input[type='number']::-webkit-inner-spin-button,
   input[type='number']::-webkit-outer-spin-button {

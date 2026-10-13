@@ -1,6 +1,7 @@
 import { CircleAlert, CircleCheck, Info, X } from 'lucide-react';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { cx } from '@/lib/cx';
+import { tr } from '@/lib/i18n';
 
 type ToastTone = 'success' | 'error' | 'info';
 
@@ -51,7 +52,7 @@ const subscribe = (listener: () => void) => {
 const getSnapshot = () => items;
 
 const icons = { success: CircleCheck, error: CircleAlert, info: Info };
-const iconColor = { success: 'text-success-solid', error: 'text-danger-text', info: 'text-brand-600' };
+const iconColor = { success: 'text-success-solid', error: 'text-danger-text', info: 'text-brand-600 dark:text-brand-700' };
 
 function ToastCard({ item }: { item: ToastItem }) {
   const [paused, setPaused] = useState(false);
@@ -77,7 +78,7 @@ function ToastCard({ item }: { item: ToastItem }) {
       <button
         type="button"
         onClick={() => dismissToast(item.id)}
-        aria-label="Hinweis schließen"
+        aria-label={tr('Hinweis schließen', 'Dismiss notification')}
         className="-mt-0.5 -mr-1.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
       >
         <X aria-hidden size={16} />

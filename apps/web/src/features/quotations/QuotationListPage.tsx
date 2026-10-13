@@ -16,6 +16,7 @@ import { cx } from '@/lib/cx';
 import { fileStamp } from '@/lib/download';
 import { formatDate, formatEur } from '@/lib/format';
 import { useDebouncedValue } from '@/lib/hooks';
+import { tr } from '@/lib/i18n';
 import { compactQuery, useListParams } from '@/lib/listParams';
 import { qk } from '@/lib/queryKeys';
 import { ADMIN_ONLY_HINT } from '@/lib/roles';
@@ -85,18 +86,18 @@ export default function QuotationListPage() {
   return (
     <>
       <PageHeader
-        title="Angebote"
-        description="Alle Angebote mit Status, Gültigkeit und Volumen."
+        title={tr('Angebote', 'Quotations')}
+        description={tr('Alle Angebote mit Status, Gültigkeit und Volumen.', 'All quotations with status, validity and value.')}
         actions={
           <>
             <ExportButton
               allowed={can.exportCsv}
               hint={ADMIN_ONLY_HINT}
-              fileName={`angebote-${fileStamp()}.csv`}
+              fileName={`${tr('angebote', 'quotations')}-${fileStamp()}.csv`}
               load={() => api.quotations.exportCsv(companyId, exportQuery)}
             />
             <ButtonLink to="/angebote/neu" variant="primary" icon={Plus}>
-              Neues Angebot
+              {tr('Neues Angebot', 'New quotation')}
             </ButtonLink>
           </>
         }
@@ -107,42 +108,42 @@ export default function QuotationListPage() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <div className="min-w-0 flex-1 lg:max-w-sm">
               <label htmlFor="quotation-search" className="sr-only">
-                Angebote suchen
+                {tr('Angebote suchen', 'Search quotations')}
               </label>
               <Input
                 id="quotation-search"
                 type="search"
                 icon={Search}
-                placeholder="Nummer, Betreff oder Kunde …"
+                placeholder={tr('Nummer, Betreff oder Kunde …', 'Number, subject or customer …')}
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-2 text-[13px] text-neutral-600">
-                <label htmlFor="quotation-from">Von</label>
+                <label htmlFor="quotation-from">{tr('Von', 'From')}</label>
                 <Input id="quotation-from" type="date" inputSize="sm" className="w-[150px]" value={params.from} onChange={(e) => update({ from: e.target.value })} />
               </div>
               <div className="flex items-center gap-2 text-[13px] text-neutral-600">
-                <label htmlFor="quotation-to">Bis</label>
+                <label htmlFor="quotation-to">{tr('Bis', 'To')}</label>
                 <Input id="quotation-to" type="date" inputSize="sm" className="w-[150px]" value={params.to} onChange={(e) => update({ to: e.target.value })} />
               </div>
               <label htmlFor="quotation-sort" className="sr-only">
-                Sortierung
+                {tr('Sortierung', 'Sort order')}
               </label>
               <Select id="quotation-sort" inputSize="sm" className="w-[190px]" value={params.sort} onChange={(e) => update({ sort: e.target.value })}>
-                <option value="-updatedAt">Zuletzt bearbeitet</option>
-                <option value="-issueDate">Angebotsdatum (neueste)</option>
-                <option value="issueDate">Angebotsdatum (älteste)</option>
-                <option value="-number">Nummer absteigend</option>
-                <option value="number">Nummer aufsteigend</option>
-                <option value="-grossTotal">Betrag (höchster)</option>
-                <option value="grossTotal">Betrag (niedrigster)</option>
-                <option value="validUntil">Gültig bis (bald ablaufend)</option>
+                <option value="-updatedAt">{tr('Zuletzt bearbeitet', 'Last edited')}</option>
+                <option value="-issueDate">{tr('Angebotsdatum (neueste)', 'Quotation date (newest)')}</option>
+                <option value="issueDate">{tr('Angebotsdatum (älteste)', 'Quotation date (oldest)')}</option>
+                <option value="-number">{tr('Nummer absteigend', 'Number descending')}</option>
+                <option value="number">{tr('Nummer aufsteigend', 'Number ascending')}</option>
+                <option value="-grossTotal">{tr('Betrag (höchster)', 'Amount (highest)')}</option>
+                <option value="grossTotal">{tr('Betrag (niedrigster)', 'Amount (lowest)')}</option>
+                <option value="validUntil">{tr('Gültig bis (bald ablaufend)', 'Valid until (expiring soon)')}</option>
               </Select>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Nach Status filtern">
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={tr('Nach Status filtern', 'Filter by status')}>
             {statuses.map((status) => (
               <FilterChip key={status} selected={selectedStatuses.has(status)} onClick={() => update({ status: toggleStatus(params.status, status) })}>
                 {quotationStatusLabel[status]}
@@ -150,10 +151,10 @@ export default function QuotationListPage() {
             ))}
             {params.customer && (
               <span className="ml-1 inline-flex h-8 items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 pr-1 pl-3 text-[13px] font-medium text-brand-800">
-                Kunde: {customer.data?.displayName ?? '…'}
+                {tr('Kunde:', 'Customer:')} {customer.data?.displayName ?? '…'}
                 <button
                   type="button"
-                  aria-label="Kundenfilter entfernen"
+                  aria-label={tr('Kundenfilter entfernen', 'Remove customer filter')}
                   onClick={() => update({ customer: '' })}
                   className="inline-flex size-6 items-center justify-center rounded-full hover:bg-brand-100"
                 >
@@ -163,7 +164,7 @@ export default function QuotationListPage() {
             )}
             {filtered && (
               <Button variant="ghost" size="sm" onClick={resetFilters} className="ml-auto">
-                Filter zurücksetzen
+                {tr('Filter zurücksetzen', 'Reset filters')}
               </Button>
             )}
           </div>
@@ -177,18 +178,21 @@ export default function QuotationListPage() {
           filtered ? (
             <EmptyState
               icon={Search}
-              title="Keine Angebote gefunden"
-              description="Für diese Filter gibt es keine Angebote."
-              action={<Button onClick={resetFilters}>Filter zurücksetzen</Button>}
+              title={tr('Keine Angebote gefunden', 'No quotations found')}
+              description={tr('Für diese Filter gibt es keine Angebote.', 'There are no quotations for these filters.')}
+              action={<Button onClick={resetFilters}>{tr('Filter zurücksetzen', 'Reset filters')}</Button>}
             />
           ) : (
             <EmptyState
               icon={FileText}
-              title="Noch keine Angebote"
-              description="Erstellen Sie Ihr erstes Angebot – mit Positionen, automatischer USt.-Berechnung und PDF."
+              title={tr('Noch keine Angebote', 'No quotations yet')}
+              description={tr(
+                'Erstellen Sie Ihr erstes Angebot – mit Positionen, automatischer USt.-Berechnung und PDF.',
+                'Create your first quotation – with line items, automatic VAT calculation and PDF.',
+              )}
               action={
                 <ButtonLink to="/angebote/neu" variant="primary" icon={FilePlus2}>
-                  Erstes Angebot erstellen
+                  {tr('Erstes Angebot erstellen', 'Create first quotation')}
                 </ButtonLink>
               }
             />
@@ -199,20 +203,20 @@ export default function QuotationListPage() {
               <table className={table.table}>
                 <thead>
                   <tr>
-                    <th scope="col" className={table.th}>Nummer</th>
-                    <th scope="col" className={table.th}>Kunde & Betreff</th>
+                    <th scope="col" className={table.th}>{tr('Nummer', 'Number')}</th>
+                    <th scope="col" className={table.th}>{tr('Kunde & Betreff', 'Customer & subject')}</th>
                     <th scope="col" className={table.th}>Status</th>
-                    <th scope="col" className={cx(table.th, 'text-right')}>Datum</th>
-                    <th scope="col" className={cx(table.th, 'text-right')}>Gültig bis</th>
-                    <th scope="col" className={cx(table.th, 'text-right')}>Netto</th>
-                    <th scope="col" className={cx(table.th, 'text-right')}>Brutto</th>
+                    <th scope="col" className={cx(table.th, 'text-right')}>{tr('Datum', 'Date')}</th>
+                    <th scope="col" className={cx(table.th, 'text-right')}>{tr('Gültig bis', 'Valid until')}</th>
+                    <th scope="col" className={cx(table.th, 'text-right')}>{tr('Netto', 'Net')}</th>
+                    <th scope="col" className={cx(table.th, 'text-right')}>{tr('Brutto', 'Gross')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {list.data.items.map((q) => (
                     <tr key={q.id} className={table.row}>
                       <td className={cx(table.td, 'whitespace-nowrap')}>
-                        <Link to={`/angebote/${q.id}`} className="font-medium text-neutral-900 hover:text-brand-700 hover:underline">
+                        <Link to={`/angebote/${q.id}`} className="font-medium text-neutral-900 hover:text-brand-700 dark:hover:text-brand-800 hover:underline">
                           {q.number}
                         </Link>
                         {q.revisionNumber > 1 && <span className="ml-1.5 text-xs text-neutral-500">Rev. {q.revisionNumber}</span>}
@@ -225,9 +229,9 @@ export default function QuotationListPage() {
                         <div className="flex items-center gap-1.5">
                           <QuotationStatusBadge status={q.status} />
                           {q.hasJob && (
-                            <span title="Auftrag erstellt" className="text-neutral-400">
+                            <span title={tr('Auftrag erstellt', 'Job created')} className="text-neutral-400">
                               <Hammer aria-hidden size={14} />
-                              <span className="sr-only">Auftrag erstellt</span>
+                              <span className="sr-only">{tr('Auftrag erstellt', 'Job created')}</span>
                             </span>
                           )}
                         </div>
@@ -256,7 +260,7 @@ export default function QuotationListPage() {
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-3">
                       <QuotationStatusBadge status={q.status} />
-                      <span className="text-xs text-neutral-500">gültig bis {formatDate(q.validUntil)}</span>
+                      <span className="text-xs text-neutral-500">{tr(`gültig bis ${formatDate(q.validUntil)}`, `valid until ${formatDate(q.validUntil)}`)}</span>
                     </div>
                   </Link>
                 </li>
@@ -267,7 +271,7 @@ export default function QuotationListPage() {
               pageSize={list.data.pageSize}
               totalCount={list.data.totalCount}
               onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
-              noun={['Angebot', 'Angeboten']}
+              noun={[tr('Angebot', 'quotation'), tr('Angeboten', 'quotations')]}
             />
           </div>
         )}

@@ -3,9 +3,10 @@ import { Navigate, Outlet, useLocation, useSearchParams } from 'react-router';
 import { BrandLogo } from '@/components/layout/Brand';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Feedback';
+import { tr } from '@/lib/i18n';
 import { useAuth } from './auth';
 
-export function FullScreenLoader({ label = 'AngebotPilot wird geladen …' }: { label?: string }) {
+export function FullScreenLoader({ label = tr('AngebotPilot wird geladen …', 'Loading AngebotPilot …') }: { label?: string }) {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-5 bg-neutral-50">
       <BrandLogo size="lg" />
@@ -22,13 +23,15 @@ function OfflineScreen() {
       <div className="mb-3 flex size-11 items-center justify-center rounded-xl border border-warning-border bg-warning-bg text-warning-text">
         <WifiOff aria-hidden size={20} />
       </div>
-      <h1 className="text-lg font-semibold text-neutral-900">Keine Verbindung zum Server</h1>
+      <h1 className="text-lg font-semibold text-neutral-900">{tr('Keine Verbindung zum Server', 'No connection to the server')}</h1>
       <p className="mt-1 max-w-sm text-sm text-neutral-600">
-        Ihre Sitzung konnte nicht wiederhergestellt werden, weil der Server nicht erreichbar ist. Bitte prüfen Sie Ihre
-        Internetverbindung.
+        {tr(
+          'Ihre Sitzung konnte nicht wiederhergestellt werden, weil der Server nicht erreichbar ist. Bitte prüfen Sie Ihre Internetverbindung.',
+          'Your session could not be restored because the server cannot be reached. Please check your internet connection.',
+        )}
       </p>
       <Button className="mt-5" icon={RefreshCw} onClick={retry}>
-        Erneut versuchen
+        {tr('Erneut versuchen', 'Try again')}
       </Button>
     </div>
   );

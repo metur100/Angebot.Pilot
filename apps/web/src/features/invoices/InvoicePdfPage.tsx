@@ -12,6 +12,7 @@ import { toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api';
 import { downloadBlob, downloadDocument } from '@/lib/download';
 import { errorMessage } from '@/lib/errors';
+import { tr } from '@/lib/i18n';
 import { qk } from '@/lib/queryKeys';
 import { invoiceName, invoicePdfFileName, invoiceXmlFileName } from './shared';
 
@@ -37,7 +38,7 @@ export default function InvoicePdfPage() {
   return (
     <>
       <PageHeader
-        title={`PDF ${i.number ?? 'Rechnungsentwurf'}`}
+        title={`PDF ${i.number ?? tr('Rechnungsentwurf', 'Invoice draft')}`}
         documentTitle={`PDF ${name}`}
         back={{ to: `/rechnungen/${i.id}`, label: name }}
         meta={<InvoiceStatusBadge status={i.status} kind={i.kind} isOverdue={i.isOverdue} />}
@@ -52,19 +53,19 @@ export default function InvoicePdfPage() {
                   setDownloadingXml(true);
                   try {
                     await downloadDocument(() => api.invoices.xml(companyId, i.id), invoiceXmlFileName(i), 'application/xml');
-                    toast.success('E-Rechnung heruntergeladen', invoiceXmlFileName(i));
+                    toast.success(tr('E-Rechnung heruntergeladen', 'E-invoice downloaded'), invoiceXmlFileName(i));
                   } catch (error) {
-                    toast.error('Download fehlgeschlagen', errorMessage(error));
+                    toast.error(tr('Download fehlgeschlagen', 'Download failed'), errorMessage(error));
                   } finally {
                     setDownloadingXml(false);
                   }
                 }}
               >
-                E-Rechnung (XML)
+                {tr('E-Rechnung (XML)', 'E-invoice (XML)')}
               </Button>
             )}
             <Button icon={Printer} disabled={!pdf.data} onClick={() => window.print()}>
-              Drucken
+              {tr('Drucken', 'Print')}
             </Button>
             <Button
               variant="primary"
@@ -73,31 +74,36 @@ export default function InvoicePdfPage() {
               onClick={() => {
                 if (!pdf.data) return;
                 downloadBlob(pdf.data, fileName);
-                toast.success('PDF heruntergeladen', fileName);
+                toast.success(tr('PDF heruntergeladen', 'PDF downloaded'), fileName);
               }}
             >
-              Herunterladen
+              {tr('Herunterladen', 'Download')}
             </Button>
           </>
         }
       />
       {i.status === 'Draft' ? (
         <Alert tone="info" className="mb-6">
-          Vorschau des Entwurfs mit Wasserzeichen „Entwurf“ und ohne Rechnungsnummer. Erst beim Stellen wird die endgültige Rechnung mit Nummer
-          und eingebetteter E-Rechnung erzeugt.
+          {tr(
+            'Vorschau des Entwurfs mit Wasserzeichen „Entwurf“ und ohne Rechnungsnummer. Erst beim Stellen wird die endgültige Rechnung mit Nummer und eingebetteter E-Rechnung erzeugt.',
+            'Preview of the draft with the watermark “Entwurf” (draft) and no invoice number. The final invoice with its number and embedded e-invoice is only created when you issue it.',
+          )}
         </Alert>
       ) : (
         <Alert tone="neutral" className="mb-6">
-          Dieses PDF ist festgeschrieben und enthält die E-Rechnung im ZUGFeRD-Format (EN 16931).
+          {tr(
+            'Dieses PDF ist festgeschrieben und enthält die E-Rechnung im ZUGFeRD-Format (EN 16931).',
+            'This PDF is locked and contains the e-invoice in ZUGFeRD format (EN 16931).',
+          )}
         </Alert>
       )}
       <div className="ap-print-area rounded-xl bg-neutral-100 px-3 py-6 sm:px-8 sm:py-10">
         {pdf.isPending ? (
           <div className="flex justify-center py-16">
-            <Spinner label="PDF wird erzeugt …" />
+            <Spinner label={tr('PDF wird erzeugt …', 'Generating PDF …')} />
           </div>
         ) : pdf.isError ? (
-          <ErrorState error={pdf.error} title="PDF konnte nicht erzeugt werden" onRetry={() => void pdf.refetch()} />
+          <ErrorState error={pdf.error} title={tr('PDF konnte nicht erzeugt werden', 'PDF could not be generated')} onRetry={() => void pdf.refetch()} />
         ) : (
           <PdfViewer data={pdf.data} label={name} />
         )}

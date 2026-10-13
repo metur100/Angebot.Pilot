@@ -1,4 +1,4 @@
-import { emailSchema, type CompanySettingsDto } from '@angebotpilot/api-contracts';
+import { emailSchema, getLocale, type CompanySettingsDto } from '@angebotpilot/api-contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useCompany, useCompanySettings } from '@/app/company';
@@ -12,11 +12,12 @@ import { NumberInput } from '@/components/ui/NumberInput';
 import { toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api';
 import { errorMessage } from '@/lib/errors';
+import { tr } from '@/lib/i18n';
 import { qk } from '@/lib/queryKeys';
 import { emptyToNull, FormSection, ReadOnlyNotice } from './shared';
 
 const dayError = (value: number, enabled: boolean) =>
-  !enabled || (Number.isInteger(value) && value >= 1 && value <= 90) ? undefined : 'Bitte 1 bis 90 Tage angeben.';
+  !enabled || (Number.isInteger(value) && value >= 1 && value <= 90) ? undefined : tr('Bitte 1 bis 90 Tage angeben.', 'Please enter 1 to 90 days.');
 
 function ReminderRow({
   label,
@@ -41,7 +42,7 @@ function ReminderRow({
     <div className="grid gap-3 rounded-lg border border-neutral-200 p-4 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-start">
       <Switch checked={enabled} onCheckedChange={onEnabled} label={label} description={description} disabled={readOnly} />
       <Field label={daysLabel} error={dayError(days, enabled)}>
-        <NumberInput value={days} onValueChange={onDays} maxFractionDigits={0} align="left" suffix="Tage" disabled={readOnly || !enabled} />
+        <NumberInput value={days} onValueChange={onDays} maxFractionDigits={0} align="left" suffix={tr('Tage', 'days')} disabled={readOnly || !enabled} />
       </Field>
     </div>
   );
@@ -53,7 +54,7 @@ function Form({ settings, readOnly }: { settings: CompanySettingsDto; readOnly: 
   const [values, setValues] = useState(settings);
   const set = <K extends keyof CompanySettingsDto>(key: K, value: CompanySettingsDto[K]) => setValues((v) => ({ ...v, [key]: value }));
   const dirty = JSON.stringify(values) !== JSON.stringify(settings);
-  const replyError = values.replyToEmail && !emailSchema.safeParse(values.replyToEmail).success ? 'Bitte gültige E-Mail-Adresse angeben.' : undefined;
+  const replyError = values.replyToEmail && !emailSchema.safeParse(values.replyToEmail).success ? tr('Bitte gültige E-Mail-Adresse angeben.', 'Please enter a valid email address.') : undefined;
   const invalid = Boolean(
     replyError ||
       dayError(values.firstReminderAfterDays, values.firstReminderEnabled) ||
@@ -62,7 +63,7 @@ function Form({ settings, readOnly }: { settings: CompanySettingsDto; readOnly: 
   );
   const orderWarning =
     values.firstReminderEnabled && values.secondReminderEnabled && values.secondReminderAfterDays <= values.firstReminderAfterDays
-      ? 'Die 2. Erinnerung sollte nach der 1. Erinnerung kommen.'
+      ? tr('Die 2. Erinnerung sollte nach der 1. Erinnerung kommen.', 'The 2nd reminder should come after the 1st reminder.')
       : null;
   const save = useMutation({
     mutationFn: () =>
@@ -74,13 +75,16 @@ function Form({ settings, readOnly }: { settings: CompanySettingsDto; readOnly: 
     onSuccess: (saved) => {
       queryClient.setQueryData(qk.settings(companyId), saved);
       setValues(saved);
-      toast.success('Einstellungen gespeichert');
+      toast.success(tr('Einstellungen gespeichert', 'Settings saved'));
     },
   });
 
   return (
     <Card>
-      <CardHeader title="Erinnerungen & Benachrichtigungen" description="Wie AngebotPilot bei offenen Angeboten automatisch nachfasst." />
+      <CardHeader
+        title={tr('Erinnerungen & Benachrichtigungen', 'Reminders & notifications')}
+        description={tr('Wie AngebotPilot bei offenen Angeboten automatisch nachfasst.', 'How AngebotPilot automatically follows up on open quotations.')}
+      />
       <fieldset disabled={readOnly} className="min-w-0">
         <CardBody className="space-y-6 py-6">
           {save.isError && (
@@ -88,65 +92,79 @@ function Form({ settings, readOnly }: { settings: CompanySettingsDto; readOnly: 
               {errorMessage(save.error)}
             </Alert>
           )}
-          <Alert tone="info" title="So funktionieren Erinnerungen">
-            Erinnerungen werden nur für Angebote geplant, die Sie per E-Mail versenden und bei denen „Automatisch nachfassen“ aktiv ist. Sie stoppen
-            automatisch, sobald Ihr Kunde annimmt oder ablehnt, das Angebot abläuft oder storniert wird – oder wenn sich der Kunde über den Link in der
-            E-Mail abmeldet. Änderungen gelten für künftig versendete Angebote.
+          <Alert tone="info" title={tr('So funktionieren Erinnerungen', 'How reminders work')}>
+            {tr(
+              'Erinnerungen werden nur für Angebote geplant, die Sie per E-Mail versenden und bei denen „Automatisch nachfassen“ aktiv ist. Sie stoppen automatisch, sobald Ihr Kunde annimmt oder ablehnt, das Angebot abläuft oder storniert wird – oder wenn sich der Kunde über den Link in der E-Mail abmeldet. Änderungen gelten für künftig versendete Angebote.',
+              'Reminders are only scheduled for quotations you send by email with “Automatic follow-up” switched on. They stop automatically as soon as your customer accepts or declines, the quotation expires or is cancelled – or when the customer unsubscribes via the link in the email. Changes apply to quotations sent from now on.',
+            )}
+            {getLocale() === 'en' && ' Reminder emails are sent to your customers in German.'}
           </Alert>
-          <FormSection title="Automatische Erinnerungen">
+          <FormSection title={tr('Automatische Erinnerungen', 'Automatic reminders')}>
             <ReminderRow
-              label="1. Erinnerung"
-              description="Freundliche Nachfrage, ob das Angebot angekommen ist."
+              label={tr('1. Erinnerung', '1st reminder')}
+              description={tr('Freundliche Nachfrage, ob das Angebot angekommen ist.', 'A friendly check that the quotation has arrived.')}
               enabled={values.firstReminderEnabled}
               onEnabled={(v) => set('firstReminderEnabled', v)}
               days={values.firstReminderAfterDays}
               onDays={(v) => set('firstReminderAfterDays', v)}
-              daysLabel="Tage nach Versand"
+              daysLabel={tr('Tage nach Versand', 'Days after sending')}
               readOnly={readOnly}
             />
             <ReminderRow
-              label="2. Erinnerung"
-              description="Zweite Nachfrage, falls noch keine Entscheidung vorliegt."
+              label={tr('2. Erinnerung', '2nd reminder')}
+              description={tr('Zweite Nachfrage, falls noch keine Entscheidung vorliegt.', 'A second follow-up if there is no decision yet.')}
               enabled={values.secondReminderEnabled}
               onEnabled={(v) => set('secondReminderEnabled', v)}
               days={values.secondReminderAfterDays}
               onDays={(v) => set('secondReminderAfterDays', v)}
-              daysLabel="Tage nach Versand"
+              daysLabel={tr('Tage nach Versand', 'Days after sending')}
               readOnly={readOnly}
             />
             {orderWarning && <p className="text-[13px] text-warning-text">{orderWarning}</p>}
             <ReminderRow
-              label="Erinnerung vor Ablauf"
-              description="Hinweis kurz bevor das Angebot seine Gültigkeit verliert."
+              label={tr('Erinnerung vor Ablauf', 'Reminder before expiry')}
+              description={tr('Hinweis kurz bevor das Angebot seine Gültigkeit verliert.', 'A note shortly before the quotation expires.')}
               enabled={values.expiryReminderEnabled}
               onEnabled={(v) => set('expiryReminderEnabled', v)}
               days={values.expiryReminderDaysBefore}
               onDays={(v) => set('expiryReminderDaysBefore', v)}
-              daysLabel="Tage vor Ablauf"
+              daysLabel={tr('Tage vor Ablauf', 'Days before expiry')}
               readOnly={readOnly}
             />
           </FormSection>
-          <FormSection title="E-Mails">
+          <FormSection title={tr('E-Mails', 'Emails')}>
             <Switch
               checked={values.attachPdfToEmails}
               onCheckedChange={(v) => set('attachPdfToEmails', v)}
-              label="PDF standardmäßig anhängen"
-              description="Vorauswahl im Versanddialog; pro Versand änderbar."
+              label={tr('PDF standardmäßig anhängen', 'Attach PDF by default')}
+              description={tr('Vorauswahl im Versanddialog; pro Versand änderbar.', 'Preselected in the send dialog; can be changed each time.')}
               disabled={readOnly}
             />
-            <Field label="Antwort-an-Adresse" error={replyError} optional hint="Antworten Ihrer Kunden gehen an diese Adresse.">
+            <Field
+              label={tr('Antwort-an-Adresse', 'Reply-to address')}
+              error={replyError}
+              optional
+              hint={tr('Antworten Ihrer Kunden gehen an diese Adresse.', 'Replies from your customers go to this address.')}
+            >
               <Input type="email" value={values.replyToEmail ?? ''} onChange={(e) => set('replyToEmail', e.target.value)} />
             </Field>
-            <Field label="E-Mail-Signatur" optional hint="Wird an Angebots- und Erinnerungs-E-Mails angehängt.">
+            <Field
+              label={tr('E-Mail-Signatur', 'Email signature')}
+              optional
+              hint={tr(
+                'Wird an Angebots- und Erinnerungs-E-Mails angehängt.',
+                'Appended to quotation and reminder emails, which your customers receive in German.',
+              )}
+            >
               <Textarea rows={4} value={values.emailSignature ?? ''} onChange={(e) => set('emailSignature', e.target.value)} />
             </Field>
           </FormSection>
-          <FormSection title="Benachrichtigungen">
+          <FormSection title={tr('Benachrichtigungen', 'Notifications')}>
             <Switch
               checked={values.notifyOnCustomerDecision}
               onCheckedChange={(v) => set('notifyOnCustomerDecision', v)}
-              label="Bei Kundenentscheidung benachrichtigen"
-              description="E-Mail und Hinweis in der App, wenn ein Kunde online annimmt oder ablehnt."
+              label={tr('Bei Kundenentscheidung benachrichtigen', 'Notify me of customer decisions')}
+              description={tr('E-Mail und Hinweis in der App, wenn ein Kunde online annimmt oder ablehnt.', 'Email and in-app notice when a customer accepts or declines online.')}
               disabled={readOnly}
             />
           </FormSection>
@@ -154,10 +172,10 @@ function Form({ settings, readOnly }: { settings: CompanySettingsDto; readOnly: 
         {!readOnly && (
           <CardFooter>
             <Button onClick={() => setValues(settings)} disabled={!dirty || save.isPending}>
-              Verwerfen
+              {tr('Verwerfen', 'Discard')}
             </Button>
             <Button variant="primary" disabled={!dirty || invalid} loading={save.isPending} onClick={() => save.mutate()}>
-              Speichern
+              {tr('Speichern', 'Save')}
             </Button>
           </CardFooter>
         )}

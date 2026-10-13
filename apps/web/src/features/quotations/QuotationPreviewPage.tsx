@@ -9,6 +9,7 @@ import { ErrorState, PageSkeleton } from '@/components/ui/Feedback';
 import { PageHeader } from '@/components/ui/Page';
 import { api } from '@/lib/api';
 import { useObjectUrl } from '@/lib/hooks';
+import { tr } from '@/lib/i18n';
 import { qk } from '@/lib/queryKeys';
 import { QuotationDocument } from './QuotationDocument';
 
@@ -45,6 +46,7 @@ export default function QuotationPreviewPage() {
   const q = quotation.data;
   const c = company.data;
   const s = settings.data;
+  // Header and footer lines belong to the German document (like the PDF): they stay German in the English UI.
   const address = [c.addressLine1, c.addressLine2, [c.postalCode, c.city].filter(Boolean).join(' ')].filter(Boolean).join('\n');
   const contact = [c.phone && `Tel. ${c.phone}`, c.email, c.website].filter(Boolean).join('\n');
   const footer = [
@@ -57,19 +59,22 @@ export default function QuotationPreviewPage() {
   return (
     <>
       <PageHeader
-        title={`Vorschau ${q.number}`}
+        title={tr(`Vorschau ${q.number}`, `Preview ${q.number}`)}
         back={{ to: `/angebote/${q.id}`, label: q.number }}
         meta={<QuotationStatusBadge status={q.status} />}
-        description="So sieht Ihr Kunde das Angebot. Maßgeblich ist das PDF."
+        description={tr(
+          'So sieht Ihr Kunde das Angebot. Maßgeblich ist das PDF.',
+          'This is how your customer sees the quotation (in German). The PDF is authoritative.',
+        )}
         actions={
           <>
             {q.status === 'Draft' && (
               <ButtonLink to={`/angebote/${q.id}/bearbeiten`} icon={Pencil}>
-                Bearbeiten
+                {tr('Bearbeiten', 'Edit')}
               </ButtonLink>
             )}
             <ButtonLink to={`/angebote/${q.id}/pdf`} variant="primary" icon={FileText}>
-              PDF anzeigen
+              {tr('PDF anzeigen', 'View PDF')}
             </ButtonLink>
           </>
         }

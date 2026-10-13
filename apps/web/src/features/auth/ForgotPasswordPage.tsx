@@ -11,6 +11,7 @@ import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { api } from '@/lib/api';
 import { errorMessage } from '@/lib/errors';
+import { tr } from '@/lib/i18n';
 import { AuthLayout } from './AuthLayout';
 
 const schema = z.object({ email: emailSchema });
@@ -36,13 +37,17 @@ export default function ForgotPasswordPage() {
 
   if (sentTo) {
     return (
-      <AuthLayout title="E-Mail unterwegs" compact>
-        <Alert tone="success" icon={MailCheck} title="Bitte prüfen Sie Ihr Postfach">
-          Falls ein Konto für <strong>{sentTo}</strong> existiert, haben wir Ihnen einen Link zum Zurücksetzen des Passworts gesendet. Der
-          Link ist aus Sicherheitsgründen nur kurze Zeit gültig. Schauen Sie auch im Spam-Ordner nach.
+      <AuthLayout title={tr('E-Mail unterwegs', 'Email on its way')} compact>
+        <Alert tone="success" icon={MailCheck} title={tr('Bitte prüfen Sie Ihr Postfach', 'Please check your inbox')}>
+          {tr('Falls ein Konto für ', 'If an account exists for ')}
+          <strong>{sentTo}</strong>
+          {tr(
+            ' existiert, haben wir Ihnen einen Link zum Zurücksetzen des Passworts gesendet. Der Link ist aus Sicherheitsgründen nur kurze Zeit gültig. Schauen Sie auch im Spam-Ordner nach.',
+            ', we have sent you a link to reset your password. For security reasons the link is only valid for a short time. Please also check your spam folder.',
+          )}
         </Alert>
         <ButtonLink to="/login" className="mt-6 w-full" size="lg">
-          Zurück zur Anmeldung
+          {tr('Zurück zur Anmeldung', 'Back to sign in')}
         </ButtonLink>
       </AuthLayout>
     );
@@ -50,11 +55,14 @@ export default function ForgotPasswordPage() {
 
   return (
     <AuthLayout
-      title="Passwort vergessen?"
-      description="Geben Sie Ihre E-Mail-Adresse ein. Wir senden Ihnen einen Link, mit dem Sie ein neues Passwort festlegen können."
+      title={tr('Passwort vergessen?', 'Forgot password?')}
+      description={tr(
+        'Geben Sie Ihre E-Mail-Adresse ein. Wir senden Ihnen einen Link, mit dem Sie ein neues Passwort festlegen können.',
+        'Enter your email address. We will send you a link to set a new password.',
+      )}
       footer={
-        <Link to="/login" className="font-medium text-brand-600 hover:text-brand-700 hover:underline">
-          Zurück zur Anmeldung
+        <Link to="/login" className="font-medium text-brand-600 dark:text-brand-700 hover:text-brand-700 dark:hover:text-brand-800 hover:underline">
+          {tr('Zurück zur Anmeldung', 'Back to sign in')}
         </Link>
       }
     >
@@ -64,11 +72,11 @@ export default function ForgotPasswordPage() {
             {formError}
           </Alert>
         )}
-        <Field label="E-Mail-Adresse" error={errors.email?.message}>
+        <Field label={tr('E-Mail-Adresse', 'Email address')} error={errors.email?.message}>
           <Input type="email" autoComplete="email" className="h-10" {...register('email')} />
         </Field>
         <Button type="submit" variant="primary" size="lg" className="w-full" loading={isSubmitting}>
-          Link anfordern
+          {tr('Link anfordern', 'Request link')}
         </Button>
       </form>
     </AuthLayout>

@@ -1,6 +1,7 @@
 import { CircleAlert } from 'lucide-react';
 import { createContext, useContext, useId, type AriaAttributes, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
+import { tr } from '@/lib/i18n';
 
 interface FieldContextValue {
   id: string;
@@ -56,7 +57,7 @@ export function Field({ label, children, hint, error, required, optional, id, cl
                 *
               </span>
             )}
-            {optional && <span className="ml-1.5 font-normal text-neutral-500">optional</span>}
+            {optional && <span className="ml-1.5 font-normal text-neutral-500">{tr('optional', 'optional')}</span>}
           </label>
           {labelAside}
         </div>
@@ -82,4 +83,4 @@ export const controlBase =
   'placeholder:text-neutral-400 transition-[border-color,box-shadow] ' +
   'hover:border-neutral-400 focus:border-brand-500 focus:shadow-focus focus:outline-none focus-visible:outline-none ' +
   'disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:text-neutral-500 read-only:bg-neutral-50 ' +
-  'aria-invalid:border-danger-text aria-invalid:focus:shadow-[0_0_0_3px_rgba(180,35,24,0.18)]';
+  'aria-invalid:border-danger-text aria-invalid:focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-danger-text)_18%,transparent)]';

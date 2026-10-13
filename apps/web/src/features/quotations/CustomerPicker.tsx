@@ -12,6 +12,7 @@ import { CustomerForm, formatAddress } from '@/features/customers/CustomerForm';
 import { api } from '@/lib/api';
 import { cx } from '@/lib/cx';
 import { useDebouncedValue } from '@/lib/hooks';
+import { tr } from '@/lib/i18n';
 import { qk } from '@/lib/queryKeys';
 
 interface CustomerPickerProps {
@@ -24,7 +25,7 @@ interface CustomerPickerProps {
 }
 
 /** Searchable customer combobox (ARIA 1.2 combobox pattern) with inline "Neuer Kunde" dialog. */
-export function CustomerPicker({ value, onChange, error, disabled, documentLabel = 'dieses Angebot' }: CustomerPickerProps) {
+export function CustomerPicker({ value, onChange, error, disabled, documentLabel = tr('dieses Angebot', 'this quotation') }: CustomerPickerProps) {
   const { companyId } = useCompany();
   const queryClient = useQueryClient();
   const baseId = useId();
@@ -55,7 +56,7 @@ export function CustomerPicker({ value, onChange, error, disabled, documentLabel
     onSuccess: (customer) => {
       queryClient.setQueryData(qk.customer(companyId, customer.id), customer);
       void queryClient.invalidateQueries({ queryKey: qk.customers(companyId) });
-      toast.success('Kunde angelegt', customer.displayName);
+      toast.success(tr('Kunde angelegt', 'Customer created'), customer.displayName);
       onChange(customer.id);
       setCreating(false);
     },
@@ -93,15 +94,15 @@ export function CustomerPicker({ value, onChange, error, disabled, documentLabel
     <div className="min-w-0">
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <label htmlFor={inputId} className="text-[13px] font-medium text-neutral-800">
-          Kunde<span aria-hidden className="ml-0.5 text-danger-text">*</span>
+          {tr('Kunde', 'Customer')}<span aria-hidden className="ml-0.5 text-danger-text">*</span>
         </label>
         <button
           type="button"
           onClick={() => setCreating(true)}
           disabled={disabled}
-          className="inline-flex items-center gap-1 rounded text-[13px] font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50"
+          className="inline-flex items-center gap-1 rounded text-[13px] font-medium text-brand-600 dark:text-brand-700 hover:text-brand-700 dark:hover:text-brand-800 disabled:opacity-50"
         >
-          <Plus aria-hidden size={14} /> Neuer Kunde
+          <Plus aria-hidden size={14} /> {tr('Neuer Kunde', 'New customer')}
         </button>
       </div>
 
@@ -113,9 +114,9 @@ export function CustomerPicker({ value, onChange, error, disabled, documentLabel
           <div className="min-w-0 flex-1 text-sm">
             <p className="truncate font-medium text-neutral-900">{customer.displayName}</p>
             <p className="text-[13px] whitespace-pre-line text-neutral-600">
-              {formatAddress(customer.billingStreet, customer.billingPostalCode, customer.billingCity, customer.billingCountry) ?? 'Keine Adresse hinterlegt'}
+              {formatAddress(customer.billingStreet, customer.billingPostalCode, customer.billingCity, customer.billingCountry) ?? tr('Keine Adresse hinterlegt', 'No address on file')}
             </p>
-            <p className="mt-0.5 text-[13px] text-neutral-500">{customer.email ?? 'Keine E-Mail-Adresse – Versand nur manuell möglich'}</p>
+            <p className="mt-0.5 text-[13px] text-neutral-500">{customer.email ?? tr('Keine E-Mail-Adresse – Versand nur manuell möglich', 'No email address – can only be sent manually')}</p>
           </div>
           {!disabled && (
             <Button
@@ -128,13 +129,13 @@ export function CustomerPicker({ value, onChange, error, disabled, documentLabel
                 window.setTimeout(() => inputRef.current?.focus(), 0);
               }}
             >
-              Ändern
+              {tr('Ändern', 'Change')}
             </Button>
           )}
         </div>
       ) : value && selected.isPending ? (
         <div className="rounded-lg border border-neutral-200 px-3.5 py-3">
-          <Spinner label="Kunde wird geladen …" />
+          <Spinner label={tr('Kunde wird geladen …', 'Loading customer …')} />
         </div>
       ) : (
         <div className="relative">
@@ -152,7 +153,7 @@ export function CustomerPicker({ value, onChange, error, disabled, documentLabel
             aria-describedby={error ? errorId : undefined}
             autoComplete="off"
             disabled={disabled}
-            placeholder="Kunden suchen (Name, E-Mail, Ort) …"
+            placeholder={tr('Kunden suchen (Name, E-Mail, Ort) …', 'Search customers (name, email, city) …')}
             value={search}
             onChange={(event) => {
               setSearch(event.target.value);
@@ -168,18 +169,18 @@ export function CustomerPicker({ value, onChange, error, disabled, documentLabel
             <ul
               id={listId}
               role="listbox"
-              aria-label="Kunden"
+              aria-label={tr('Kunden', 'Customers')}
               className="ap-popover absolute top-full right-0 left-0 z-30 mt-1 max-h-72 overflow-y-auto rounded-lg border border-neutral-200 bg-white p-1 shadow-lg"
             >
               {results.isPending ? (
                 <li className="px-3 py-2.5" role="presentation">
-                  <Spinner label="Suche …" />
+                  <Spinner label={tr('Suche …', 'Searching …')} />
                 </li>
               ) : items.length === 0 ? (
                 <li className="px-3 py-3 text-sm text-neutral-500" role="presentation">
-                  Kein Kunde gefunden.{' '}
-                  <button type="button" className="font-medium text-brand-600 hover:underline" onMouseDown={(e) => e.preventDefault()} onClick={() => setCreating(true)}>
-                    Neuen Kunden anlegen
+                  {tr('Kein Kunde gefunden.', 'No customer found.')}{' '}
+                  <button type="button" className="font-medium text-brand-600 dark:text-brand-700 hover:underline" onMouseDown={(e) => e.preventDefault()} onClick={() => setCreating(true)}>
+                    {tr('Neuen Kunden anlegen', 'Create new customer')}
                   </button>
                 </li>
               ) : (
@@ -207,7 +208,7 @@ export function CustomerPicker({ value, onChange, error, disabled, documentLabel
                         {[customerTypeLabel[item.type], item.city, item.email].filter(Boolean).join(' · ')}
                       </span>
                     </span>
-                    {item.id === value && <Check aria-hidden size={16} className="text-brand-600" />}
+                    {item.id === value && <Check aria-hidden size={16} className="text-brand-600 dark:text-brand-700" />}
                   </li>
                 ))
               )}
@@ -224,15 +225,15 @@ export function CustomerPicker({ value, onChange, error, disabled, documentLabel
       <Dialog
         open={creating}
         onOpenChange={setCreating}
-        title="Neuer Kunde"
-        description={`Der Kunde wird angelegt und direkt für ${documentLabel} ausgewählt.`}
+        title={tr('Neuer Kunde', 'New customer')}
+        description={tr(`Der Kunde wird angelegt und direkt für ${documentLabel} ausgewählt.`, `The customer is created and selected for ${documentLabel} straight away.`)}
         size="lg"
         dismissible={false}
         footer={
           <>
-            <Button onClick={() => setCreating(false)}>Abbrechen</Button>
+            <Button onClick={() => setCreating(false)}>{tr('Abbrechen', 'Cancel')}</Button>
             <Button type="submit" form="inline-customer-form" variant="primary" loading={create.isPending}>
-              Kunde anlegen und auswählen
+              {tr('Kunde anlegen und auswählen', 'Create and select customer')}
             </Button>
           </>
         }

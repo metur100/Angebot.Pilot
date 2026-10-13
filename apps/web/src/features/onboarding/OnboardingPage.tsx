@@ -11,6 +11,7 @@ import { COMPANY_KEY } from '@/app/company';
 import { TaxModePicker } from '@/components/domain/TaxMode';
 import { LegalFooter } from '@/features/auth/AuthLayout';
 import { BrandLogo } from '@/components/layout/Brand';
+import { PreferenceBar } from '@/components/layout/Preferences';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardFooter } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Feedback';
@@ -20,6 +21,7 @@ import { toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api';
 import { applyServerErrors, errorMessage, hasFieldErrors } from '@/lib/errors';
 import { useDocumentTitle } from '@/lib/hooks';
+import { tr } from '@/lib/i18n';
 
 type CompanyInput = z.input<typeof companySchema>;
 type CompanyOutput = z.output<typeof companySchema>;
@@ -28,7 +30,7 @@ const fields = ['name', 'addressLine1', 'postalCode', 'city', 'email', 'phone', 
 const emptyToNull = (value: string | undefined) => (value && value.trim() ? value.trim() : null);
 
 export default function OnboardingPage() {
-  useDocumentTitle('Firma anlegen');
+  useDocumentTitle(tr('Firma anlegen', 'Create company'));
   const user = useUser();
   const { reloadUser, logout } = useAuth();
   const queryClient = useQueryClient();
@@ -81,7 +83,10 @@ export default function OnboardingPage() {
       }
       await reloadUser();
       await queryClient.invalidateQueries();
-      toast.success('Firma angelegt', `${company.name} ist bereit. Legen Sie jetzt Ihren ersten Kunden an.`);
+      toast.success(
+        tr('Firma angelegt', 'Company created'),
+        tr(`${company.name} ist bereit. Legen Sie jetzt Ihren ersten Kunden an.`, `${company.name} is ready. Now add your first customer.`),
+      );
       void navigate('/dashboard', { replace: true });
     } catch (error) {
       const rest = applyServerErrors(error, setError, fields);
@@ -95,19 +100,22 @@ export default function OnboardingPage() {
         <BrandLogo />
         {additional ? (
           <Link to="/dashboard" className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-neutral-900">
-            <ArrowLeft aria-hidden size={15} /> Zurück
+            <ArrowLeft aria-hidden size={15} /> {tr('Zurück', 'Back')}
           </Link>
         ) : (
           <Button variant="ghost" size="sm" icon={LogOut} onClick={() => void logout().then(() => navigate('/login'))}>
-            Abmelden
+            {tr('Abmelden', 'Sign out')}
           </Button>
         )}
       </header>
       <main className="mx-auto max-w-[680px] px-4 py-10 sm:px-6">
-        <p className="text-[13px] font-semibold text-brand-700">{additional ? 'Weitere Firma' : 'Willkommen, ' + user.displayName.split(' ')[0]}</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-[-0.015em] text-neutral-900">Legen Sie Ihre Firma an</h1>
+        <p className="text-[13px] font-semibold text-brand-700">{additional ? tr('Weitere Firma', 'Another company') : tr('Willkommen, ', 'Welcome, ') + user.displayName.split(' ')[0]}</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-[-0.015em] text-neutral-900">{tr('Legen Sie Ihre Firma an', 'Set up your company')}</h1>
         <p className="mt-2 text-sm text-neutral-600">
-          Diese Angaben erscheinen im Briefkopf Ihrer Angebote. Sie können alles später unter Einstellungen ändern.
+          {tr(
+            'Diese Angaben erscheinen im Briefkopf Ihrer Angebote. Sie können alles später unter Einstellungen ändern.',
+            'These details appear in the letterhead of your quotations. You can change everything later under Settings.',
+          )}
         </p>
 
         <form onSubmit={onSubmit} noValidate className="mt-8">
@@ -119,52 +127,57 @@ export default function OnboardingPage() {
                 </Alert>
               )}
               <section className="space-y-4">
-                <h2 className="text-sm font-semibold text-neutral-900">Firmendaten</h2>
-                <Field label="Firmenname" error={errors.name?.message} required>
-                  <Input autoComplete="organization" placeholder="z. B. Elektro Berger GmbH" {...register('name')} />
+                <h2 className="text-sm font-semibold text-neutral-900">{tr('Firmendaten', 'Company details')}</h2>
+                <Field label={tr('Firmenname', 'Company name')} error={errors.name?.message} required>
+                  <Input autoComplete="organization" placeholder={tr('z. B. Elektro Berger GmbH', 'e.g. Elektro Berger GmbH')} {...register('name')} />
                 </Field>
-                <Field label="Straße und Hausnummer" error={errors.addressLine1?.message} optional>
+                <Field label={tr('Straße und Hausnummer', 'Street and house number')} error={errors.addressLine1?.message} optional>
                   <Input autoComplete="street-address" {...register('addressLine1')} />
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
-                  <Field label="PLZ" error={errors.postalCode?.message} optional>
+                  <Field label={tr('PLZ', 'Postcode')} error={errors.postalCode?.message} optional>
                     <Input inputMode="numeric" autoComplete="postal-code" {...register('postalCode')} />
                   </Field>
-                  <Field label="Ort" error={errors.city?.message} optional>
+                  <Field label={tr('Ort', 'City')} error={errors.city?.message} optional>
                     <Input autoComplete="address-level2" {...register('city')} />
                   </Field>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="E-Mail für Kunden" error={errors.email?.message} optional>
+                  <Field label={tr('E-Mail für Kunden', 'Email for customers')} error={errors.email?.message} optional>
                     <Input type="email" autoComplete="email" {...register('email')} />
                   </Field>
-                  <Field label="Telefon" error={errors.phone?.message} optional>
+                  <Field label={tr('Telefon', 'Phone')} error={errors.phone?.message} optional>
                     <Input type="tel" autoComplete="tel" {...register('phone')} />
                   </Field>
                 </div>
-                <Field label="USt-IdNr." error={errors.vatId?.message} optional hint="Format z. B. DE123456789. Kann später ergänzt werden.">
+                <Field
+                  label={tr('USt-IdNr.', 'VAT ID (USt-IdNr.)')}
+                  error={errors.vatId?.message}
+                  optional
+                  hint={tr('Format z. B. DE123456789. Kann später ergänzt werden.', 'Format e.g. DE123456789. Can be added later.')}
+                >
                   <Input placeholder="DE123456789" {...register('vatId', { setValueAs: (v: string) => v.toUpperCase().replace(/\s/g, '') })} />
                 </Field>
               </section>
 
               <section className="space-y-4 border-t border-neutral-100 pt-6">
-                <h2 className="text-sm font-semibold text-neutral-900">Steuern & Nummern</h2>
+                <h2 className="text-sm font-semibold text-neutral-900">{tr('Steuern & Nummern', 'Taxes & numbers')}</h2>
                 <Controller
                   control={control}
                   name="defaultTaxMode"
                   render={({ field }) => (
                     <TaxModePicker
                       name="defaultTaxMode"
-                      legend="Standard-Besteuerung für neue Angebote"
+                      legend={tr('Standard-Besteuerung für neue Angebote', 'Default taxation for new quotations')}
                       value={field.value}
                       onChange={(mode: TaxMode) => field.onChange(mode)}
                     />
                   )}
                 />
                 <Field
-                  label="Präfix für Angebotsnummern"
+                  label={tr('Präfix für Angebotsnummern', 'Prefix for quotation numbers')}
                   error={errors.quotationPrefix?.message}
-                  hint="1–8 Großbuchstaben oder Ziffern. Beispiel: AN → AN-2026-0001."
+                  hint={tr('1–8 Großbuchstaben oder Ziffern. Beispiel: AN → AN-2026-0001.', '1–8 capital letters or digits. Example: AN → AN-2026-0001.')}
                   className="sm:max-w-[260px]"
                 >
                   <Input {...register('quotationPrefix', { setValueAs: (v: string) => v.toUpperCase() })} />
@@ -173,12 +186,13 @@ export default function OnboardingPage() {
             </CardBody>
             <CardFooter>
               <Button type="submit" variant="primary" size="lg" loading={isSubmitting} className="w-full sm:w-auto">
-                Firma anlegen und loslegen
+                {tr('Firma anlegen und loslegen', 'Create company and get started')}
               </Button>
             </CardFooter>
           </Card>
         </form>
         <LegalFooter className="mt-10 justify-center" />
+        <PreferenceBar className="mt-3" />
       </main>
     </div>
   );

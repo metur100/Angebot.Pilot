@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { cx } from '@/lib/cx';
 import { useDocumentTitle } from '@/lib/hooks';
+import { formatCount, tr } from '@/lib/i18n';
 
 interface PageHeaderProps {
   title: ReactNode;
@@ -50,16 +51,19 @@ interface PaginationProps {
   noun?: [string, string];
 }
 
-export function Pagination({ page, pageSize, totalCount, onPageChange, noun = ['Eintrag', 'Einträgen'] }: PaginationProps) {
+export function Pagination({ page, pageSize, totalCount, onPageChange, noun = [tr('Eintrag', 'entry'), tr('Einträgen', 'entries')] }: PaginationProps) {
   const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
   const first = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const last = Math.min(page * pageSize, totalCount);
   return (
-    <nav aria-label="Seitennavigation" className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 px-5 py-3">
+    <nav aria-label={tr('Seitennavigation', 'Pagination')} className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 px-5 py-3">
       <p className="text-[13px] text-neutral-500 tabular">
         {totalCount === 0
-          ? `Keine ${noun[1]}`
-          : `${first.toLocaleString('de-DE')}–${last.toLocaleString('de-DE')} von ${totalCount.toLocaleString('de-DE')} ${totalCount === 1 ? noun[0] : noun[1]}`}
+          ? tr(`Keine ${noun[1]}`, `No ${noun[1]}`)
+          : tr(
+              `${formatCount(first)}–${formatCount(last)} von ${formatCount(totalCount)} ${totalCount === 1 ? noun[0] : noun[1]}`,
+              `${formatCount(first)}–${formatCount(last)} of ${formatCount(totalCount)} ${totalCount === 1 ? noun[0] : noun[1]}`,
+            )}
       </p>
       <div className="flex items-center gap-1">
         <button
@@ -69,10 +73,10 @@ export function Pagination({ page, pageSize, totalCount, onPageChange, noun = ['
           className="inline-flex h-8 items-center gap-1 rounded-md border border-neutral-300 bg-white px-2.5 text-[13px] font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ChevronLeft aria-hidden size={15} />
-          Zurück
+          {tr('Zurück', 'Previous')}
         </button>
         <span className="px-2 text-[13px] text-neutral-600 tabular" aria-current="page">
-          Seite {page} von {pageCount}
+          {tr(`Seite ${page} von ${pageCount}`, `Page ${page} of ${pageCount}`)}
         </span>
         <button
           type="button"
@@ -80,7 +84,7 @@ export function Pagination({ page, pageSize, totalCount, onPageChange, noun = ['
           disabled={page >= pageCount}
           className="inline-flex h-8 items-center gap-1 rounded-md border border-neutral-300 bg-white px-2.5 text-[13px] font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Weiter
+          {tr('Weiter', 'Next')}
           <ChevronRight aria-hidden size={15} />
         </button>
       </div>
@@ -108,12 +112,12 @@ export function FilterChip({ selected, onClick, children, count }: { selected: b
       className={cx(
         'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium whitespace-nowrap transition-colors',
         selected
-          ? 'border-brand-600 bg-brand-600 text-white hover:bg-brand-700'
+          ? 'border-brand-600 bg-brand-600 text-on-brand hover:bg-brand-solid-hover'
           : 'border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400 hover:bg-neutral-50',
       )}
     >
       {children}
-      {count !== undefined && <span className={cx('tabular', selected ? 'text-brand-100' : 'text-neutral-500')}>{count}</span>}
+      {count !== undefined && <span className={cx('tabular', selected ? 'text-on-brand/80' : 'text-neutral-500')}>{count}</span>}
     </button>
   );
 }

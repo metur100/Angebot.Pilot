@@ -1,4 +1,4 @@
-import { customerTypeLabel, type CustomerDto } from '@angebotpilot/api-contracts';
+import { customerTypeLabel, getLocale, type CustomerDto } from '@angebotpilot/api-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, ArchiveRestore, BellOff, FileText, Hammer, Mail, MoreHorizontal, Pencil, Phone, Plus, ReceiptText, Trash2 } from 'lucide-react';
 import { useState } from 'react';
@@ -17,6 +17,7 @@ import { api } from '@/lib/api';
 import { cx } from '@/lib/cx';
 import { errorMessage } from '@/lib/errors';
 import { formatDate, formatDateTime, formatEur } from '@/lib/format';
+import { tr } from '@/lib/i18n';
 import { qk } from '@/lib/queryKeys';
 import { ADMIN_ONLY_HINT } from '@/lib/roles';
 import { formatAddress } from './CustomerForm';
@@ -42,9 +43,9 @@ export default function CustomerDetailPage() {
     onSuccess: (updated) => {
       queryClient.setQueryData(qk.customer(companyId, id), updated);
       void queryClient.invalidateQueries({ queryKey: qk.customers(companyId) });
-      toast.success(updated.isArchived ? 'Kunde archiviert' : 'Kunde wiederhergestellt');
+      toast.success(updated.isArchived ? tr('Kunde archiviert', 'Customer archived') : tr('Kunde wiederhergestellt', 'Customer restored'));
     },
-    onError: (error) => toast.error('Aktion fehlgeschlagen', errorMessage(error)),
+    onError: (error) => toast.error(tr('Aktion fehlgeschlagen', 'Action failed'), errorMessage(error)),
   });
 
   if (customer.isPending) return <PageSkeleton />;
@@ -57,39 +58,43 @@ export default function CustomerDetailPage() {
     <>
       <PageHeader
         title={c.displayName}
-        back={{ to: '/kunden', label: 'Kunden' }}
+        back={{ to: '/kunden', label: tr('Kunden', 'Customers') }}
         meta={
           <div className="flex flex-wrap gap-1.5">
             <Badge tone="neutral">{customerTypeLabel[c.type]}</Badge>
-            {c.isArchived && <Badge tone="muted" icon={Archive}>Archiviert</Badge>}
-            {c.isAnonymized && <Badge tone="warning">Anonymisiert</Badge>}
-            {c.followUpOptOut && <Badge tone="muted" icon={BellOff}>Keine Erinnerungen</Badge>}
+            {c.isArchived && <Badge tone="muted" icon={Archive}>
+                {tr('Archiviert', 'Archived')}
+              </Badge>}
+            {c.isAnonymized && <Badge tone="warning">{tr('Anonymisiert', 'Anonymised')}</Badge>}
+            {c.followUpOptOut && <Badge tone="muted" icon={BellOff}>
+                {tr('Keine Erinnerungen', 'No reminders')}
+              </Badge>}
           </div>
         }
         actions={
           <>
             {!c.isAnonymized && (
               <ButtonLink to={`/kunden/${c.id}/bearbeiten`} icon={Pencil}>
-                Bearbeiten
+                {tr('Bearbeiten', 'Edit')}
               </ButtonLink>
             )}
             {!c.isArchived && !c.isAnonymized && (
               <ButtonLink to={`/angebote/neu?kunde=${c.id}`} variant="primary" icon={Plus}>
-                Neues Angebot
+                {tr('Neues Angebot', 'New quotation')}
               </ButtonLink>
             )}
             <Menu>
               <MenuTrigger asChild>
-                <IconButton icon={MoreHorizontal} label="Weitere Aktionen" variant="secondary" />
+                <IconButton icon={MoreHorizontal} label={tr('Weitere Aktionen', 'More actions')} variant="secondary" />
               </MenuTrigger>
               <MenuContent>
                 {c.isArchived ? (
                   <MenuItem icon={ArchiveRestore} onSelect={() => archive.mutate(false)}>
-                    Wiederherstellen
+                    {tr('Wiederherstellen', 'Restore')}
                   </MenuItem>
                 ) : (
-                  <MenuItem icon={Archive} onSelect={() => archive.mutate(true)} description="Ausblenden, Daten bleiben erhalten">
-                    Archivieren
+                  <MenuItem icon={Archive} onSelect={() => archive.mutate(true)} description={tr('Ausblenden, Daten bleiben erhalten', 'Hide, data is kept')}>
+                    {tr('Archivieren', 'Archive')}
                   </MenuItem>
                 )}
                 <MenuSeparator />
@@ -100,7 +105,7 @@ export default function CustomerDetailPage() {
                   description={!can.deleteCustomers ? ADMIN_ONLY_HINT : undefined}
                   onSelect={() => setConfirmDelete(true)}
                 >
-                  Löschen …
+                  {tr('Löschen …', 'Delete …')}
                 </MenuItem>
               </MenuContent>
             </Menu>
@@ -109,21 +114,24 @@ export default function CustomerDetailPage() {
       />
 
       {c.isAnonymized && (
-        <Alert tone="warning" className="mb-6" title="Personenbezogene Daten wurden entfernt">
-          Dieser Kunde wurde anonymisiert. Seine Angebote, Aufträge und Rechnungen bleiben aufgrund von Aufbewahrungspflichten erhalten.
+        <Alert tone="warning" className="mb-6" title={tr('Personenbezogene Daten wurden entfernt', 'Personal data has been removed')}>
+          {tr(
+            'Dieser Kunde wurde anonymisiert. Seine Angebote, Aufträge und Rechnungen bleiben aufgrund von Aufbewahrungspflichten erhalten.',
+            'This customer has been anonymised. Their quotations, jobs and invoices are kept due to statutory retention obligations.',
+          )}
         </Alert>
       )}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
         <div className="space-y-6">
           <Card>
-            <CardHeader title="Kontaktdaten" />
+            <CardHeader title={tr('Kontaktdaten', 'Contact details')} />
             <CardBody>
               <DetailList
                 items={[
-                  ...(c.type === 'Business' ? [{ label: 'Ansprechpartner', value: contactName(c) }] : []),
+                  ...(c.type === 'Business' ? [{ label: tr('Ansprechpartner', 'Contact person'), value: contactName(c) }] : []),
                   {
-                    label: 'E-Mail',
+                    label: tr('E-Mail', 'Email'),
                     value: c.email && (
                       <a href={`mailto:${c.email}`} className="inline-flex items-center gap-1.5 text-brand-700 hover:underline">
                         <Mail aria-hidden size={14} />
@@ -132,7 +140,7 @@ export default function CustomerDetailPage() {
                     ),
                   },
                   {
-                    label: 'Telefon',
+                    label: tr('Telefon', 'Phone'),
                     value: c.phone && (
                       <a href={`tel:${c.phone}`} className="inline-flex items-center gap-1.5 text-brand-700 hover:underline">
                         <Phone aria-hidden size={14} />
@@ -140,21 +148,21 @@ export default function CustomerDetailPage() {
                       </a>
                     ),
                   },
-                  { label: 'Rechnungsadresse', value: billing && <span className="whitespace-pre-line">{billing}</span> },
-                  ...(service ? [{ label: 'Leistungsadresse', value: <span className="whitespace-pre-line">{service}</span> }] : []),
-                  ...(c.type === 'Business' ? [{ label: 'USt-IdNr.', value: c.vatId }] : []),
-                  { label: 'Angelegt', value: formatDateTime(c.createdAt) },
+                  { label: tr('Rechnungsadresse', 'Billing address'), value: billing && <span className="whitespace-pre-line">{billing}</span> },
+                  ...(service ? [{ label: tr('Leistungsadresse', 'Service address'), value: <span className="whitespace-pre-line">{service}</span> }] : []),
+                  ...(c.type === 'Business' ? [{ label: tr('USt-IdNr.', 'VAT ID (USt-IdNr.)'), value: c.vatId }] : []),
+                  { label: tr('Angelegt', 'Created'), value: formatDateTime(c.createdAt) },
                 ]}
               />
             </CardBody>
           </Card>
           <Card>
-            <CardHeader title="Notizen" description="Nur intern sichtbar" />
+            <CardHeader title={tr('Notizen', 'Notes')} description={tr('Nur intern sichtbar', 'Only visible internally')} />
             <CardBody>
               {c.notes ? (
                 <p className="text-sm whitespace-pre-line text-neutral-800">{c.notes}</p>
               ) : (
-                <p className="text-sm text-neutral-500">Keine Notizen.</p>
+                <p className="text-sm text-neutral-500">{tr('Keine Notizen.', 'No notes.')}</p>
               )}
             </CardBody>
           </Card>
@@ -163,12 +171,12 @@ export default function CustomerDetailPage() {
         <div className="min-w-0 space-y-6">
           <Card>
             <CardHeader
-              title="Angebote"
+              title={tr('Angebote', 'Quotations')}
               actions={
                 !c.isArchived &&
                 !c.isAnonymized && (
                   <ButtonLink to={`/angebote/neu?kunde=${c.id}`} size="sm" icon={Plus}>
-                    Angebot
+                    {tr('Angebot', 'Quotation')}
                   </ButtonLink>
                 )
               }
@@ -180,24 +188,29 @@ export default function CustomerDetailPage() {
             ) : quotations.isError ? (
               <ErrorState error={quotations.error} onRetry={() => void quotations.refetch()} />
             ) : quotations.data.length === 0 ? (
-              <EmptyState compact icon={FileText} title="Noch keine Angebote" description="Erstellen Sie das erste Angebot für diesen Kunden." />
+              <EmptyState
+                compact
+                icon={FileText}
+                title={tr('Noch keine Angebote', 'No quotations yet')}
+                description={tr('Erstellen Sie das erste Angebot für diesen Kunden.', 'Create the first quotation for this customer.')}
+              />
             ) : (
               <div className={table.wrapper}>
                 <table className={table.table}>
                   <thead>
                     <tr>
-                      <th scope="col" className={table.th}>Nummer</th>
-                      <th scope="col" className={table.th}>Betreff</th>
+                      <th scope="col" className={table.th}>{tr('Nummer', 'Number')}</th>
+                      <th scope="col" className={table.th}>{tr('Betreff', 'Subject')}</th>
                       <th scope="col" className={table.th}>Status</th>
-                      <th scope="col" className={cx(table.th, 'text-right')}>Datum</th>
-                      <th scope="col" className={cx(table.th, 'text-right')}>Brutto</th>
+                      <th scope="col" className={cx(table.th, 'text-right')}>{tr('Datum', 'Date')}</th>
+                      <th scope="col" className={cx(table.th, 'text-right')}>{tr('Brutto', 'Gross')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {quotations.data.map((q) => (
                       <tr key={q.id} className={table.row}>
                         <td className={cx(table.td, 'whitespace-nowrap')}>
-                          <Link to={`/angebote/${q.id}`} className="font-medium text-neutral-900 hover:text-brand-700 hover:underline">
+                          <Link to={`/angebote/${q.id}`} className="font-medium text-neutral-900 hover:text-brand-700 dark:hover:text-brand-800 hover:underline">
                             {q.number}
                           </Link>
                         </td>
@@ -216,7 +229,7 @@ export default function CustomerDetailPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Aufträge" />
+            <CardHeader title={tr('Aufträge', 'Jobs')} />
             {jobs.isPending ? (
               <div className="p-5">
                 <Spinner />
@@ -224,18 +237,23 @@ export default function CustomerDetailPage() {
             ) : jobs.isError ? (
               <ErrorState error={jobs.error} onRetry={() => void jobs.refetch()} />
             ) : jobs.data.length === 0 ? (
-              <EmptyState compact icon={Hammer} title="Noch keine Aufträge" description="Angenommene Angebote können Sie in Aufträge umwandeln." />
+              <EmptyState
+                compact
+                icon={Hammer}
+                title={tr('Noch keine Aufträge', 'No jobs yet')}
+                description={tr('Angenommene Angebote können Sie in Aufträge umwandeln.', 'You can convert accepted quotations into jobs.')}
+              />
             ) : (
               <ul className="divide-y divide-neutral-100">
                 {jobs.data.map((j) => (
                   <li key={j.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
                     <div className="min-w-0">
-                      <Link to={`/auftraege/${j.id}`} className="font-medium text-neutral-900 hover:text-brand-700 hover:underline">
+                      <Link to={`/auftraege/${j.id}`} className="font-medium text-neutral-900 hover:text-brand-700 dark:hover:text-brand-800 hover:underline">
                         {j.number} · {j.title}
                       </Link>
                       <p className="text-[13px] text-neutral-500">
-                        aus {j.quotationNumber}
-                        {j.dueDate ? ` · fällig ${formatDate(j.dueDate)}` : ''}
+                        {tr(`aus ${j.quotationNumber}`, `from ${j.quotationNumber}`)}
+                        {j.dueDate ? tr(` · fällig ${formatDate(j.dueDate)}`, ` · due ${formatDate(j.dueDate)}`) : ''}
                       </p>
                     </div>
                     <JobStatusBadge status={j.status} />
@@ -247,17 +265,17 @@ export default function CustomerDetailPage() {
 
           <Card>
             <CardHeader
-              title="Rechnungen"
+              title={tr('Rechnungen', 'Invoices')}
               description={
                 invoices.data && invoices.data.some((i) => i.openAmount > 0)
-                  ? `Offen: ${formatEur(invoices.data.reduce((sum, i) => sum + i.openAmount, 0))}`
+                  ? tr('Offen: ', 'Open: ') + formatEur(invoices.data.reduce((sum, i) => sum + i.openAmount, 0))
                   : undefined
               }
               actions={
                 !c.isArchived &&
                 !c.isAnonymized && (
                   <ButtonLink to={`/rechnungen/neu?kunde=${c.id}`} size="sm" icon={Plus}>
-                    Neue Rechnung
+                    {tr('Neue Rechnung', 'New invoice')}
                   </ButtonLink>
                 )
               }
@@ -272,20 +290,23 @@ export default function CustomerDetailPage() {
               <EmptyState
                 compact
                 icon={ReceiptText}
-                title="Noch keine Rechnungen"
-                description="Erstellen Sie eine Rechnung manuell oder aus einem Auftrag bzw. angenommenen Angebot dieses Kunden."
+                title={tr('Noch keine Rechnungen', 'No invoices yet')}
+                description={tr(
+                  'Erstellen Sie eine Rechnung manuell oder aus einem Auftrag bzw. angenommenen Angebot dieses Kunden.',
+                  "Create an invoice manually or from one of this customer's jobs or accepted quotations.",
+                )}
               />
             ) : (
               <div className={table.wrapper}>
                 <table className={table.table}>
                   <thead>
                     <tr>
-                      <th scope="col" className={table.th}>Nummer</th>
-                      <th scope="col" className={table.th}>Betreff</th>
+                      <th scope="col" className={table.th}>{tr('Nummer', 'Number')}</th>
+                      <th scope="col" className={table.th}>{tr('Betreff', 'Subject')}</th>
                       <th scope="col" className={table.th}>Status</th>
-                      <th scope="col" className={cx(table.th, 'text-right')}>Datum</th>
-                      <th scope="col" className={cx(table.th, 'text-right')}>Brutto</th>
-                      <th scope="col" className={cx(table.th, 'text-right')}>Offen</th>
+                      <th scope="col" className={cx(table.th, 'text-right')}>{tr('Datum', 'Date')}</th>
+                      <th scope="col" className={cx(table.th, 'text-right')}>{tr('Brutto', 'Gross')}</th>
+                      <th scope="col" className={cx(table.th, 'text-right')}>{tr('Offen', 'Open')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -294,9 +315,9 @@ export default function CustomerDetailPage() {
                         <td className={cx(table.td, 'whitespace-nowrap')}>
                           <Link
                             to={`/rechnungen/${i.id}`}
-                            className={cx('font-medium hover:text-brand-700 hover:underline', i.number ? 'text-neutral-900' : 'text-neutral-500 italic')}
+                            className={cx('font-medium hover:text-brand-700 dark:hover:text-brand-800 hover:underline', i.number ? 'text-neutral-900' : 'text-neutral-500 italic')}
                           >
-                            {i.number ?? 'Entwurf'}
+                            {i.number ?? tr('Entwurf', 'Draft')}
                           </Link>
                         </td>
                         <td className={cx(table.td, 'max-w-[220px] truncate')}>{i.title}</td>
@@ -321,31 +342,47 @@ export default function CustomerDetailPage() {
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
-        title={`${c.displayName} löschen?`}
-        confirmLabel="Endgültig löschen"
+        title={tr(`${c.displayName} löschen?`, `Delete ${c.displayName}?`)}
+        confirmLabel={tr('Endgültig löschen', 'Delete permanently')}
         variant="danger"
         onConfirm={async () => {
           const result = await api.customers.delete(companyId, id);
           void queryClient.invalidateQueries({ queryKey: qk.customers(companyId) });
           if (result.result === 'anonymized') {
-            toast.success('Kunde anonymisiert', 'Die Dokumente bleiben wegen Aufbewahrungspflichten erhalten.');
+            toast.success(
+              tr('Kunde anonymisiert', 'Customer anonymised'),
+              tr('Die Dokumente bleiben wegen Aufbewahrungspflichten erhalten.', 'The documents are kept due to retention obligations.'),
+            );
             void queryClient.invalidateQueries({ queryKey: qk.customer(companyId, id) });
           } else {
-            toast.success('Kunde gelöscht');
+            toast.success(tr('Kunde gelöscht', 'Customer deleted'));
             void navigate('/kunden', { replace: true });
           }
         }}
       >
-        <div className="space-y-2 text-sm text-neutral-700">
-          <p>
-            <strong className="font-medium text-neutral-900">Ohne Angebote, Aufträge oder Rechnungen</strong> wird der Kunde vollständig gelöscht.
-          </p>
-          <p>
-            <strong className="font-medium text-neutral-900">Mit Angeboten, Aufträgen oder Rechnungen</strong> werden stattdessen Name, Kontakt- und
-            Adressdaten anonymisiert. Die Dokumente selbst bleiben wegen gesetzlicher Aufbewahrungspflichten erhalten.
-          </p>
-          <p className="text-neutral-500">Dieser Schritt kann nicht rückgängig gemacht werden. Zum Ausblenden genügt „Archivieren“.</p>
-        </div>
+        {getLocale() === 'en' ? (
+          <div className="space-y-2 text-sm text-neutral-700">
+            <p>
+              <strong className="font-medium text-neutral-900">Without quotations, jobs or invoices</strong> the customer is deleted completely.
+            </p>
+            <p>
+              <strong className="font-medium text-neutral-900">With quotations, jobs or invoices</strong> the name, contact and address details are
+              anonymised instead. The documents themselves are kept due to statutory retention obligations.
+            </p>
+            <p className="text-neutral-500">This cannot be undone. To just hide the customer, “Archive” is enough.</p>
+          </div>
+        ) : (
+          <div className="space-y-2 text-sm text-neutral-700">
+            <p>
+              <strong className="font-medium text-neutral-900">Ohne Angebote, Aufträge oder Rechnungen</strong> wird der Kunde vollständig gelöscht.
+            </p>
+            <p>
+              <strong className="font-medium text-neutral-900">Mit Angeboten, Aufträgen oder Rechnungen</strong> werden stattdessen Name, Kontakt- und
+              Adressdaten anonymisiert. Die Dokumente selbst bleiben wegen gesetzlicher Aufbewahrungspflichten erhalten.
+            </p>
+            <p className="text-neutral-500">Dieser Schritt kann nicht rückgängig gemacht werden. Zum Ausblenden genügt „Archivieren“.</p>
+          </div>
+        )}
       </ConfirmDialog>
     </>
   );

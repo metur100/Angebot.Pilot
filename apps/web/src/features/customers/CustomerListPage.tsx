@@ -14,8 +14,9 @@ import { FilterChip, PageHeader, Pagination, table } from '@/components/ui/Page'
 import { api } from '@/lib/api';
 import { cx } from '@/lib/cx';
 import { fileStamp } from '@/lib/download';
-import { formatDate, formatEur } from '@/lib/format';
+import { formatDate, formatEur, plural } from '@/lib/format';
 import { useDebouncedValue } from '@/lib/hooks';
+import { tr } from '@/lib/i18n';
 import { compactQuery, useListParams } from '@/lib/listParams';
 import { qk } from '@/lib/queryKeys';
 import { ADMIN_ONLY_HINT } from '@/lib/roles';
@@ -47,7 +48,7 @@ function NameCell({ customer }: { customer: CustomerListItemDto }) {
     <div className="flex min-w-0 items-center gap-3">
       <CustomerIcon type={customer.type} />
       <div className="min-w-0">
-        <Link to={`/kunden/${customer.id}`} className="block truncate font-medium text-neutral-900 hover:text-brand-700 hover:underline">
+        <Link to={`/kunden/${customer.id}`} className="block truncate font-medium text-neutral-900 hover:text-brand-700 dark:hover:text-brand-800 hover:underline">
           {customer.displayName}
         </Link>
         <p className="truncate text-[13px] text-neutral-500">
@@ -55,7 +56,7 @@ function NameCell({ customer }: { customer: CustomerListItemDto }) {
           {customer.contactPerson ? ` · ${customer.contactPerson}` : ''}
         </p>
       </div>
-      {customer.isArchived && <Badge tone="muted">Archiviert</Badge>}
+      {customer.isArchived && <Badge tone="muted">{tr('Archiviert', 'Archived')}</Badge>}
     </div>
   );
 }
@@ -80,18 +81,18 @@ export default function CustomerListPage() {
   return (
     <>
       <PageHeader
-        title="Kunden"
-        description="Alle Geschäfts- und Privatkunden Ihrer Firma."
+        title={tr('Kunden', 'Customers')}
+        description={tr('Alle Geschäfts- und Privatkunden Ihrer Firma.', 'All business and private customers of your company.')}
         actions={
           <>
             <ExportButton
               allowed={can.exportCsv}
               hint={ADMIN_ONLY_HINT}
-              fileName={`kunden-${fileStamp()}.csv`}
+              fileName={`${tr('kunden', 'customers')}-${fileStamp()}.csv`}
               load={() => api.customers.exportCsv(companyId)}
             />
             <ButtonLink to="/kunden/neu" variant="primary" icon={Plus}>
-              Neuer Kunde
+              {tr('Neuer Kunde', 'New customer')}
             </ButtonLink>
           </>
         }
@@ -100,13 +101,13 @@ export default function CustomerListPage() {
         <div className="flex flex-col gap-3 border-b border-neutral-100 px-4 py-3 sm:px-5 lg:flex-row lg:items-center">
           <div className="min-w-0 flex-1 lg:max-w-sm">
             <label htmlFor="customer-search" className="sr-only">
-              Kunden suchen
+              {tr('Kunden suchen', 'Search customers')}
             </label>
             <Input
               id="customer-search"
               type="search"
               icon={Search}
-              placeholder="Name, E-Mail oder Ort suchen …"
+              placeholder={tr('Name, E-Mail oder Ort suchen …', 'Search name, email or city …')}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -115,9 +116,9 @@ export default function CustomerListPage() {
             <div role="group" aria-label="Status" className="flex gap-1.5">
               {(
                 [
-                  ['active', 'Aktiv'],
-                  ['archived', 'Archiviert'],
-                  ['all', 'Alle'],
+                  ['active', tr('Aktiv', 'Active')],
+                  ['archived', tr('Archiviert', 'Archived')],
+                  ['all', tr('Alle', 'All')],
                 ] as const
               ).map(([value, label]) => (
                 <FilterChip key={value} selected={params.status === value} onClick={() => update({ status: value })}>
@@ -126,21 +127,21 @@ export default function CustomerListPage() {
               ))}
             </div>
             <label htmlFor="customer-type" className="sr-only">
-              Kundenart
+              {tr('Kundenart', 'Customer type')}
             </label>
             <Select id="customer-type" inputSize="sm" className="w-[170px]" value={params.type} onChange={(e) => update({ type: e.target.value })}>
-              <option value="">Alle Kundenarten</option>
-              <option value="Business">Geschäftskunden</option>
-              <option value="Private">Privatkunden</option>
+              <option value="">{tr('Alle Kundenarten', 'All customer types')}</option>
+              <option value="Business">{tr('Geschäftskunden', 'Business customers')}</option>
+              <option value="Private">{tr('Privatkunden', 'Private customers')}</option>
             </Select>
             <label htmlFor="customer-sort" className="sr-only">
-              Sortierung
+              {tr('Sortierung', 'Sort order')}
             </label>
             <Select id="customer-sort" inputSize="sm" className="w-[170px]" value={params.sort} onChange={(e) => update({ sort: e.target.value })}>
               <option value="name">Name A–Z</option>
               <option value="-name">Name Z–A</option>
-              <option value="-createdAt">Neueste zuerst</option>
-              <option value="createdAt">Älteste zuerst</option>
+              <option value="-createdAt">{tr('Neueste zuerst', 'Newest first')}</option>
+              <option value="createdAt">{tr('Älteste zuerst', 'Oldest first')}</option>
             </Select>
           </div>
         </div>
@@ -153,29 +154,32 @@ export default function CustomerListPage() {
           filtered ? (
             <EmptyState
               icon={Search}
-              title="Keine Kunden gefunden"
-              description="Passen Sie die Suche oder die Filter an."
+              title={tr('Keine Kunden gefunden', 'No customers found')}
+              description={tr('Passen Sie die Suche oder die Filter an.', 'Adjust your search or filters.')}
               action={
                 <button
                   type="button"
-                  className="text-sm font-medium text-brand-600 hover:underline"
+                  className="text-sm font-medium text-brand-600 dark:text-brand-700 hover:underline"
                   onClick={() => {
                     setSearch('');
                     update({ q: '', type: '', status: 'active' });
                   }}
                 >
-                  Filter zurücksetzen
+                  {tr('Filter zurücksetzen', 'Reset filters')}
                 </button>
               }
             />
           ) : (
             <EmptyState
               icon={Users}
-              title="Noch keine Kunden"
-              description="Legen Sie Ihren ersten Kunden an – danach können Sie direkt ein Angebot für ihn erstellen."
+              title={tr('Noch keine Kunden', 'No customers yet')}
+              description={tr(
+                'Legen Sie Ihren ersten Kunden an – danach können Sie direkt ein Angebot für ihn erstellen.',
+                'Add your first customer – then you can create a quotation for them straight away.',
+              )}
               action={
                 <ButtonLink to="/kunden/neu" variant="primary" icon={Plus}>
-                  Ersten Kunden anlegen
+                  {tr('Ersten Kunden anlegen', 'Add first customer')}
                 </ButtonLink>
               }
             />
@@ -191,19 +195,19 @@ export default function CustomerListPage() {
                       Name
                     </th>
                     <th scope="col" className={table.th}>
-                      Kontakt
+                      {tr('Kontakt', 'Contact')}
                     </th>
                     <th scope="col" className={table.th}>
-                      Ort
+                      {tr('Ort', 'City')}
                     </th>
                     <th scope="col" className={cx(table.th, 'text-right')}>
-                      Angebote
+                      {tr('Angebote', 'Quotations')}
                     </th>
                     <th scope="col" className={cx(table.th, 'text-right')}>
-                      Angenommen (netto)
+                      {tr('Angenommen (netto)', 'Accepted (net)')}
                     </th>
                     <th scope="col" className={cx(table.th, 'text-right')}>
-                      Angelegt
+                      {tr('Angelegt', 'Created')}
                     </th>
                   </tr>
                 </thead>
@@ -233,8 +237,8 @@ export default function CustomerListPage() {
                   <NameCell customer={c} />
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 pl-11 text-[13px] text-neutral-600">
                     {c.city && <span>{c.city}</span>}
-                    <span>{c.quotationCount} Angebote</span>
-                    <span>{formatEur(c.acceptedValue)} angenommen</span>
+                    <span>{tr(`${c.quotationCount} Angebote`, plural(c.quotationCount, 'quotation', 'quotations'))}</span>
+                    <span>{tr(`${formatEur(c.acceptedValue)} angenommen`, `${formatEur(c.acceptedValue)} accepted`)}</span>
                   </div>
                 </li>
               ))}
@@ -244,7 +248,7 @@ export default function CustomerListPage() {
               pageSize={list.data.pageSize}
               totalCount={list.data.totalCount}
               onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
-              noun={['Kunde', 'Kunden']}
+              noun={[tr('Kunde', 'customer'), tr('Kunden', 'customers')]}
             />
           </div>
         )}

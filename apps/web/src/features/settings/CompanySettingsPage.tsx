@@ -1,4 +1,4 @@
-import { emailSchema, type CompanyDto } from '@angebotpilot/api-contracts';
+import { emailSchema, getLocale, type CompanyDto } from '@angebotpilot/api-contracts';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Download, Trash2, TriangleAlert } from 'lucide-react';
@@ -16,27 +16,26 @@ import { Alert, ErrorState, PageSkeleton } from '@/components/ui/Feedback';
 import { Field } from '@/components/ui/Field';
 import { Input, Select } from '@/components/ui/Input';
 import { toast } from '@/components/ui/Toast';
-import { countries } from '@/features/customers/CustomerForm';
 import { api } from '@/lib/api';
 import { downloadBlob, fileStamp } from '@/lib/download';
 import { applyServerErrors, errorMessage, hasFieldErrors, isConflict } from '@/lib/errors';
+import { currentIntlLocale, tr } from '@/lib/i18n';
 import { qk } from '@/lib/queryKeys';
-import { OWNER_ONLY_HINT } from '@/lib/roles';
 import { companyToRequest, ConflictAlert, emptyToNull, FormSection, ReadOnlyNotice } from './shared';
 
-const optional = (max: number) => z.string().trim().max(max, `Maximal ${max} Zeichen.`);
+const optional = (max: number) => z.string().trim().max(max, { error: () => tr(`Maximal ${max} Zeichen.`, `At most ${max} characters.`) });
 
 const schema = z.object({
-  name: z.string().trim().min(2, 'Bitte Firmennamen angeben.').max(200),
+  name: z.string().trim().min(2, { error: () => tr('Bitte Firmennamen angeben.', 'Please enter a company name.') }).max(200),
   addressLine1: optional(200),
   addressLine2: optional(200),
-  postalCode: z.string().trim().regex(/^(\d{4,5})?$/, 'Bitte gültige Postleitzahl angeben.'),
+  postalCode: z.string().trim().regex(/^(\d{4,5})?$/, { error: () => tr('Bitte gültige Postleitzahl angeben.', 'Please enter a valid postcode.') }),
   city: optional(100),
   country: z.string().length(2),
   email: emailSchema.or(z.literal('')),
   phone: optional(50),
   website: optional(200),
-  vatId: z.string().trim().regex(/^([A-Z]{2}[A-Z0-9]{2,13})?$/, 'Format z. B. DE123456789.'),
+  vatId: z.string().trim().regex(/^([A-Z]{2}[A-Z0-9]{2,13})?$/, { error: () => tr('Format z. B. DE123456789.', 'Format e.g. DE123456789.') }),
   taxNumber: optional(30),
   timeZone: z.string().min(1),
   language: z.string().min(1),
@@ -45,18 +44,37 @@ type FormValues = z.infer<typeof schema>;
 
 const fields = Object.keys(schema.shape);
 
-const knownTimeZones: [string, string][] = [
-  ['Europe/Berlin', 'Europa/Berlin'],
-  ['Europe/Vienna', 'Europa/Wien'],
-  ['Europe/Zurich', 'Europa/Zürich'],
+/** Countries offered for the company address (names follow the UI language). */
+const countryCodes = ['DE', 'AT', 'CH', 'LU', 'NL', 'BE', 'FR', 'DK', 'PL', 'CZ', 'IT', 'ES'];
+
+function displayName(type: 'region' | 'language', code: string): string {
+  try {
+    return new Intl.DisplayNames([currentIntlLocale()], { type }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/** Country options plus the stored value, so the select never shows an empty entry. */
+function countryOptions(current: string): [string, string][] {
+  const codes = !current || countryCodes.includes(current) ? countryCodes : [...countryCodes, current];
+  return codes.map((code) => [code, displayName('region', code)]);
+}
+
+const knownTimeZones = (): [string, string][] => [
+  ['Europe/Berlin', tr('Europa/Berlin', 'Europe/Berlin')],
+  ['Europe/Vienna', tr('Europa/Wien', 'Europe/Vienna')],
+  ['Europe/Zurich', tr('Europa/Zürich', 'Europe/Zurich')],
 ];
 /** Known zones plus the stored value, so the select never shows an empty entry. */
 function timeZoneOptions(current: string): [string, string][] {
-  return knownTimeZones.some(([v]) => v === current) || !current ? knownTimeZones : [...knownTimeZones, [current, current]];
+  const known = knownTimeZones();
+  return known.some(([v]) => v === current) || !current ? known : [...known, [current, current]];
 }
+/** The company's document language (documents for customers are German; the value is kept as stored). */
 function languageOptions(current: string): [string, string][] {
   const value = current || 'de-DE';
-  return [[value, value.toLowerCase().startsWith('de') ? 'Deutsch' : value]];
+  return [[value, value.toLowerCase().startsWith('de') ? tr('Deutsch', 'German') : displayName('language', value)]];
 }
 
 function toForm(c: CompanyDto): FormValues {
@@ -115,7 +133,7 @@ function ProfileForm({ company, readOnly }: { company: CompanyDto; readOnly: boo
       queryClient.setQueryData(qk.company(companyId), updated);
       reset(toForm(updated));
       if (updated.name !== company.name) void reloadUser().catch(() => undefined);
-      toast.success('Firmendaten gespeichert');
+      toast.success(tr('Firmendaten gespeichert', 'Company details saved'));
     } catch (error) {
       if (isConflict(error)) {
         setConflict(true);
@@ -128,7 +146,10 @@ function ProfileForm({ company, readOnly }: { company: CompanyDto; readOnly: boo
 
   return (
     <Card>
-      <CardHeader title="Firmenprofil" description="Erscheint im Briefkopf und in der Fußzeile Ihrer Angebote." />
+      <CardHeader
+        title={tr('Firmenprofil', 'Company profile')}
+        description={tr('Erscheint im Briefkopf und in der Fußzeile Ihrer Angebote.', 'Appears in the letterhead and footer of your quotations.')}
+      />
       <form onSubmit={onSubmit} noValidate>
         <fieldset disabled={readOnly} className="min-w-0">
           <CardBody className="space-y-6 py-6">
@@ -146,26 +167,26 @@ function ProfileForm({ company, readOnly }: { company: CompanyDto; readOnly: boo
                 {formError}
               </Alert>
             )}
-            <FormSection title="Name & Anschrift">
-              <Field label="Firmenname" error={errors.name?.message} required>
+            <FormSection title={tr('Name & Anschrift', 'Name & address')}>
+              <Field label={tr('Firmenname', 'Company name')} error={errors.name?.message} required>
                 <Input autoComplete="organization" {...register('name')} />
               </Field>
-              <Field label="Straße und Hausnummer" error={errors.addressLine1?.message} optional>
+              <Field label={tr('Straße und Hausnummer', 'Street and number')} error={errors.addressLine1?.message} optional>
                 <Input {...register('addressLine1')} />
               </Field>
-              <Field label="Adresszusatz" error={errors.addressLine2?.message} optional>
+              <Field label={tr('Adresszusatz', 'Address line 2')} error={errors.addressLine2?.message} optional>
                 <Input {...register('addressLine2')} />
               </Field>
               <div className="grid gap-4 sm:grid-cols-[120px_1fr_200px]">
-                <Field label="PLZ" error={errors.postalCode?.message} optional>
+                <Field label={tr('PLZ', 'Postcode')} error={errors.postalCode?.message} optional>
                   <Input inputMode="numeric" {...register('postalCode')} />
                 </Field>
-                <Field label="Ort" error={errors.city?.message} optional>
+                <Field label={tr('Ort', 'City')} error={errors.city?.message} optional>
                   <Input {...register('city')} />
                 </Field>
-                <Field label="Land" error={errors.country?.message}>
+                <Field label={tr('Land', 'Country')} error={errors.country?.message}>
                   <Select {...register('country')}>
-                    {countries.map(([code, name]) => (
+                    {countryOptions(company.country).map(([code, name]) => (
                       <option key={code} value={code}>
                         {name}
                       </option>
@@ -174,32 +195,32 @@ function ProfileForm({ company, readOnly }: { company: CompanyDto; readOnly: boo
                 </Field>
               </div>
             </FormSection>
-            <FormSection title="Kontakt">
+            <FormSection title={tr('Kontakt', 'Contact')}>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="E-Mail" error={errors.email?.message} optional>
+                <Field label={tr('E-Mail', 'Email')} error={errors.email?.message} optional>
                   <Input type="email" {...register('email')} />
                 </Field>
-                <Field label="Telefon" error={errors.phone?.message} optional>
+                <Field label={tr('Telefon', 'Phone')} error={errors.phone?.message} optional>
                   <Input type="tel" {...register('phone')} />
                 </Field>
               </div>
-              <Field label="Website" error={errors.website?.message} optional>
+              <Field label={tr('Website', 'Website')} error={errors.website?.message} optional>
                 <Input type="url" placeholder="https://" {...register('website')} />
               </Field>
             </FormSection>
-            <FormSection title="Steuern" description="Pflichtangaben auf Angeboten und Rechnungen.">
+            <FormSection title={tr('Steuern', 'Tax')} description={tr('Pflichtangaben auf Angeboten und Rechnungen.', 'Mandatory details on quotations and invoices.')}>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="USt-IdNr." error={errors.vatId?.message} optional>
+                <Field label={tr('USt-IdNr.', 'VAT ID (USt-IdNr.)')} error={errors.vatId?.message} optional>
                   <Input placeholder="DE123456789" {...register('vatId', { setValueAs: (v: string) => v.toUpperCase().replace(/\s/g, '') })} />
                 </Field>
-                <Field label="Steuernummer" error={errors.taxNumber?.message} optional>
+                <Field label={tr('Steuernummer', 'Tax number')} error={errors.taxNumber?.message} optional>
                   <Input {...register('taxNumber')} />
                 </Field>
               </div>
             </FormSection>
-            <FormSection title="Region">
+            <FormSection title={tr('Region', 'Region')}>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Zeitzone" hint="Für Datumsangaben, Fristen und Erinnerungen.">
+                <Field label={tr('Zeitzone', 'Time zone')} hint={tr('Für Datumsangaben, Fristen und Erinnerungen.', 'Used for dates, deadlines and reminders.')}>
                   <Select {...register('timeZone')}>
                     {timeZoneOptions(company.timeZone).map(([value, label]) => (
                       <option key={value} value={value}>
@@ -208,7 +229,10 @@ function ProfileForm({ company, readOnly }: { company: CompanyDto; readOnly: boo
                     ))}
                   </Select>
                 </Field>
-                <Field label="Sprache der Dokumente">
+                <Field
+                  label={tr('Sprache der Dokumente', 'Document language')}
+                  hint={getLocale() === 'en' ? 'Quotations, invoices and emails to your customers are created in German.' : undefined}
+                >
                   <Select {...register('language')}>
                     {languageOptions(company.language).map(([value, label]) => (
                       <option key={value} value={value}>
@@ -223,10 +247,10 @@ function ProfileForm({ company, readOnly }: { company: CompanyDto; readOnly: boo
           {!readOnly && (
             <CardFooter>
               <Button onClick={() => reset(toForm(company))} disabled={!isDirty || isSubmitting}>
-                Verwerfen
+                {tr('Verwerfen', 'Discard')}
               </Button>
               <Button type="submit" variant="primary" loading={isSubmitting} disabled={!isDirty}>
-                Speichern
+                {tr('Speichern', 'Save')}
               </Button>
             </CardFooter>
           )}
@@ -245,10 +269,10 @@ function DangerZone({ company }: { company: CompanyDto }) {
   const exportData = useMutation({
     mutationFn: () => api.companies.export(companyId),
     onSuccess: (blob) => {
-      downloadBlob(blob, `firma-export-${fileStamp()}.json`);
-      toast.success('Export erstellt');
+      downloadBlob(blob, tr(`firma-export-${fileStamp()}.json`, `company-export-${fileStamp()}.json`));
+      toast.success(tr('Export erstellt', 'Export created'));
     },
-    onError: (error) => toast.error('Export fehlgeschlagen', errorMessage(error)),
+    onError: (error) => toast.error(tr('Export fehlgeschlagen', 'Export failed'), errorMessage(error)),
   });
 
   return (
@@ -256,31 +280,41 @@ function DangerZone({ company }: { company: CompanyDto }) {
       <CardHeader
         title={
           <span className="inline-flex items-center gap-2 text-danger-text">
-            <TriangleAlert aria-hidden size={16} /> Gefahrenzone
+            <TriangleAlert aria-hidden size={16} /> {tr('Gefahrenzone', 'Danger zone')}
           </span>
         }
-        description="Datenexport und endgültiges Löschen der Firma. Nur für Inhaber:innen."
+        description={tr('Datenexport und endgültiges Löschen der Firma. Nur für Inhaber:innen.', 'Data export and permanent deletion of the company. Owners only.')}
       />
       <CardBody className="divide-y divide-neutral-100 p-0">
         <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
           <div className="min-w-0 max-w-xl">
-            <p className="text-sm font-medium text-neutral-900">Firmendaten exportieren</p>
-            <p className="text-[13px] text-neutral-500">Alle Kunden, Angebote, Aufträge und Einstellungen als JSON-Datei (Art. 20 DSGVO).</p>
+            <p className="text-sm font-medium text-neutral-900">{tr('Firmendaten exportieren', 'Export company data')}</p>
+            <p className="text-[13px] text-neutral-500">
+              {tr(
+                'Alle Kunden, Angebote, Aufträge und Einstellungen als JSON-Datei (Art. 20 DSGVO).',
+                'All customers, quotations, jobs and settings as a JSON file (Art. 20 GDPR).',
+              )}
+            </p>
           </div>
-          <Restricted allowed={can.ownerActions} hint={OWNER_ONLY_HINT}>
+          <Restricted allowed={can.ownerActions} hint={tr('Nur für Inhaber:innen verfügbar.', 'Only available to owners.')}>
             <Button icon={Download} loading={exportData.isPending} disabled={!can.ownerActions} onClick={() => exportData.mutate()}>
-              Exportieren
+              {tr('Exportieren', 'Export')}
             </Button>
           </Restricted>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
           <div className="min-w-0 max-w-xl">
-            <p className="text-sm font-medium text-neutral-900">Firma löschen</p>
-            <p className="text-[13px] text-neutral-500">Löscht die Firma mit allen Kunden, Angeboten, Aufträgen und Teamzugängen. Nicht umkehrbar.</p>
+            <p className="text-sm font-medium text-neutral-900">{tr('Firma löschen', 'Delete company')}</p>
+            <p className="text-[13px] text-neutral-500">
+              {tr(
+                'Löscht die Firma mit allen Kunden, Angeboten, Aufträgen und Teamzugängen. Nicht umkehrbar.',
+                'Deletes the company with all customers, quotations, jobs and team access. Cannot be undone.',
+              )}
+            </p>
           </div>
-          <Restricted allowed={can.ownerActions} hint={OWNER_ONLY_HINT}>
+          <Restricted allowed={can.ownerActions} hint={tr('Nur für Inhaber:innen verfügbar.', 'Only available to owners.')}>
             <Button variant="danger" icon={Trash2} disabled={!can.ownerActions} onClick={() => setOpen(true)}>
-              Firma löschen …
+              {tr('Firma löschen …', 'Delete company …')}
             </Button>
           </Restricted>
         </div>
@@ -291,24 +325,29 @@ function DangerZone({ company }: { company: CompanyDto }) {
           setOpen(next);
           if (!next) setConfirmName('');
         }}
-        title={`„${company.name}“ endgültig löschen?`}
-        confirmLabel="Endgültig löschen"
+        title={tr(`„${company.name}“ endgültig löschen?`, `Permanently delete “${company.name}”?`)}
+        confirmLabel={tr('Endgültig löschen', 'Delete permanently')}
         variant="danger"
         confirmDisabled={confirmName.trim() !== company.name}
         onConfirm={async () => {
           await api.companies.delete(companyId, { confirmName: confirmName.trim() });
-          toast.success('Firma gelöscht', company.name);
+          toast.success(tr('Firma gelöscht', 'Company deleted'), company.name);
           await reloadUser();
           void navigate('/dashboard', { replace: true });
         }}
       >
         <div className="space-y-3 text-sm text-neutral-700">
           <ul className="list-disc space-y-1 pl-5">
-            <li>Alle Kunden, Angebote, PDFs, Aufträge und Vorlagen dieser Firma werden gelöscht.</li>
-            <li>Alle Teammitglieder verlieren den Zugriff, offene Kundenlinks funktionieren nicht mehr.</li>
-            <li>Gesetzliche Aufbewahrungspflichten liegen bei Ihnen: Exportieren Sie Ihre Daten vorher.</li>
+            <li>{tr('Alle Kunden, Angebote, PDFs, Aufträge und Vorlagen dieser Firma werden gelöscht.', 'All customers, quotations, PDFs, jobs and templates of this company are deleted.')}</li>
+            <li>{tr('Alle Teammitglieder verlieren den Zugriff, offene Kundenlinks funktionieren nicht mehr.', 'All team members lose access; open customer links stop working.')}</li>
+            <li>
+              {tr(
+                'Gesetzliche Aufbewahrungspflichten liegen bei Ihnen: Exportieren Sie Ihre Daten vorher.',
+                'Statutory retention obligations remain with you: export your data first.',
+              )}
+            </li>
           </ul>
-          <Field label={`Zur Bestätigung den Firmennamen eingeben: ${company.name}`}>
+          <Field label={tr(`Zur Bestätigung den Firmennamen eingeben: ${company.name}`, `Enter the company name to confirm: ${company.name}`)}>
             <Input value={confirmName} onChange={(e) => setConfirmName(e.target.value)} autoComplete="off" />
           </Field>
         </div>

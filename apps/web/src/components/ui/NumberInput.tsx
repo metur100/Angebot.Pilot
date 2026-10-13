@@ -1,6 +1,7 @@
-import { parseGermanNumber } from '@angebotpilot/api-contracts';
+import { parseNumberInput } from '@angebotpilot/api-contracts';
 import { forwardRef, useState, type InputHTMLAttributes } from 'react';
 import { cx } from '@/lib/cx';
+import { currentIntlLocale } from '@/lib/i18n';
 import { controlBase, useFieldControl } from './Field';
 
 interface NumberInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type' | 'size'> {
@@ -16,11 +17,12 @@ interface NumberInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, '
 
 function formatDisplay(value: number, min: number, max: number, grouping: boolean) {
   if (!Number.isFinite(value)) return '';
-  return new Intl.NumberFormat('de-DE', { minimumFractionDigits: min, maximumFractionDigits: max, useGrouping: grouping }).format(value);
+  return new Intl.NumberFormat(currentIntlLocale(), { minimumFractionDigits: min, maximumFractionDigits: max, useGrouping: grouping }).format(value);
 }
 
 /**
- * Text input for German numbers: accepts "1.234,56", "1234,56" and "1234.56".
+ * Text input for numbers in the UI language: German accepts "1.234,56", "1234,56" and "1234.56", English "1,234.56" and
+ * "1234.56" (see parseNumberInput). The value passed to onValueChange is always a plain number.
  * Shows the formatted value when not focused and the raw text while editing.
  */
 export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(function NumberInput(
@@ -47,7 +49,7 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(functi
         onChange={(event) => {
           const text = event.target.value;
           setEditing(text);
-          onValueChange(parseGermanNumber(text));
+          onValueChange(parseNumberInput(text));
         }}
         onBlur={(event) => {
           setEditing(null);

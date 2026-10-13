@@ -1,4 +1,4 @@
-import { formatPercent, type CompanyDto, type CompanySettingsDto, type TaxMode, type TaxRateDto } from '@angebotpilot/api-contracts';
+import { formatPercent, getLocale, type CompanyDto, type CompanySettingsDto, type TaxMode, type TaxRateDto } from '@angebotpilot/api-contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ImageUp, Pencil, Plus, Trash2, TriangleAlert } from 'lucide-react';
 import { useRef, useState, type ChangeEvent } from 'react';
@@ -22,10 +22,19 @@ import { contrastWithWhite } from '@/lib/color';
 import { cx } from '@/lib/cx';
 import { errorMessage, isConflict } from '@/lib/errors';
 import { formatFileSize } from '@/lib/format';
+import { currentIntlLocale, tr } from '@/lib/i18n';
 import { qk } from '@/lib/queryKeys';
 import { companyToRequest, ConflictAlert, emptyToNull, FormSection, ReadOnlyNotice } from './shared';
 
 const MAX_LOGO_BYTES = 1024 * 1024;
+
+/** Contrast ratio with one decimal in the UI language (4,5 / 4.5). */
+const formatRatio = (value: number) => new Intl.NumberFormat(currentIntlLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value);
+
+/** English UI only: texts entered here are printed on the (German) documents as written. */
+function GermanDocumentsHint() {
+  return getLocale() === 'en' ? <>Printed on your German documents as written.</> : null;
+}
 
 function LogoCard({ company, readOnly }: { company: CompanyDto; readOnly: boolean }) {
   const { companyId } = useCompany();
@@ -45,7 +54,7 @@ function LogoCard({ company, readOnly }: { company: CompanyDto; readOnly: boolea
     },
     onSuccess: (updated) => {
       onUpdated(updated);
-      toast.success('Logo gespeichert');
+      toast.success(tr('Logo gespeichert', 'Logo saved'));
     },
     onError: (e) => setError(errorMessage(e)),
   });
@@ -53,9 +62,9 @@ function LogoCard({ company, readOnly }: { company: CompanyDto; readOnly: boolea
     mutationFn: () => api.companies.deleteLogo(companyId),
     onSuccess: (updated) => {
       onUpdated(updated);
-      toast.success('Logo entfernt');
+      toast.success(tr('Logo entfernt', 'Logo removed'));
     },
-    onError: (e) => toast.error('Entfernen fehlgeschlagen', errorMessage(e)),
+    onError: (e) => toast.error(tr('Entfernen fehlgeschlagen', 'Removal failed'), errorMessage(e)),
   });
 
   const onFile = (event: ChangeEvent<HTMLInputElement>) => {
@@ -64,11 +73,16 @@ function LogoCard({ company, readOnly }: { company: CompanyDto; readOnly: boolea
     setError(null);
     if (!file) return;
     if (!['image/png', 'image/jpeg'].includes(file.type)) {
-      setError('Bitte wählen Sie eine PNG- oder JPEG-Datei.');
+      setError(tr('Bitte wählen Sie eine PNG- oder JPEG-Datei.', 'Please choose a PNG or JPEG file.'));
       return;
     }
     if (file.size > MAX_LOGO_BYTES) {
-      setError(`Die Datei ist ${formatFileSize(file.size)} groß. Erlaubt sind höchstens 1 MB.`);
+      setError(
+        tr(
+          `Die Datei ist ${formatFileSize(file.size)} groß. Erlaubt sind höchstens 1 MB.`,
+          `The file is ${formatFileSize(file.size)}. The maximum is 1 MB.`,
+        ),
+      );
       return;
     }
     upload.mutate(file);
@@ -76,28 +90,34 @@ function LogoCard({ company, readOnly }: { company: CompanyDto; readOnly: boolea
 
   return (
     <Card>
-      <CardHeader title="Logo" description="Erscheint im Briefkopf von PDF und Kundenseite. PNG oder JPEG, höchstens 1 MB, idealerweise mit transparentem Hintergrund." />
+      <CardHeader
+        title={tr('Logo', 'Logo')}
+        description={tr(
+          'Erscheint im Briefkopf von PDF und Kundenseite. PNG oder JPEG, höchstens 1 MB, idealerweise mit transparentem Hintergrund.',
+          'Appears in the letterhead of the PDF and the customer page. PNG or JPEG, max. 1 MB, ideally with a transparent background.',
+        )}
+      />
       <CardBody className="flex flex-wrap items-center gap-5">
-        <div className="flex h-24 w-56 items-center justify-center rounded-lg border border-dashed border-neutral-300 bg-neutral-25 p-3">
+        <div data-theme="light" className="flex h-24 w-56 items-center justify-center rounded-lg border border-dashed border-neutral-300 bg-neutral-25 p-3">
           {company.hasLogo ? (
             logoUrl ? (
-              <img src={logoUrl} alt={`Aktuelles Logo von ${company.name}`} className="max-h-full max-w-full object-contain" />
+              <img src={logoUrl} alt={tr(`Aktuelles Logo von ${company.name}`, `Current logo of ${company.name}`)} className="max-h-full max-w-full object-contain" />
             ) : (
               <Spinner label="" />
             )
           ) : (
-            <span className="text-[13px] text-neutral-500">Kein Logo hinterlegt</span>
+            <span className="text-[13px] text-neutral-500">{tr('Kein Logo hinterlegt', 'No logo uploaded')}</span>
           )}
         </div>
         <div className="space-y-2">
-          <input ref={inputRef} type="file" accept="image/png,image/jpeg" className="sr-only" onChange={onFile} aria-label="Logo-Datei auswählen" tabIndex={-1} />
+          <input ref={inputRef} type="file" accept="image/png,image/jpeg" className="sr-only" onChange={onFile} aria-label={tr('Logo-Datei auswählen', 'Choose logo file')} tabIndex={-1} />
           <div className="flex flex-wrap gap-2">
             <Button icon={ImageUp} disabled={readOnly} loading={upload.isPending} onClick={() => inputRef.current?.click()}>
-              {company.hasLogo ? 'Logo ersetzen' : 'Logo hochladen'}
+              {company.hasLogo ? tr('Logo ersetzen', 'Replace logo') : tr('Logo hochladen', 'Upload logo')}
             </Button>
             {company.hasLogo && (
               <Button variant="dangerGhost" icon={Trash2} disabled={readOnly} loading={remove.isPending} onClick={() => remove.mutate()}>
-                Entfernen
+                {tr('Entfernen', 'Remove')}
               </Button>
             )}
           </div>
@@ -123,16 +143,22 @@ function BrandColorCard({ company, readOnly }: { company: CompanyDto; readOnly: 
     mutationFn: () => api.companies.update(companyId, companyToRequest(company, { brandColor: color.toUpperCase() })),
     onSuccess: (updated) => {
       queryClient.setQueryData(qk.company(companyId), updated);
-      toast.success('Markenfarbe gespeichert');
+      toast.success(tr('Markenfarbe gespeichert', 'Brand colour saved'));
     },
     onError: (e) => {
       if (isConflict(e)) setConflict(true);
-      else toast.error('Speichern fehlgeschlagen', errorMessage(e));
+      else toast.error(tr('Speichern fehlgeschlagen', 'Saving failed'), errorMessage(e));
     },
   });
   return (
     <Card>
-      <CardHeader title="Markenfarbe" description="Akzentfarbe für PDF und Kundenseite (z. B. Linien, Überschriften, Annahme-Button)." />
+      <CardHeader
+        title={tr('Markenfarbe', 'Brand colour')}
+        description={tr(
+          'Akzentfarbe für PDF und Kundenseite (z. B. Linien, Überschriften, Annahme-Button).',
+          'Accent colour for the PDF and the customer page (e.g. lines, headings, accept button).',
+        )}
+      />
       <CardBody className="space-y-4">
         {conflict && (
           <ConflictAlert
@@ -144,37 +170,39 @@ function BrandColorCard({ company, readOnly }: { company: CompanyDto; readOnly: 
           />
         )}
         <div className="flex flex-wrap items-end gap-4">
-          <Field label="Farbe wählen">
+          <Field label={tr('Farbe wählen', 'Choose colour')}>
             <input
               type="color"
-              aria-label="Markenfarbe wählen"
+              aria-label={tr('Markenfarbe wählen', 'Choose brand colour')}
               value={valid ? color : '#2F45D8'}
               onChange={(e) => setColor(e.target.value.toUpperCase())}
               disabled={readOnly}
               className="h-9 w-16 cursor-pointer rounded-md border border-neutral-300 bg-white p-1 disabled:cursor-not-allowed"
             />
           </Field>
-          <Field label="Hex-Wert" error={valid ? undefined : 'Format #RRGGBB, z. B. #2F45D8.'} className="w-36">
+          <Field label={tr('Hex-Wert', 'Hex value')} error={valid ? undefined : tr('Format #RRGGBB, z. B. #2F45D8.', 'Format #RRGGBB, e.g. #2F45D8.')} className="w-36">
             <Input value={color} onChange={(e) => setColor(e.target.value.trim())} disabled={readOnly} maxLength={7} className="font-mono" />
           </Field>
           <div className="flex items-center gap-3 pb-0.5">
-            <span className="text-[13px] text-neutral-500">Vorschau:</span>
-            <span className="inline-flex h-9 items-center rounded-md px-4 text-sm font-medium text-white shadow-sm" style={{ background: valid ? color : '#2F45D8' }}>
-              Angebot annehmen
+            <span className="text-[13px] text-neutral-500">{tr('Vorschau:', 'Preview:')}</span>
+            <span className="inline-flex h-9 items-center rounded-md px-4 text-sm font-medium text-on-brand shadow-sm" style={{ background: valid ? color : '#2F45D8' }}>
+              {tr('Angebot annehmen', 'Accept quotation')}
             </span>
           </div>
         </div>
         {contrast !== null && contrast < 4.5 && (
           <Alert tone="warning" icon={TriangleAlert}>
-            Weißer Text auf dieser Farbe ist schwer lesbar (Kontrast {contrast.toFixed(1).replace('.', ',')}:1, empfohlen mindestens 4,5:1). Wählen Sie
-            einen dunkleren Farbton.
+            {tr(
+              `Weißer Text auf dieser Farbe ist schwer lesbar (Kontrast ${formatRatio(contrast)}:1, empfohlen mindestens ${formatRatio(4.5)}:1). Wählen Sie einen dunkleren Farbton.`,
+              `White text on this colour is hard to read (contrast ${formatRatio(contrast)}:1, recommended at least ${formatRatio(4.5)}:1). Choose a darker shade.`,
+            )}
           </Alert>
         )}
       </CardBody>
       {!readOnly && (
         <CardFooter>
           <Button variant="primary" disabled={!valid || color.toUpperCase() === company.brandColor.toUpperCase()} loading={save.isPending} onClick={() => save.mutate()}>
-            Farbe speichern
+            {tr('Farbe speichern', 'Save colour')}
           </Button>
         </CardFooter>
       )}
@@ -189,14 +217,14 @@ function DocumentDefaultsCard({ settings, readOnly }: { settings: CompanySetting
   const [errorText, setErrorText] = useState<string | null>(null);
   const set = <K extends keyof CompanySettingsDto>(key: K, value: CompanySettingsDto[K]) => setValues((v) => ({ ...v, [key]: value }));
   const dirty = JSON.stringify(values) !== JSON.stringify(settings);
-  const prefixError = (v: string) => (/^[A-Z0-9]{1,8}$/.test(v) ? undefined : '1–8 Großbuchstaben oder Ziffern.');
-  const validityError = Number.isInteger(values.defaultValidityDays) && values.defaultValidityDays >= 1 && values.defaultValidityDays <= 365 ? undefined : 'Zwischen 1 und 365 Tagen.';
+  const prefixError = (v: string) => (/^[A-Z0-9]{1,8}$/.test(v) ? undefined : tr('1–8 Großbuchstaben oder Ziffern.', '1–8 capital letters or digits.'));
+  const validityError = Number.isInteger(values.defaultValidityDays) && values.defaultValidityDays >= 1 && values.defaultValidityDays <= 365 ? undefined : tr('Zwischen 1 und 365 Tagen.', 'Between 1 and 365 days.');
   const paymentDaysError =
-    Number.isInteger(values.invoicePaymentDays) && values.invoicePaymentDays >= 0 && values.invoicePaymentDays <= 120 ? undefined : 'Zwischen 0 und 120 Tagen.';
+    Number.isInteger(values.invoicePaymentDays) && values.invoicePaymentDays >= 0 && values.invoicePaymentDays <= 120 ? undefined : tr('Zwischen 0 und 120 Tagen.', 'Between 0 and 120 days.');
   const reminderDaysError =
     Number.isInteger(values.invoiceReminderAfterDays) && values.invoiceReminderAfterDays >= 1 && values.invoiceReminderAfterDays <= 60
       ? undefined
-      : 'Zwischen 1 und 60 Tagen.';
+      : tr('Zwischen 1 und 60 Tagen.', 'Between 1 and 60 days.');
   const invalid = Boolean(
     prefixError(values.quotationPrefix) ||
       prefixError(values.jobPrefix) ||
@@ -226,14 +254,20 @@ function DocumentDefaultsCard({ settings, readOnly }: { settings: CompanySetting
       queryClient.setQueryData(qk.settings(companyId), saved);
       setValues(saved);
       setErrorText(null);
-      toast.success('Dokumenteinstellungen gespeichert');
+      toast.success(tr('Dokumenteinstellungen gespeichert', 'Document settings saved'));
     },
     onError: (e) => setErrorText(errorMessage(e)),
   });
 
   return (
     <Card>
-      <CardHeader title="Dokumente & Standardtexte" description="Vorgaben für neue Angebote und Rechnungen. Bestehende Dokumente bleiben unverändert." />
+      <CardHeader
+        title={tr('Dokumente & Standardtexte', 'Documents & default texts')}
+        description={tr(
+          'Vorgaben für neue Angebote und Rechnungen. Bestehende Dokumente bleiben unverändert.',
+          'Defaults for new quotations and invoices. Existing documents stay unchanged.',
+        )}
+      />
       <fieldset disabled={readOnly} className="min-w-0">
         <CardBody className="space-y-6 py-6">
           {errorText && (
@@ -241,52 +275,70 @@ function DocumentDefaultsCard({ settings, readOnly }: { settings: CompanySetting
               {errorText}
             </Alert>
           )}
-          <FormSection title="Nummern & Gültigkeit">
+          <FormSection title={tr('Nummern & Gültigkeit', 'Numbers & validity')}>
             <div className="grid gap-4 sm:grid-cols-3">
-              <Field label="Präfix Angebote" error={prefixError(values.quotationPrefix)} hint={`z. B. ${values.quotationPrefix}-2026-0001`}>
+              <Field
+                label={tr('Präfix Angebote', 'Quotation prefix')}
+                error={prefixError(values.quotationPrefix)}
+                hint={tr(`z. B. ${values.quotationPrefix}-2026-0001`, `e.g. ${values.quotationPrefix}-2026-0001`)}
+              >
                 <Input value={values.quotationPrefix} onChange={(e) => set('quotationPrefix', e.target.value.toUpperCase())} maxLength={8} />
               </Field>
-              <Field label="Präfix Aufträge" error={prefixError(values.jobPrefix)}>
+              <Field label={tr('Präfix Aufträge', 'Job prefix')} error={prefixError(values.jobPrefix)}>
                 <Input value={values.jobPrefix} onChange={(e) => set('jobPrefix', e.target.value.toUpperCase())} maxLength={8} />
               </Field>
-              <Field label="Gültigkeit (Tage)" error={validityError}>
+              <Field label={tr('Gültigkeit (Tage)', 'Validity (days)')} error={validityError}>
                 <NumberInput value={values.defaultValidityDays} onValueChange={(v) => set('defaultValidityDays', v)} maxFractionDigits={0} align="left" />
               </Field>
             </div>
             <TaxModePicker
               name="settings-tax-mode"
-              legend="Standard-Besteuerung"
+              legend={tr('Standard-Besteuerung', 'Default taxation')}
               value={values.defaultTaxMode}
               onChange={(mode: TaxMode) => set('defaultTaxMode', mode)}
               disabled={readOnly}
             />
           </FormSection>
-          <FormSection title="Standardtexte" description="Werden in neue Angebote übernommen und können dort angepasst werden.">
-            <Field label="Einleitung" optional>
+          <FormSection
+            title={tr('Standardtexte', 'Default texts')}
+            description={
+              <>
+                {tr('Werden in neue Angebote übernommen und können dort angepasst werden.', 'Copied into new quotations, where you can adjust them.')}{' '}
+                <GermanDocumentsHint />
+              </>
+            }
+          >
+            <Field label={tr('Einleitung', 'Introduction')} optional>
               <Textarea rows={3} value={values.defaultIntroText ?? ''} onChange={(e) => set('defaultIntroText', e.target.value)} />
             </Field>
-            <Field label="Schlusstext" optional>
+            <Field label={tr('Schlusstext', 'Closing text')} optional>
               <Textarea rows={3} value={values.defaultClosingText ?? ''} onChange={(e) => set('defaultClosingText', e.target.value)} />
             </Field>
-            <Field label="Zahlungsbedingungen" optional>
+            <Field label={tr('Zahlungsbedingungen', 'Payment terms')} optional>
               <Textarea rows={2} value={values.paymentTerms ?? ''} onChange={(e) => set('paymentTerms', e.target.value)} />
             </Field>
-            <Field label="Weitere Bedingungen" optional>
+            <Field label={tr('Weitere Bedingungen', 'Further terms')} optional>
               <Textarea rows={3} value={values.defaultTerms ?? ''} onChange={(e) => set('defaultTerms', e.target.value)} />
             </Field>
           </FormSection>
-          <FormSection title="Bankverbindung" description="Optional in der Fußzeile der Angebote, auf Rechnungen immer (sofern eine IBAN hinterlegt ist).">
+          <FormSection
+            title={tr('Bankverbindung', 'Bank details')}
+            description={tr(
+              'Optional in der Fußzeile der Angebote, auf Rechnungen immer (sofern eine IBAN hinterlegt ist).',
+              'Optional in the footer of quotations, always on invoices (if an IBAN is stored).',
+            )}
+          >
             <Switch
               checked={values.showBankDetails}
               onCheckedChange={(v) => set('showBankDetails', v)}
-              label="Auf Angeboten anzeigen"
+              label={tr('Auf Angeboten anzeigen', 'Show on quotations')}
               disabled={readOnly}
             />
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Kontoinhaber" optional>
+              <Field label={tr('Kontoinhaber', 'Account holder')} optional>
                 <Input value={values.bankAccountHolder ?? ''} onChange={(e) => set('bankAccountHolder', e.target.value)} />
               </Field>
-              <Field label="Bank" optional>
+              <Field label={tr('Bank', 'Bank')} optional>
                 <Input value={values.bankName ?? ''} onChange={(e) => set('bankName', e.target.value)} />
               </Field>
               <Field label="IBAN" optional>
@@ -297,38 +349,65 @@ function DocumentDefaultsCard({ settings, readOnly }: { settings: CompanySetting
               </Field>
             </div>
           </FormSection>
-          <FormSection title="Rechnungen" description="Nummernkreis, Zahlungsziel und Texte für neue Rechnungen.">
+          <FormSection
+            title={tr('Rechnungen', 'Invoices')}
+            description={
+              <>
+                {tr('Nummernkreis, Zahlungsziel und Texte für neue Rechnungen.', 'Number range, payment terms and texts for new invoices.')}{' '}
+                <GermanDocumentsHint />
+              </>
+            }
+          >
             <Alert tone="info">
-              Für Rechnungen sind die vollständige Anschrift sowie Steuernummer oder USt-IdNr. in den{' '}
-              <Link to="/einstellungen/firma">Firmendaten</Link> Pflicht. Ohne diese Angaben kann eine Rechnung nicht gestellt werden.
+              {getLocale() === 'en' ? (
+                <>
+                  Invoices require the full address and a tax number or VAT ID (USt-IdNr.) in the{' '}
+                  <Link to="/einstellungen/firma">company details</Link>. Without these details an invoice cannot be issued.
+                </>
+              ) : (
+                <>
+                  Für Rechnungen sind die vollständige Anschrift sowie Steuernummer oder USt-IdNr. in den{' '}
+                  <Link to="/einstellungen/firma">Firmendaten</Link> Pflicht. Ohne diese Angaben kann eine Rechnung nicht gestellt werden.
+                </>
+              )}
             </Alert>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
-                label="Präfix Rechnungen"
+                label={tr('Präfix Rechnungen', 'Invoice prefix')}
                 error={prefixError(values.invoicePrefix)}
-                hint={`z. B. ${values.invoicePrefix || 'RE'}-${new Date().getFullYear()}-0001 · fortlaufend und lückenlos`}
+                hint={tr(
+                  `z. B. ${values.invoicePrefix || 'RE'}-${new Date().getFullYear()}-0001 · fortlaufend und lückenlos`,
+                  `e.g. ${values.invoicePrefix || 'RE'}-${new Date().getFullYear()}-0001 · consecutive without gaps`,
+                )}
               >
                 <Input value={values.invoicePrefix} onChange={(e) => set('invoicePrefix', e.target.value.toUpperCase())} maxLength={8} />
               </Field>
-              <Field label="Zahlungsziel (Tage)" error={paymentDaysError} hint="Fälligkeit = Rechnungsdatum + Zahlungsziel. 0 = sofort fällig.">
+              <Field
+                label={tr('Zahlungsziel (Tage)', 'Payment terms (days)')}
+                error={paymentDaysError}
+                hint={tr('Fälligkeit = Rechnungsdatum + Zahlungsziel. 0 = sofort fällig.', 'Due date = invoice date + payment terms. 0 = due immediately.')}
+              >
                 <NumberInput value={values.invoicePaymentDays} onValueChange={(v) => set('invoicePaymentDays', v)} maxFractionDigits={0} align="left" />
               </Field>
             </div>
-            <Field label="Einleitung Rechnungen" optional>
+            <Field label={tr('Einleitung Rechnungen', 'Invoice introduction')} optional>
               <Textarea rows={3} value={values.invoiceIntroText ?? ''} onChange={(e) => set('invoiceIntroText', e.target.value)} />
             </Field>
-            <Field label="Schlusstext Rechnungen" optional>
+            <Field label={tr('Schlusstext Rechnungen', 'Invoice closing text')} optional>
               <Textarea rows={3} value={values.invoiceClosingText ?? ''} onChange={(e) => set('invoiceClosingText', e.target.value)} />
             </Field>
             <div className="space-y-3 rounded-lg border border-neutral-200 p-4">
               <Switch
                 checked={values.invoiceReminderEnabled}
                 onCheckedChange={(v) => set('invoiceReminderEnabled', v)}
-                label="Automatische Zahlungserinnerung"
-                description="Eine freundliche Erinnerung per E-Mail, wenn eine per E-Mail versendete Rechnung überfällig ist."
+                label={tr('Automatische Zahlungserinnerung', 'Automatic payment reminder')}
+                description={tr(
+                  'Eine freundliche Erinnerung per E-Mail, wenn eine per E-Mail versendete Rechnung überfällig ist.',
+                  'A friendly email reminder when an invoice sent by email is overdue.',
+                )}
                 disabled={readOnly}
               />
-              <Field label="Tage nach Fälligkeit" error={values.invoiceReminderEnabled ? reminderDaysError : undefined} className="sm:max-w-[220px]">
+              <Field label={tr('Tage nach Fälligkeit', 'Days after due date')} error={values.invoiceReminderEnabled ? reminderDaysError : undefined} className="sm:max-w-[220px]">
                 <NumberInput
                   value={values.invoiceReminderAfterDays}
                   onValueChange={(v) => set('invoiceReminderAfterDays', v)}
@@ -339,18 +418,20 @@ function DocumentDefaultsCard({ settings, readOnly }: { settings: CompanySetting
               </Field>
             </div>
             <p className="text-[13px] leading-[18px] text-neutral-500">
-              Auf Rechnungen wird Ihre Bankverbindung immer angegeben, sofern eine IBAN hinterlegt ist. Rechnungen enthalten einen GiroCode zum
-              Bezahlen per Banking-App.
+              {tr(
+                'Auf Rechnungen wird Ihre Bankverbindung immer angegeben, sofern eine IBAN hinterlegt ist. Rechnungen enthalten einen GiroCode zum Bezahlen per Banking-App.',
+                'Your bank details are always shown on invoices if an IBAN is stored. Invoices include a GiroCode for paying with a banking app.',
+              )}
             </p>
           </FormSection>
         </CardBody>
         {!readOnly && (
           <CardFooter>
             <Button onClick={() => setValues(settings)} disabled={!dirty || save.isPending}>
-              Verwerfen
+              {tr('Verwerfen', 'Discard')}
             </Button>
             <Button variant="primary" disabled={!dirty || invalid} loading={save.isPending} onClick={() => save.mutate()}>
-              Speichern
+              {tr('Speichern', 'Save')}
             </Button>
           </CardFooter>
         )}
@@ -366,7 +447,7 @@ function TaxRateDialog({ rate, open, onOpenChange }: { rate: TaxRateDto | null; 
   const [percent, setPercent] = useState(rate?.ratePercent ?? Number.NaN);
   const [isDefault, setIsDefault] = useState(rate?.isDefault ?? false);
   const [isArchived, setIsArchived] = useState(rate?.isArchived ?? false);
-  const percentError = Number.isFinite(percent) && percent >= 0 && percent <= 100 ? undefined : 'Bitte einen Satz zwischen 0 und 100 % angeben.';
+  const percentError = Number.isFinite(percent) && percent >= 0 && percent <= 100 ? undefined : tr('Bitte einen Satz zwischen 0 und 100 % angeben.', 'Please enter a rate between 0 and 100 %.');
   const save = useMutation({
     mutationFn: () => {
       const body = { name: name.trim(), ratePercent: percent, isDefault, isArchived };
@@ -374,7 +455,7 @@ function TaxRateDialog({ rate, open, onOpenChange }: { rate: TaxRateDto | null; 
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: qk.taxRates(companyId) });
-      toast.success(rate ? 'Steuersatz gespeichert' : 'Steuersatz angelegt');
+      toast.success(rate ? tr('Steuersatz gespeichert', 'VAT rate saved') : tr('Steuersatz angelegt', 'VAT rate created'));
       onOpenChange(false);
     },
   });
@@ -382,13 +463,13 @@ function TaxRateDialog({ rate, open, onOpenChange }: { rate: TaxRateDto | null; 
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title={rate ? 'Steuersatz bearbeiten' : 'Neuer Steuersatz'}
+      title={rate ? tr('Steuersatz bearbeiten', 'Edit VAT rate') : tr('Neuer Steuersatz', 'New VAT rate')}
       size="sm"
       footer={
         <>
-          <Button onClick={() => onOpenChange(false)}>Abbrechen</Button>
+          <Button onClick={() => onOpenChange(false)}>{tr('Abbrechen', 'Cancel')}</Button>
           <Button variant="primary" loading={save.isPending} disabled={!name.trim() || Boolean(percentError)} onClick={() => save.mutate()}>
-            Speichern
+            {tr('Speichern', 'Save')}
           </Button>
         </>
       }
@@ -399,16 +480,19 @@ function TaxRateDialog({ rate, open, onOpenChange }: { rate: TaxRateDto | null; 
             {errorMessage(save.error)}
           </Alert>
         )}
-        <Field label="Bezeichnung" required>
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="z. B. Regelsatz" maxLength={50} />
+        <Field label={tr('Bezeichnung', 'Name')} required>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={tr('z. B. Regelsatz', 'e.g. Standard rate')} maxLength={50} />
         </Field>
-        <Field label="Steuersatz" error={Number.isNaN(percent) ? undefined : percentError} required>
+        <Field label={tr('Steuersatz', 'VAT rate')} error={Number.isNaN(percent) ? undefined : percentError} required>
           <NumberInput value={percent} onValueChange={setPercent} suffix="%" maxFractionDigits={2} align="left" />
         </Field>
-        <Checkbox label="Standardsatz für neue Positionen" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />
+        <Checkbox label={tr('Standardsatz für neue Positionen', 'Default rate for new line items')} checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />
         <Checkbox
-          label="Archiviert"
-          description="Nicht mehr für neue Positionen auswählbar. Bestehende Angebote bleiben unverändert."
+          label={tr('Archiviert', 'Archived')}
+          description={tr(
+            'Nicht mehr für neue Positionen auswählbar. Bestehende Angebote bleiben unverändert.',
+            'No longer selectable for new line items. Existing quotations stay unchanged.',
+          )}
           checked={isArchived}
           onChange={(e) => setIsArchived(e.target.checked)}
         />
@@ -423,12 +507,12 @@ function TaxRatesCard({ readOnly }: { readOnly: boolean }) {
   return (
     <Card>
       <CardHeader
-        title="Umsatzsteuersätze"
-        description="Auswahl in den Positionen bei Regelbesteuerung."
+        title={tr('Umsatzsteuersätze', 'VAT rates')}
+        description={tr('Auswahl in den Positionen bei Regelbesteuerung.', 'Selectable in line items under standard taxation.')}
         actions={
           !readOnly && (
             <Button size="sm" icon={Plus} onClick={() => setEditing('new')}>
-              Steuersatz
+              {tr('Steuersatz', 'VAT rate')}
             </Button>
           )
         }
@@ -442,11 +526,17 @@ function TaxRatesCard({ readOnly }: { readOnly: boolean }) {
           <table className={table.table}>
             <thead>
               <tr>
-                <th scope="col" className={table.th}>Bezeichnung</th>
-                <th scope="col" className={cx(table.th, 'text-right')}>Satz</th>
-                <th scope="col" className={table.th}>Status</th>
                 <th scope="col" className={table.th}>
-                  <span className="sr-only">Aktionen</span>
+                  {tr('Bezeichnung', 'Name')}
+                </th>
+                <th scope="col" className={cx(table.th, 'text-right')}>
+                  {tr('Satz', 'Rate')}
+                </th>
+                <th scope="col" className={table.th}>
+                  {tr('Status', 'Status')}
+                </th>
+                <th scope="col" className={table.th}>
+                  <span className="sr-only">{tr('Aktionen', 'Actions')}</span>
                 </th>
               </tr>
             </thead>
@@ -459,12 +549,12 @@ function TaxRatesCard({ readOnly }: { readOnly: boolean }) {
                     <td className={cx(table.td, table.num)}>{formatPercent(r.ratePercent)}</td>
                     <td className={table.td}>
                       <div className="flex gap-1.5">
-                        {r.isDefault && <Badge tone="info">Standard</Badge>}
-                        {r.isArchived ? <Badge tone="muted">Archiviert</Badge> : <Badge tone="success">Aktiv</Badge>}
+                        {r.isDefault && <Badge tone="info">{tr('Standard', 'Default')}</Badge>}
+                        {r.isArchived ? <Badge tone="muted">{tr('Archiviert', 'Archived')}</Badge> : <Badge tone="success">{tr('Aktiv', 'Active')}</Badge>}
                       </div>
                     </td>
                     <td className={cx(table.td, 'w-12 text-right')}>
-                      {!readOnly && <IconButton size="sm" icon={Pencil} label={`${r.name} bearbeiten`} onClick={() => setEditing(r)} />}
+                      {!readOnly && <IconButton size="sm" icon={Pencil} label={tr(`${r.name} bearbeiten`, `Edit ${r.name}`)} onClick={() => setEditing(r)} />}
                     </td>
                   </tr>
                 ))}

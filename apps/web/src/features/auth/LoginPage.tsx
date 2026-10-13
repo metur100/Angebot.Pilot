@@ -11,6 +11,7 @@ import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { ApiError } from '@angebotpilot/api-contracts';
 import { errorMessage } from '@/lib/errors';
+import { tr } from '@/lib/i18n';
 import { AuthLayout, PasswordInput } from './AuthLayout';
 
 export default function LoginPage() {
@@ -31,7 +32,7 @@ export default function LoginPage() {
       // <PublicOnly> redirects to ?next= or the dashboard once authenticated.
     } catch (error) {
       if (error instanceof ApiError && (error.status === 401 || error.status === 400)) {
-        setFormError(error.problem.detail ?? 'E-Mail-Adresse oder Passwort ist falsch.');
+        setFormError(error.problem.detail ?? tr('E-Mail-Adresse oder Passwort ist falsch.', 'Email address or password is incorrect.'));
       } else {
         setFormError(errorMessage(error));
       }
@@ -43,13 +44,13 @@ export default function LoginPage() {
 
   return (
     <AuthLayout
-      title="Anmelden"
-      description="Willkommen zurück. Melden Sie sich mit Ihrer E-Mail-Adresse an."
+      title={tr('Anmelden', 'Sign in')}
+      description={tr('Willkommen zurück. Melden Sie sich mit Ihrer E-Mail-Adresse an.', 'Welcome back. Sign in with your email address.')}
       footer={
         <>
-          Noch kein Konto?{' '}
-          <Link to={registerHref} className="font-medium text-brand-600 hover:text-brand-700 hover:underline">
-            Jetzt kostenlos registrieren
+          {tr('Noch kein Konto?', 'No account yet?')}{' '}
+          <Link to={registerHref} className="font-medium text-brand-600 dark:text-brand-700 hover:text-brand-700 dark:hover:text-brand-800 hover:underline">
+            {tr('Jetzt kostenlos registrieren', 'Sign up for free')}
           </Link>
         </>
       }
@@ -60,28 +61,31 @@ export default function LoginPage() {
             {formError}
           </Alert>
         )}
-        <Field label="E-Mail-Adresse" error={errors.email?.message}>
+        <Field label={tr('E-Mail-Adresse', 'Email address')} error={errors.email?.message}>
           <Input type="email" autoComplete="email" className="h-10" {...register('email')} />
         </Field>
         <Field
-          label="Passwort"
+          label={tr('Passwort', 'Password')}
           error={errors.password?.message}
           labelAside={
-            <Link to="/passwort-vergessen" className="text-[13px] font-medium text-brand-600 hover:text-brand-700 hover:underline">
-              Passwort vergessen?
+            <Link to="/passwort-vergessen" className="text-[13px] font-medium text-brand-600 dark:text-brand-700 hover:text-brand-700 dark:hover:text-brand-800 hover:underline">
+              {tr('Passwort vergessen?', 'Forgot password?')}
             </Link>
           }
         >
           <PasswordInput autoComplete="current-password" {...register('password')} />
         </Field>
         <Checkbox
-          label="Angemeldet bleiben"
-          description="Nur auf eigenen Geräten aktivieren. Sonst endet die Sitzung, wenn Sie den Browser-Tab schließen."
+          label={tr('Angemeldet bleiben', 'Stay signed in')}
+          description={tr(
+            'Nur auf eigenen Geräten aktivieren. Sonst endet die Sitzung, wenn Sie den Browser-Tab schließen.',
+            'Only use this on your own devices. Otherwise the session ends when you close the browser tab.',
+          )}
           checked={remember}
           onChange={(event) => setRemember(event.target.checked)}
         />
         <Button type="submit" variant="primary" size="lg" className="w-full" loading={isSubmitting}>
-          Anmelden
+          {tr('Anmelden', 'Sign in')}
         </Button>
       </form>
     </AuthLayout>

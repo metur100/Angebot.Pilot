@@ -11,6 +11,7 @@ import { FilterChip, PageHeader, Pagination } from '@/components/ui/Page';
 import { api } from '@/lib/api';
 import { cx } from '@/lib/cx';
 import { formatDateTime, formatRelative } from '@/lib/format';
+import { tr } from '@/lib/i18n';
 import { useListParams } from '@/lib/listParams';
 import { qk } from '@/lib/queryKeys';
 
@@ -38,21 +39,21 @@ export default function NotificationsPage() {
   return (
     <>
       <PageHeader
-        title="Benachrichtigungen"
-        description="Entscheidungen Ihrer Kunden, Versandprobleme und andere Ereignisse."
+        title={tr('Benachrichtigungen', 'Notifications')}
+        description={tr('Entscheidungen Ihrer Kunden, Versandprobleme und andere Ereignisse.', "Your customers' decisions, delivery problems and other events.")}
         actions={
           <Button icon={CheckCheck} loading={markAll.isPending} onClick={() => markAll.mutate()}>
-            Alle als gelesen markieren
+            {tr('Alle als gelesen markieren', 'Mark all as read')}
           </Button>
         }
       />
       <Card>
-        <div className="flex gap-1.5 border-b border-neutral-100 px-4 py-3 sm:px-5" role="group" aria-label="Filter">
+        <div className="flex gap-1.5 border-b border-neutral-100 px-4 py-3 sm:px-5" role="group" aria-label={tr('Filter', 'Filter')}>
           <FilterChip selected={!unreadOnly} onClick={() => update({ filter: 'all' })}>
-            Alle
+            {tr('Alle', 'All')}
           </FilterChip>
           <FilterChip selected={unreadOnly} onClick={() => update({ filter: 'unread' })}>
-            Ungelesen
+            {tr('Ungelesen', 'Unread')}
           </FilterChip>
         </div>
         {list.isPending ? (
@@ -62,8 +63,11 @@ export default function NotificationsPage() {
         ) : list.data.items.length === 0 ? (
           <EmptyState
             icon={Bell}
-            title={unreadOnly ? 'Keine ungelesenen Benachrichtigungen' : 'Noch keine Benachrichtigungen'}
-            description="Sie werden hier informiert, sobald ein Kunde ein Angebot annimmt oder ablehnt."
+            title={unreadOnly ? tr('Keine ungelesenen Benachrichtigungen', 'No unread notifications') : tr('Noch keine Benachrichtigungen', 'No notifications yet')}
+            description={tr(
+              'Sie werden hier informiert, sobald ein Kunde ein Angebot annimmt oder ablehnt.',
+              'You will be notified here as soon as a customer accepts or declines a quotation.',
+            )}
           />
         ) : (
           <div className={cx(list.isPlaceholderData && 'opacity-60')}>
@@ -75,19 +79,26 @@ export default function NotificationsPage() {
                     <span aria-hidden className={cx('mt-2 size-2 shrink-0 rounded-full', n.isRead ? 'bg-neutral-200' : 'bg-brand-600')} />
                     <div className="min-w-0 flex-1">
                       {target ? (
-                        <button type="button" onClick={() => open(n)} className="text-left text-sm font-medium text-neutral-900 hover:text-brand-700 hover:underline">
+                        <button type="button" onClick={() => open(n)} className="text-left text-sm font-medium text-neutral-900 hover:text-brand-700 dark:hover:text-brand-800 hover:underline">
                           {n.title}
                         </button>
                       ) : (
                         <p className="text-sm font-medium text-neutral-900">{n.title}</p>
                       )}
-                      {!n.isRead && <span className="sr-only"> (ungelesen)</span>}
+                      {!n.isRead && <span className="sr-only">{tr(' (ungelesen)', ' (unread)')}</span>}
                       {n.body && <p className="mt-0.5 text-[13px] text-neutral-600">{n.body}</p>}
                       <p className="mt-1 text-xs text-neutral-500" title={formatDateTime(n.createdAt)}>
                         {formatRelative(n.createdAt)}
                       </p>
                     </div>
-                    {!n.isRead && <IconButton size="sm" icon={Check} label={`„${n.title}“ als gelesen markieren`} onClick={() => markRead.mutate(n.id)} />}
+                    {!n.isRead && (
+                      <IconButton
+                        size="sm"
+                        icon={Check}
+                        label={tr(`„${n.title}“ als gelesen markieren`, `Mark “${n.title}” as read`)}
+                        onClick={() => markRead.mutate(n.id)}
+                      />
+                    )}
                   </li>
                 );
               })}
@@ -97,7 +108,7 @@ export default function NotificationsPage() {
               pageSize={list.data.pageSize}
               totalCount={list.data.totalCount}
               onPageChange={(p) => update({ page: String(p) }, { resetPage: false })}
-              noun={['Benachrichtigung', 'Benachrichtigungen']}
+              noun={[tr('Benachrichtigung', 'notification'), tr('Benachrichtigungen', 'notifications')]}
             />
           </div>
         )}

@@ -1,13 +1,25 @@
 import { addDaysIso, todayIso } from '@angebotpilot/api-contracts';
+import { tr } from './i18n';
 
 export type DatePreset = 'month' | 'last30' | 'last90' | 'year' | 'custom';
 
+/** Labels in the current UI language (getters, resolved on access). */
 export const datePresetLabel: Record<DatePreset, string> = {
-  month: 'Dieser Monat',
-  last30: 'Letzte 30 Tage',
-  last90: 'Letzte 90 Tage',
-  year: 'Dieses Jahr',
-  custom: 'Benutzerdefiniert',
+  get month() {
+    return tr('Dieser Monat', 'This month');
+  },
+  get last30() {
+    return tr('Letzte 30 Tage', 'Last 30 days');
+  },
+  get last90() {
+    return tr('Letzte 90 Tage', 'Last 90 days');
+  },
+  get year() {
+    return tr('Dieses Jahr', 'This year');
+  },
+  get custom() {
+    return tr('Benutzerdefiniert', 'Custom');
+  },
 };
 
 export interface DateRange {

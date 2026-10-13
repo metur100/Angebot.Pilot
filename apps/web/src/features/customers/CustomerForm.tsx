@@ -9,6 +9,7 @@ import { Alert } from '@/components/ui/Feedback';
 import { Field } from '@/components/ui/Field';
 import { Input, Select, Textarea } from '@/components/ui/Input';
 import { applyServerErrors, errorMessage, hasFieldErrors, isConflict } from '@/lib/errors';
+import { currentIntlLocale, tr } from '@/lib/i18n';
 
 export type CustomerFormInput = z.input<typeof customerSchema>;
 type CustomerFormOutput = z.output<typeof customerSchema>;
@@ -18,24 +19,22 @@ const knownFields = [
   'billingCountry', 'hasServiceAddress', 'serviceStreet', 'servicePostalCode', 'serviceCity', 'serviceCountry', 'vatId', 'notes', 'followUpOptOut',
 ];
 
-export const countries: [string, string][] = [
-  ['DE', 'Deutschland'],
-  ['AT', 'Österreich'],
-  ['CH', 'Schweiz'],
-  ['LU', 'Luxemburg'],
-  ['NL', 'Niederlande'],
-  ['BE', 'Belgien'],
-  ['FR', 'Frankreich'],
-  ['DK', 'Dänemark'],
-  ['PL', 'Polen'],
-  ['CZ', 'Tschechien'],
-  ['IT', 'Italien'],
-  ['ES', 'Spanien'],
-];
+/** ISO 3166-1 alpha-2 codes offered in country selects (stored as the value), DACH first. */
+export const countryCodes = ['DE', 'AT', 'CH', 'LU', 'NL', 'BE', 'FR', 'DK', 'PL', 'CZ', 'IT', 'ES'] as const;
 
+/** Country name in the current UI language (Intl.DisplayNames), falling back to the code. */
 export function countryName(code: string | null | undefined) {
   if (!code) return '';
-  return countries.find(([c]) => c === code)?.[1] ?? code;
+  try {
+    return new Intl.DisplayNames([currentIntlLocale()], { type: 'region' }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/** [code, name] pairs for country selects, names in the current UI language. Call at render time. */
+export function countryOptions(): [string, string][] {
+  return countryCodes.map((code) => [code, countryName(code)]);
 }
 
 export function formatAddress(street: string | null, postalCode: string | null, city: string | null, country: string | null) {
@@ -173,77 +172,102 @@ export function CustomerForm({ customer, id, onSubmit, compact, onConflict }: Cu
           {formError}
         </Alert>
       )}
-      <Section compact={compact} title="Kundenart" description="Geschäftskunden erhalten Firmenname und USt-IdNr. auf dem Angebot.">
+      <Section
+        compact={compact}
+        title={tr('Kundenart', 'Customer type')}
+        description={tr('Geschäftskunden erhalten Firmenname und USt-IdNr. auf dem Angebot.', 'Business customers get their company name and VAT ID on the quotation.')}
+      >
         <Controller
           control={control}
           name="type"
           render={({ field }) => (
             <RadioCards<CustomerType>
               name={`${id}-type`}
-              legend="Kundenart"
+              legend={tr('Kundenart', 'Customer type')}
               hideLegend
               value={field.value}
               onChange={field.onChange}
               options={[
-                { value: 'Business', label: 'Geschäftskunde', description: 'Firma, Verein, Behörde', icon: <Building2 aria-hidden size={18} className="mt-0.5 text-neutral-500" /> },
-                { value: 'Private', label: 'Privatkunde', description: 'Privatperson oder Haushalt', icon: <UserRound aria-hidden size={18} className="mt-0.5 text-neutral-500" /> },
+                {
+                  value: 'Business',
+                  label: tr('Geschäftskunde', 'Business customer'),
+                  description: tr('Firma, Verein, Behörde', 'Company, association, public authority'),
+                  icon: <Building2 aria-hidden size={18} className="mt-0.5 text-neutral-500" />,
+                },
+                {
+                  value: 'Private',
+                  label: tr('Privatkunde', 'Private customer'),
+                  description: tr('Privatperson oder Haushalt', 'Private person or household'),
+                  icon: <UserRound aria-hidden size={18} className="mt-0.5 text-neutral-500" />,
+                },
               ]}
             />
           )}
         />
       </Section>
 
-      <Section compact={compact} title={business ? 'Firma & Ansprechpartner' : 'Person'}>
+      <Section compact={compact} title={business ? tr('Firma & Ansprechpartner', 'Company & contact person') : tr('Person', 'Person')}>
         {business && (
-          <Field label="Firmenname" error={errors.companyName?.message} required>
+          <Field label={tr('Firmenname', 'Company name')} error={errors.companyName?.message} required>
             <Input autoComplete="organization" {...register('companyName')} />
           </Field>
         )}
         <div className="grid gap-4 sm:grid-cols-[140px_1fr_1fr]">
-          <Field label="Anrede" error={errors.salutation?.message} optional>
+          <Field label={tr('Anrede', 'Salutation')} error={errors.salutation?.message} optional>
+            {/* Stored values stay German: they are used in the salutation of German customer documents. */}
             <Select {...register('salutation')}>
               <option value="">–</option>
-              <option value="Frau">Frau</option>
-              <option value="Herr">Herr</option>
-              <option value="Divers">Divers</option>
+              <option value="Frau">{tr('Frau', 'Ms')}</option>
+              <option value="Herr">{tr('Herr', 'Mr')}</option>
+              <option value="Divers">{tr('Divers', 'Mx')}</option>
             </Select>
           </Field>
-          <Field label="Vorname" error={errors.firstName?.message} optional>
+          <Field label={tr('Vorname', 'First name')} error={errors.firstName?.message} optional>
             <Input autoComplete="given-name" {...register('firstName')} />
           </Field>
-          <Field label="Nachname" error={errors.lastName?.message} required={!business} optional={business}>
+          <Field label={tr('Nachname', 'Last name')} error={errors.lastName?.message} required={!business} optional={business}>
             <Input autoComplete="family-name" {...register('lastName')} />
           </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="E-Mail" error={errors.email?.message} optional hint="Für den Versand von Angeboten und Erinnerungen.">
+          <Field
+            label={tr('E-Mail', 'Email')}
+            error={errors.email?.message}
+            optional
+            hint={tr('Für den Versand von Angeboten und Erinnerungen.', 'For sending quotations and reminders.')}
+          >
             <Input type="email" autoComplete="email" {...register('email')} />
           </Field>
-          <Field label="Telefon" error={errors.phone?.message} optional>
+          <Field label={tr('Telefon', 'Phone')} error={errors.phone?.message} optional>
             <Input type="tel" autoComplete="tel" {...register('phone')} />
           </Field>
         </div>
         {business && (
-          <Field label="USt-IdNr." error={errors.vatId?.message} optional hint="Wichtig z. B. bei Reverse Charge (§ 13b UStG).">
+          <Field
+            label={tr('USt-IdNr.', 'VAT ID (USt-IdNr.)')}
+            error={errors.vatId?.message}
+            optional
+            hint={tr('Wichtig z. B. bei Reverse Charge (§ 13b UStG).', 'Important e.g. for reverse charge (§ 13b UStG).')}
+          >
             <Input placeholder="DE123456789" className="sm:max-w-[260px]" {...register('vatId')} />
           </Field>
         )}
       </Section>
 
-      <Section compact={compact} title="Rechnungsadresse">
-        <Field label="Straße und Hausnummer" error={errors.billingStreet?.message} optional>
+      <Section compact={compact} title={tr('Rechnungsadresse', 'Billing address')}>
+        <Field label={tr('Straße und Hausnummer', 'Street and house number')} error={errors.billingStreet?.message} optional>
           <Input autoComplete="street-address" {...register('billingStreet')} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-[120px_1fr_200px]">
-          <Field label="PLZ" error={errors.billingPostalCode?.message} optional>
+          <Field label={tr('PLZ', 'Postcode')} error={errors.billingPostalCode?.message} optional>
             <Input autoComplete="postal-code" {...register('billingPostalCode')} />
           </Field>
-          <Field label="Ort" error={errors.billingCity?.message} optional>
+          <Field label={tr('Ort', 'City')} error={errors.billingCity?.message} optional>
             <Input autoComplete="address-level2" {...register('billingCity')} />
           </Field>
-          <Field label="Land" error={errors.billingCountry?.message}>
+          <Field label={tr('Land', 'Country')} error={errors.billingCountry?.message}>
             <Select {...register('billingCountry')}>
-              {countries.map(([code, name]) => (
+              {countryOptions().map(([code, name]) => (
                 <option key={code} value={code}>
                   {name}
                 </option>
@@ -258,26 +282,26 @@ export function CustomerForm({ customer, id, onSubmit, compact, onConflict }: Cu
             <Switch
               checked={Boolean(field.value)}
               onCheckedChange={field.onChange}
-              label="Abweichende Leistungsadresse"
-              description="z. B. Baustelle oder Objekt, an dem die Arbeiten ausgeführt werden."
+              label={tr('Abweichende Leistungsadresse', 'Different service address')}
+              description={tr('z. B. Baustelle oder Objekt, an dem die Arbeiten ausgeführt werden.', 'e.g. the site or property where the work is carried out.')}
             />
           )}
         />
         {hasServiceAddress && (
           <div className="space-y-4 rounded-lg border border-neutral-200 bg-neutral-25 p-4">
-            <Field label="Straße und Hausnummer (Leistungsort)" error={errors.serviceStreet?.message}>
+            <Field label={tr('Straße und Hausnummer (Leistungsort)', 'Street and house number (service location)')} error={errors.serviceStreet?.message}>
               <Input {...register('serviceStreet')} />
             </Field>
             <div className="grid gap-4 sm:grid-cols-[120px_1fr_200px]">
-              <Field label="PLZ" error={errors.servicePostalCode?.message}>
+              <Field label={tr('PLZ', 'Postcode')} error={errors.servicePostalCode?.message}>
                 <Input {...register('servicePostalCode')} />
               </Field>
-              <Field label="Ort" error={errors.serviceCity?.message}>
+              <Field label={tr('Ort', 'City')} error={errors.serviceCity?.message}>
                 <Input {...register('serviceCity')} />
               </Field>
-              <Field label="Land" error={errors.serviceCountry?.message}>
+              <Field label={tr('Land', 'Country')} error={errors.serviceCountry?.message}>
                 <Select {...register('serviceCountry')}>
-                  {countries.map(([code, name]) => (
+                  {countryOptions().map(([code, name]) => (
                     <option key={code} value={code}>
                       {name}
                     </option>
@@ -289,8 +313,13 @@ export function CustomerForm({ customer, id, onSubmit, compact, onConflict }: Cu
         )}
       </Section>
 
-      <Section compact={compact} title="Notizen & Erinnerungen">
-        <Field label="Interne Notizen" error={errors.notes?.message} optional hint="Nur intern sichtbar – erscheint nie auf Angeboten.">
+      <Section compact={compact} title={tr('Notizen & Erinnerungen', 'Notes & reminders')}>
+        <Field
+          label={tr('Interne Notizen', 'Internal notes')}
+          error={errors.notes?.message}
+          optional
+          hint={tr('Nur intern sichtbar – erscheint nie auf Angeboten.', 'Only visible internally – never appears on quotations.')}
+        >
           <Textarea rows={3} {...register('notes')} />
         </Field>
         <Controller
@@ -300,8 +329,8 @@ export function CustomerForm({ customer, id, onSubmit, compact, onConflict }: Cu
             <Switch
               checked={Boolean(field.value)}
               onCheckedChange={field.onChange}
-              label="Keine automatischen Erinnerungen"
-              description="Dieser Kunde erhält keine Nachfass-E-Mails zu offenen Angeboten."
+              label={tr('Keine automatischen Erinnerungen', 'No automatic reminders')}
+              description={tr('Dieser Kunde erhält keine Nachfass-E-Mails zu offenen Angeboten.', 'This customer receives no follow-up emails about open quotations.')}
             />
           )}
         />

@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { BrandLogo } from '@/components/layout/Brand';
+import { PreferenceBar } from '@/components/layout/Preferences';
 import { legalLinks } from '@/lib/env';
+import { tr } from '@/lib/i18n';
 
 /** Minimal chrome for pages customers see (no app navigation). */
 export function PublicLayout({ header, children }: { header?: ReactNode; children: ReactNode }) {
@@ -10,18 +12,21 @@ export function PublicLayout({ header, children }: { header?: ReactNode; childre
       <main className="flex-1">{children}</main>
       <footer className="border-t border-neutral-200 bg-white">
         <div className="mx-auto flex max-w-[1100px] flex-wrap items-center justify-between gap-3 px-4 py-4 text-xs text-neutral-500 sm:px-6">
-          <a href={legalLinks.home} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 hover:text-neutral-800" aria-label="Erstellt mit AngebotPilot">
-            <span>Erstellt mit</span>
+          <a href={legalLinks.home} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 hover:text-neutral-800" aria-label={tr('Erstellt mit AngebotPilot', 'Made with AngebotPilot')}>
+            <span>{tr('Erstellt mit', 'Made with')}</span>
             <BrandLogo size="sm" />
           </a>
-          <nav aria-label="Rechtliches" className="flex gap-4">
+          <nav aria-label={tr('Rechtliches', 'Legal')} className="flex gap-4">
             <a href={legalLinks.impressum} target="_blank" rel="noopener noreferrer" className="hover:text-neutral-800 hover:underline">
-              Impressum
+              {tr('Impressum', 'Legal notice')}
             </a>
             <a href={legalLinks.datenschutz} target="_blank" rel="noopener noreferrer" className="hover:text-neutral-800 hover:underline">
-              Datenschutz
+              {tr('Datenschutz', 'Privacy')}
             </a>
           </nav>
+        </div>
+        <div className="no-print mx-auto max-w-[1100px] px-4 pb-4 sm:px-6">
+          <PreferenceBar className="sm:justify-end" />
         </div>
       </footer>
     </div>

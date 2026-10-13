@@ -1,4 +1,4 @@
-import type { MembershipRole } from '@angebotpilot/api-contracts';
+import { onLocaleChange, tr, type MembershipRole } from '@angebotpilot/api-contracts';
 
 export const isAdminRole = (role: MembershipRole | undefined) => role === 'Owner' || role === 'Admin';
 
@@ -19,5 +19,15 @@ export function permissionsFor(role: MembershipRole | undefined) {
 
 export type Permissions = ReturnType<typeof permissionsFor>;
 
-export const ADMIN_ONLY_HINT = 'Nur für Inhaber:innen und Administrator:innen verfügbar.';
-export const OWNER_ONLY_HINT = 'Nur für Inhaber:innen verfügbar.';
+// Hints in the current UI language. Live bindings (let), re-assigned when the language changes, so importers that
+// read them during render always get the current text.
+export let ADMIN_ONLY_HINT = '';
+export let OWNER_ONLY_HINT = '';
+
+function localizeHints() {
+  ADMIN_ONLY_HINT = tr('Nur für Inhaber:innen und Administrator:innen verfügbar.', 'Only available to owners and administrators.');
+  OWNER_ONLY_HINT = tr('Nur für Inhaber:innen verfügbar.', 'Only available to owners.');
+}
+
+localizeHints();
+onLocaleChange(localizeHints);

@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Feedback';
 import { cx } from '@/lib/cx';
+import { tr } from '@/lib/i18n';
 
 /** Full update request from the loaded company, optionally with changed fields (PUT replaces everything). */
 export function companyToRequest(company: CompanyDto, patch: Partial<UpdateCompanyRequest> = {}): UpdateCompanyRequest {
@@ -33,11 +34,14 @@ export const emptyToNull = (value: string | null | undefined) => (value && value
 /** Shown on settings pages the current role may only read. */
 export function ReadOnlyNotice({ owner = false, children, className }: { owner?: boolean; children?: ReactNode; className?: string }) {
   return (
-    <Alert tone="neutral" icon={Lock} title="Nur Lesezugriff" className={className}>
+    <Alert tone="neutral" icon={Lock} title={tr('Nur Lesezugriff', 'Read-only access')} className={className}>
       {children ??
         (owner
-          ? 'Diese Einstellungen können nur Inhaber:innen ändern. Sie sehen die aktuellen Werte.'
-          : 'Diese Einstellungen können nur Inhaber:innen und Administrator:innen ändern. Sie sehen die aktuellen Werte.')}
+          ? tr('Diese Einstellungen können nur Inhaber:innen ändern. Sie sehen die aktuellen Werte.', 'Only owners can change these settings. You see the current values.')
+          : tr(
+              'Diese Einstellungen können nur Inhaber:innen und Administrator:innen ändern. Sie sehen die aktuellen Werte.',
+              'Only owners and admins can change these settings. You see the current values.',
+            ))}
     </Alert>
   );
 }
@@ -50,7 +54,7 @@ export function ConflictAlert({ onReload, className }: { onReload: () => Promise
       tone="warning"
       live
       className={className}
-      title="Die Daten wurden zwischenzeitlich geändert"
+      title={tr('Die Daten wurden zwischenzeitlich geändert', 'The data has been changed in the meantime')}
       actions={
         <Button
           size="sm"
@@ -65,12 +69,14 @@ export function ConflictAlert({ onReload, className }: { onReload: () => Promise
             }
           }}
         >
-          Neu laden (eigene Änderungen verwerfen)
+          {tr('Neu laden (eigene Änderungen verwerfen)', 'Reload (discard your changes)')}
         </Button>
       }
     >
-      Jemand anderes hat diese Einstellungen gespeichert, während Sie sie bearbeitet haben. Laden Sie die aktuelle Fassung neu und
-      übernehmen Sie Ihre Änderungen danach erneut.
+      {tr(
+        'Jemand anderes hat diese Einstellungen gespeichert, während Sie sie bearbeitet haben. Laden Sie die aktuelle Fassung neu und übernehmen Sie Ihre Änderungen danach erneut.',
+        'Someone else saved these settings while you were editing them. Reload the current version and then apply your changes again.',
+      )}
     </Alert>
   );
 }

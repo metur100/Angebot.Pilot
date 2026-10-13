@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest';
+import { setLocale } from '@angebotpilot/api-contracts';
 import { cleanup, configure } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { toast } from '@/components/ui/Toast';
@@ -48,6 +49,10 @@ if (!URL.createObjectURL) {
 }
 window.scrollTo = () => undefined;
 
+// Like the E2E browser (locale de-DE): without a stored choice the app starts in German.
+Object.defineProperty(window.navigator, 'languages', { configurable: true, get: () => ['de-DE', 'de'] });
+Object.defineProperty(window.navigator, 'language', { configurable: true, get: () => 'de-DE' });
+
 // The MSW mock backend (apps/web/src/mocks) answers all API calls with realistic DTOs.
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
@@ -61,5 +66,7 @@ afterEach(() => {
   window.localStorage.clear();
   window.sessionStorage.clear();
   window.location.hash = '';
+  setLocale('de');
+  document.documentElement.removeAttribute('data-theme');
 });
 afterAll(() => server.close());

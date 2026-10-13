@@ -1,4 +1,4 @@
-import { invoiceStatusLabel, type InvoiceListItemDto, type InvoiceListQuery, type InvoiceStatus } from '@angebotpilot/api-contracts';
+import { getLocale, invoiceStatusLabel, type InvoiceListItemDto, type InvoiceListQuery, type InvoiceStatus } from '@angebotpilot/api-contracts';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { AlarmClock, CircleCheck, FilePlus2, Hammer, Plus, ReceiptText, Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -16,6 +16,7 @@ import { cx } from '@/lib/cx';
 import { fileStamp } from '@/lib/download';
 import { formatDate, formatEur } from '@/lib/format';
 import { useDebouncedValue } from '@/lib/hooks';
+import { tr } from '@/lib/i18n';
 import { compactQuery, useListParams } from '@/lib/listParams';
 import { qk } from '@/lib/queryKeys';
 import { ADMIN_ONLY_HINT } from '@/lib/roles';
@@ -71,11 +72,15 @@ function DueDate({ invoice, compact }: { invoice: InvoiceListItemDto; compact?: 
     return (
       <span className="text-danger-text">
         {compact ? '' : <span className="block">{formatDate(invoice.dueDate)}</span>}
-        <span className="text-xs font-medium">{daysText(invoice.daysOverdue)} überfällig</span>
+        <span className="text-xs font-medium">{tr(`${daysText(invoice.daysOverdue)} überfällig`, `${daysText(invoice.daysOverdue)} overdue`)}</span>
       </span>
     );
   }
-  return <span className="text-neutral-600">{compact ? `fällig am ${formatDate(invoice.dueDate)}` : formatDate(invoice.dueDate)}</span>;
+  return (
+    <span className="text-neutral-600">
+      {compact ? tr(`fällig am ${formatDate(invoice.dueDate)}`, `due on ${formatDate(invoice.dueDate)}`) : formatDate(invoice.dueDate)}
+    </span>
+  );
 }
 
 export default function InvoiceListPage() {
@@ -106,18 +111,18 @@ export default function InvoiceListPage() {
   return (
     <>
       <PageHeader
-        title="Rechnungen"
-        description="Rechnungen stellen, versenden und Zahlungseingänge im Blick behalten."
+        title={tr('Rechnungen', 'Invoices')}
+        description={tr('Rechnungen stellen, versenden und Zahlungseingänge im Blick behalten.', 'Issue and send invoices and keep track of incoming payments.')}
         actions={
           <>
             <ExportButton
               allowed={can.exportCsv}
               hint={ADMIN_ONLY_HINT}
-              fileName={`rechnungen-${fileStamp()}.csv`}
+              fileName={`${tr('rechnungen', 'invoices')}-${fileStamp()}.csv`}
               load={() => api.invoices.exportCsv(companyId, exportQuery)}
             />
             <ButtonLink to="/rechnungen/neu" variant="primary" icon={Plus}>
-              Neue Rechnung
+              {tr('Neue Rechnung', 'New invoice')}
             </ButtonLink>
           </>
         }
@@ -128,43 +133,43 @@ export default function InvoiceListPage() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <div className="min-w-0 flex-1 lg:max-w-sm">
               <label htmlFor="invoice-search" className="sr-only">
-                Rechnungen suchen
+                {tr('Rechnungen suchen', 'Search invoices')}
               </label>
               <Input
                 id="invoice-search"
                 type="search"
                 icon={Search}
-                placeholder="Nummer, Betreff, Kunde oder Auftrag …"
+                placeholder={tr('Nummer, Betreff, Kunde oder Auftrag …', 'Number, subject, customer or job …')}
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-2 text-[13px] text-neutral-600">
-                <label htmlFor="invoice-from">Von</label>
+                <label htmlFor="invoice-from">{tr('Von', 'From')}</label>
                 <Input id="invoice-from" type="date" inputSize="sm" className="w-[150px]" value={params.from} onChange={(e) => update({ from: e.target.value })} />
               </div>
               <div className="flex items-center gap-2 text-[13px] text-neutral-600">
-                <label htmlFor="invoice-to">Bis</label>
+                <label htmlFor="invoice-to">{tr('Bis', 'To')}</label>
                 <Input id="invoice-to" type="date" inputSize="sm" className="w-[150px]" value={params.to} onChange={(e) => update({ to: e.target.value })} />
               </div>
               <label htmlFor="invoice-sort" className="sr-only">
-                Sortierung
+                {tr('Sortierung', 'Sort order')}
               </label>
               <Select id="invoice-sort" inputSize="sm" className="w-[200px]" value={params.sort} onChange={(e) => update({ sort: e.target.value })}>
-                <option value="-updatedAt">Zuletzt bearbeitet</option>
-                <option value="-issueDate">Rechnungsdatum (neueste)</option>
-                <option value="issueDate">Rechnungsdatum (älteste)</option>
-                <option value="dueDate">Fälligkeit (früheste)</option>
-                <option value="-dueDate">Fälligkeit (späteste)</option>
-                <option value="-number">Nummer absteigend</option>
-                <option value="number">Nummer aufsteigend</option>
-                <option value="-grossTotal">Betrag (höchster)</option>
-                <option value="grossTotal">Betrag (niedrigster)</option>
+                <option value="-updatedAt">{tr('Zuletzt bearbeitet', 'Last edited')}</option>
+                <option value="-issueDate">{tr('Rechnungsdatum (neueste)', 'Invoice date (newest)')}</option>
+                <option value="issueDate">{tr('Rechnungsdatum (älteste)', 'Invoice date (oldest)')}</option>
+                <option value="dueDate">{tr('Fälligkeit (früheste)', 'Due date (earliest)')}</option>
+                <option value="-dueDate">{tr('Fälligkeit (späteste)', 'Due date (latest)')}</option>
+                <option value="-number">{tr('Nummer absteigend', 'Number descending')}</option>
+                <option value="number">{tr('Nummer aufsteigend', 'Number ascending')}</option>
+                <option value="-grossTotal">{tr('Betrag (höchster)', 'Amount (highest)')}</option>
+                <option value="grossTotal">{tr('Betrag (niedrigster)', 'Amount (lowest)')}</option>
               </Select>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Nach Status filtern">
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={tr('Nach Status filtern', 'Filter by status')}>
             {statuses.map((status) => (
               <FilterChip key={status} selected={selectedStatuses.has(status)} onClick={() => update({ status: toggleInvoiceStatus(params.status, status) })}>
                 {invoiceStatusLabel[status]}
@@ -172,14 +177,14 @@ export default function InvoiceListPage() {
             ))}
             <FilterChip selected={params.ueberfaellig === '1'} onClick={() => update({ ueberfaellig: params.ueberfaellig === '1' ? '' : '1' })}>
               <AlarmClock aria-hidden size={14} />
-              Überfällig
+              {tr('Überfällig', 'Overdue')}
             </FilterChip>
             {params.customer && (
               <span className="ml-1 inline-flex h-8 items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 pr-1 pl-3 text-[13px] font-medium text-brand-800">
-                Kunde: {customer.data?.displayName ?? '…'}
+                {tr('Kunde', 'Customer')}: {customer.data?.displayName ?? '…'}
                 <button
                   type="button"
-                  aria-label="Kundenfilter entfernen"
+                  aria-label={tr('Kundenfilter entfernen', 'Remove customer filter')}
                   onClick={() => update({ customer: '' })}
                   className="inline-flex size-6 items-center justify-center rounded-full hover:bg-brand-100"
                 >
@@ -189,7 +194,7 @@ export default function InvoiceListPage() {
             )}
             {filtered && (
               <Button variant="ghost" size="sm" onClick={resetFilters} className="ml-auto">
-                Filter zurücksetzen
+                {tr('Filter zurücksetzen', 'Reset filters')}
               </Button>
             )}
           </div>
@@ -203,31 +208,46 @@ export default function InvoiceListPage() {
           filtered ? (
             <EmptyState
               icon={Search}
-              title="Keine Rechnungen gefunden"
-              description={params.ueberfaellig === '1' ? 'Keine überfälligen Rechnungen – alle offenen Rechnungen sind noch im Zahlungsziel.' : 'Für diese Filter gibt es keine Rechnungen.'}
-              action={<Button onClick={resetFilters}>Filter zurücksetzen</Button>}
+              title={tr('Keine Rechnungen gefunden', 'No invoices found')}
+              description={
+                params.ueberfaellig === '1'
+                  ? tr(
+                      'Keine überfälligen Rechnungen – alle offenen Rechnungen sind noch im Zahlungsziel.',
+                      'No overdue invoices – all open invoices are still within their payment terms.',
+                    )
+                  : tr('Für diese Filter gibt es keine Rechnungen.', 'There are no invoices for these filters.')
+              }
+              action={<Button onClick={resetFilters}>{tr('Filter zurücksetzen', 'Reset filters')}</Button>}
             />
           ) : (
             <EmptyState
               icon={ReceiptText}
-              title="Noch keine Rechnungen"
+              title={tr('Noch keine Rechnungen', 'No invoices yet')}
               description={
-                <>
-                  So erstellen Sie eine Rechnung: <strong className="font-medium text-neutral-700">manuell</strong> mit eigenen Positionen,{' '}
-                  <strong className="font-medium text-neutral-700">aus einem Auftrag</strong> (Auftrag öffnen → „Rechnung erstellen“) oder{' '}
-                  <strong className="font-medium text-neutral-700">aus einem angenommenen Angebot</strong>. Positionen werden dabei übernommen.
-                </>
+                getLocale() === 'en' ? (
+                  <>
+                    How to create an invoice: <strong className="font-medium text-neutral-700">manually</strong> with your own line items,{' '}
+                    <strong className="font-medium text-neutral-700">from a job</strong> (open the job → “Create invoice”) or{' '}
+                    <strong className="font-medium text-neutral-700">from an accepted quotation</strong>. The line items are copied over.
+                  </>
+                ) : (
+                  <>
+                    So erstellen Sie eine Rechnung: <strong className="font-medium text-neutral-700">manuell</strong> mit eigenen Positionen,{' '}
+                    <strong className="font-medium text-neutral-700">aus einem Auftrag</strong> (Auftrag öffnen → „Rechnung erstellen“) oder{' '}
+                    <strong className="font-medium text-neutral-700">aus einem angenommenen Angebot</strong>. Positionen werden dabei übernommen.
+                  </>
+                )
               }
               action={
                 <>
                   <ButtonLink to="/rechnungen/neu" variant="primary" icon={FilePlus2}>
-                    Rechnung manuell erstellen
+                    {tr('Rechnung manuell erstellen', 'Create invoice manually')}
                   </ButtonLink>
                   <ButtonLink to="/auftraege" icon={Hammer}>
-                    Zu den Aufträgen
+                    {tr('Zu den Aufträgen', 'Go to jobs')}
                   </ButtonLink>
                   <ButtonLink to="/angebote?status=Accepted" icon={CircleCheck}>
-                    Angenommene Angebote
+                    {tr('Angenommene Angebote', 'Accepted quotations')}
                   </ButtonLink>
                 </>
               }
@@ -239,13 +259,13 @@ export default function InvoiceListPage() {
               <table className={table.table}>
                 <thead>
                   <tr>
-                    <th scope="col" className={table.th}>Nummer</th>
-                    <th scope="col" className={table.th}>Kunde & Betreff</th>
-                    <th scope="col" className={table.th}>Status</th>
-                    <th scope="col" className={cx(table.th, 'hidden text-right xl:table-cell')}>Rechnungsdatum</th>
-                    <th scope="col" className={cx(table.th, 'text-right')}>Fällig am</th>
-                    <th scope="col" className={cx(table.th, 'text-right')}>Brutto</th>
-                    <th scope="col" className={cx(table.th, 'hidden text-right xl:table-cell')}>Offen</th>
+                    <th scope="col" className={table.th}>{tr('Nummer', 'Number')}</th>
+                    <th scope="col" className={table.th}>{tr('Kunde & Betreff', 'Customer & subject')}</th>
+                    <th scope="col" className={table.th}>{tr('Status', 'Status')}</th>
+                    <th scope="col" className={cx(table.th, 'hidden text-right xl:table-cell')}>{tr('Rechnungsdatum', 'Invoice date')}</th>
+                    <th scope="col" className={cx(table.th, 'text-right')}>{tr('Fällig am', 'Due date')}</th>
+                    <th scope="col" className={cx(table.th, 'text-right')}>{tr('Brutto', 'Gross')}</th>
+                    <th scope="col" className={cx(table.th, 'hidden text-right xl:table-cell')}>{tr('Offen', 'Open')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -254,9 +274,9 @@ export default function InvoiceListPage() {
                       <td className={cx(table.td, 'whitespace-nowrap')}>
                         <Link
                           to={`/rechnungen/${i.id}`}
-                          className={cx('font-medium hover:text-brand-700 hover:underline', i.number ? 'text-neutral-900' : 'text-neutral-500 italic')}
+                          className={cx('font-medium hover:text-brand-700 dark:hover:text-brand-800 hover:underline', i.number ? 'text-neutral-900' : 'text-neutral-500 italic')}
                         >
-                          {i.number ?? 'Entwurf'}
+                          {i.number ?? tr('Entwurf', 'Draft')}
                         </Link>
                       </td>
                       <td className={cx(table.td, 'max-w-[220px] xl:max-w-[320px]')}>
@@ -274,7 +294,7 @@ export default function InvoiceListPage() {
                         {invoiceAmount(i.grossTotal, i.kind)}
                         {i.openAmount > 0 && i.openAmount !== i.grossTotal ? (
                           <span className={cx('block text-[12px] font-normal xl:hidden', i.isOverdue ? 'text-danger-text' : 'text-neutral-500')}>
-                            offen {formatEur(i.openAmount)}
+                            {tr(`offen ${formatEur(i.openAmount)}`, `${formatEur(i.openAmount)} open`)}
                           </span>
                         ) : null}
                       </td>
@@ -294,13 +314,15 @@ export default function InvoiceListPage() {
                       <div className="min-w-0">
                         <p className="truncate font-medium text-neutral-900">{i.customerName}</p>
                         <p className="truncate text-[13px] text-neutral-500">
-                          {i.number ?? 'Entwurf'} · {i.title}
+                          {i.number ?? tr('Entwurf', 'Draft')} · {i.title}
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
                         <p className="font-medium whitespace-nowrap tabular">{invoiceAmount(i.grossTotal, i.kind)}</p>
                         {i.openAmount > 0 && i.openAmount !== i.grossTotal && (
-                          <p className="text-xs whitespace-nowrap text-neutral-500 tabular">offen {formatEur(i.openAmount)}</p>
+                          <p className="text-xs whitespace-nowrap text-neutral-500 tabular">
+                            {tr(`offen ${formatEur(i.openAmount)}`, `${formatEur(i.openAmount)} open`)}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -319,7 +341,7 @@ export default function InvoiceListPage() {
               pageSize={list.data.pageSize}
               totalCount={list.data.totalCount}
               onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
-              noun={['Rechnung', 'Rechnungen']}
+              noun={[tr('Rechnung', 'invoice'), tr('Rechnungen', 'invoices')]}
             />
           </div>
         )}

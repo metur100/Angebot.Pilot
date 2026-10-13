@@ -1,8 +1,9 @@
-import type { AuthResponse, LoginRequest, MeDto, RegisterRequest } from '@angebotpilot/api-contracts';
+import { getLocale, isLocale, type AuthResponse, type LoginRequest, type MeDto, type RegisterRequest } from '@angebotpilot/api-contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api';
+import { applyLocale, tr } from '@/lib/i18n';
 import { session, type Persistence } from '@/lib/session';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'anonymous' | 'offline';
@@ -39,6 +40,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return response.user;
   }, []);
 
+  // Signed in, the language stored on the user wins (set at registration or by switching it in the app).
+  const userLanguage = user?.language;
+  useEffect(() => {
+    if (isLocale(userLanguage) && userLanguage !== getLocale()) applyLocale(userLanguage);
+  }, [userLanguage]);
+
   // Session events from background refreshes (API client 401 handling).
   useEffect(() => {
     session.setEvents({
@@ -48,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUserState(null);
         setStatus('anonymous');
         queryClient.clear();
-        if (wasAuthenticated) toast.info('Sitzung abgelaufen', 'Bitte melden Sie sich erneut an.');
+        if (wasAuthenticated) toast.info(tr('Sitzung abgelaufen', 'Session expired'), tr('Bitte melden Sie sich erneut an.', 'Please sign in again.'));
       },
     });
     return () => session.setEvents({});
@@ -102,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async (request: Omit<RegisterRequest, 'client'>) => {
-      const response = await api.auth.register({ ...request, client: 'Web' });
+      const response = await api.auth.register({ language: getLocale(), ...request, client: 'Web' });
       queryClient.clear();
       return applyAuth(response, 'session');
     },

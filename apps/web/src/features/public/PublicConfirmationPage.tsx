@@ -5,6 +5,7 @@ import { Spinner } from '@/components/ui/Feedback';
 import { api } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
 import { useDocumentTitle } from '@/lib/hooks';
+import { tr } from '@/lib/i18n';
 import { PublicLayout, PublicMessage } from './PublicLayout';
 import { PublicLinkError, usePublicQuotation } from './PublicQuotationPage';
 
@@ -19,7 +20,13 @@ export default function PublicConfirmationPage() {
   // After a reload the navigation state is gone: show the current status from the server instead.
   const quotation = usePublicQuotation(token, !fromState);
   const decision = fromState ?? (quotation.data ? { status: quotation.data.status, decidedAt: quotation.data.decidedAt ?? '', number: quotation.data.number, companyName: quotation.data.companyName } : null);
-  useDocumentTitle(decision?.status === 'Accepted' ? 'Angebot angenommen' : decision?.status === 'Rejected' ? 'Angebot abgelehnt' : 'Angebot');
+  useDocumentTitle(
+    decision?.status === 'Accepted'
+      ? tr('Angebot angenommen', 'Quotation accepted')
+      : decision?.status === 'Rejected'
+        ? tr('Angebot abgelehnt', 'Quotation declined')
+        : tr('Angebot', 'Quotation'),
+  );
 
   if (!fromState && quotation.isPending) {
     return (
@@ -37,20 +44,24 @@ export default function PublicConfirmationPage() {
   const rejected = decision.status === 'Rejected';
   const back = (
     <Link to={`/q/${encodeURIComponent(token)}`} className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3.5 py-2 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50">
-      <ArrowLeft aria-hidden size={16} /> Zum Angebot
+      <ArrowLeft aria-hidden size={16} /> {tr('Zum Angebot', 'Back to quotation')}
     </Link>
   );
   if (!accepted && !rejected) {
     return (
-      <PublicMessage icon={<CircleCheck aria-hidden size={22} />} title={`Angebot ${decision.number}`} actions={back}>
-        Für dieses Angebot liegt noch keine Entscheidung vor.
+      <PublicMessage icon={<CircleCheck aria-hidden size={22} />} title={tr(`Angebot ${decision.number}`, `Quotation ${decision.number}`)} actions={back}>
+        {tr('Für dieses Angebot liegt noch keine Entscheidung vor.', 'No decision has been made on this quotation yet.')}
       </PublicMessage>
     );
   }
   return (
     <PublicMessage
       icon={accepted ? <CircleCheck aria-hidden size={22} className="text-success-text" /> : <CircleX aria-hidden size={22} className="text-danger-text" />}
-      title={accepted ? 'Vielen Dank – Ihre Annahme ist eingegangen' : 'Ihre Ablehnung wurde übermittelt'}
+      title={
+        accepted
+          ? tr('Vielen Dank – Ihre Annahme ist eingegangen', 'Thank you – your acceptance has been received')
+          : tr('Ihre Ablehnung wurde übermittelt', 'Your decision to decline has been sent')
+      }
       actions={
         <>
           {back}
@@ -59,9 +70,9 @@ export default function PublicConfirmationPage() {
               href={api.publicQuotation.pdfUrl(token)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
+              className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-3.5 py-2 text-sm font-medium text-on-brand shadow-sm hover:bg-brand-solid-hover"
             >
-              <Download aria-hidden size={16} /> PDF für Ihre Unterlagen
+              <Download aria-hidden size={16} /> {tr('PDF für Ihre Unterlagen', 'PDF for your records')}
             </a>
           )}
         </>
@@ -69,8 +80,14 @@ export default function PublicConfirmationPage() {
     >
       <p>
         {accepted
-          ? `Sie haben das Angebot ${decision.number} von ${decision.companyName} am ${formatDateTime(decision.decidedAt)} angenommen. ${decision.companyName} wurde über Ihre Annahme informiert.`
-          : `Sie haben das Angebot ${decision.number} am ${formatDateTime(decision.decidedAt)} abgelehnt. ${decision.companyName} wurde informiert. Sie erhalten keine weiteren Erinnerungen zu diesem Angebot.`}
+          ? tr(
+              `Sie haben das Angebot ${decision.number} von ${decision.companyName} am ${formatDateTime(decision.decidedAt)} angenommen. ${decision.companyName} wurde über Ihre Annahme informiert.`,
+              `You accepted quotation ${decision.number} from ${decision.companyName} on ${formatDateTime(decision.decidedAt)}. ${decision.companyName} has been notified of your acceptance.`,
+            )
+          : tr(
+              `Sie haben das Angebot ${decision.number} am ${formatDateTime(decision.decidedAt)} abgelehnt. ${decision.companyName} wurde informiert. Sie erhalten keine weiteren Erinnerungen zu diesem Angebot.`,
+              `You declined quotation ${decision.number} on ${formatDateTime(decision.decidedAt)}. ${decision.companyName} has been notified. You will not receive any further reminders about this quotation.`,
+            )}
       </p>
     </PublicMessage>
   );

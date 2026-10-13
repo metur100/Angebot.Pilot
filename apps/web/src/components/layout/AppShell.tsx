@@ -1,4 +1,4 @@
-import { roleLabel } from '@angebotpilot/api-contracts';
+import { localeNames, locales, roleLabel, type Locale } from '@angebotpilot/api-contracts';
 import {
   Building2,
   Check,
@@ -25,12 +25,15 @@ import { useAuth, useUser } from '@/app/auth';
 import { useCompany, useCompanyDetails } from '@/app/company';
 import { ButtonLink } from '@/components/ui/Button';
 import { PageSkeleton } from '@/components/ui/Feedback';
-import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from '@/components/ui/Menu';
+import { Menu, MenuContent, MenuItem, MenuLabel, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuTrigger } from '@/components/ui/Menu';
 import { cx } from '@/lib/cx';
 import { legalLinks } from '@/lib/env';
+import { tr, useLocale } from '@/lib/i18n';
+import { useTheme, type ThemePreference } from '@/lib/theme';
 import { NetworkBanner, VerifyEmailBanner } from './Banners';
 import { BrandLogo } from './Brand';
 import { NotificationBell } from './NotificationBell';
+import { themeOptions, useChangeLanguage } from './Preferences';
 
 interface NavItem {
   to: string;
@@ -38,18 +41,18 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-const mainNav: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/angebote', label: 'Angebote', icon: FileText },
-  { to: '/kunden', label: 'Kunden', icon: Users },
-  { to: '/auftraege', label: 'Aufträge', icon: Hammer },
-  { to: '/rechnungen', label: 'Rechnungen', icon: ReceiptText },
-  { to: '/vorlagen', label: 'Vorlagen', icon: LayoutTemplate },
+const mainNav = (): NavItem[] => [
+  { to: '/dashboard', label: tr('Dashboard', 'Dashboard'), icon: LayoutDashboard },
+  { to: '/angebote', label: tr('Angebote', 'Quotations'), icon: FileText },
+  { to: '/kunden', label: tr('Kunden', 'Customers'), icon: Users },
+  { to: '/auftraege', label: tr('Aufträge', 'Jobs'), icon: Hammer },
+  { to: '/rechnungen', label: tr('Rechnungen', 'Invoices'), icon: ReceiptText },
+  { to: '/vorlagen', label: tr('Vorlagen', 'Templates'), icon: LayoutTemplate },
 ];
 
-const secondaryNav: NavItem[] = [
-  { to: '/team', label: 'Team', icon: UsersRound },
-  { to: '/einstellungen', label: 'Einstellungen', icon: Settings },
+const secondaryNav = (): NavItem[] => [
+  { to: '/team', label: tr('Team', 'Team'), icon: UsersRound },
+  { to: '/einstellungen', label: tr('Einstellungen', 'Settings'), icon: Settings },
 ];
 
 function NavItems({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => void }) {
@@ -73,7 +76,7 @@ function NavItems({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => 
                   aria-hidden
                   size={18}
                   strokeWidth={isActive ? 2.25 : 2}
-                  className={isActive ? 'text-brand-600' : 'text-neutral-400 group-hover:text-neutral-600'}
+                  className={isActive ? 'text-brand-600 dark:text-brand-700' : 'text-neutral-400 group-hover:text-neutral-600'}
                 />
                 {item.label}
               </>
@@ -87,27 +90,27 @@ function NavItems({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => 
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <nav aria-label="Hauptnavigation" className="flex h-full flex-col">
+    <nav aria-label={tr('Hauptnavigation', 'Main navigation')} className="flex h-full flex-col">
       <div className="flex h-14 shrink-0 items-center px-5">
-        <NavLink to="/dashboard" onClick={onNavigate} aria-label="AngebotPilot – zum Dashboard" className="rounded">
+        <NavLink to="/dashboard" onClick={onNavigate} aria-label={tr('AngebotPilot – zum Dashboard', 'AngebotPilot – go to dashboard')} className="rounded">
           <BrandLogo />
         </NavLink>
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-3">
-        <NavItems items={mainNav} onNavigate={onNavigate} />
-        <p className="mt-6 mb-1.5 px-3 text-[11px] font-semibold tracking-wider text-neutral-500 uppercase">Verwaltung</p>
-        <NavItems items={secondaryNav} onNavigate={onNavigate} />
+        <NavItems items={mainNav()} onNavigate={onNavigate} />
+        <p className="mt-6 mb-1.5 px-3 text-[11px] font-semibold tracking-wider text-neutral-500 uppercase">{tr('Verwaltung', 'Administration')}</p>
+        <NavItems items={secondaryNav()} onNavigate={onNavigate} />
       </div>
       <div className="border-t border-neutral-100 px-5 py-4 text-xs text-neutral-500">
         <div className="flex flex-wrap gap-x-3 gap-y-1">
           <a href={legalLinks.impressum} target="_blank" rel="noopener noreferrer" className="hover:text-neutral-800 hover:underline">
-            Impressum
+            {tr('Impressum', 'Legal notice')}
           </a>
           <a href={legalLinks.datenschutz} target="_blank" rel="noopener noreferrer" className="hover:text-neutral-800 hover:underline">
-            Datenschutz
+            {tr('Datenschutz', 'Privacy')}
           </a>
           <a href={legalLinks.agb} target="_blank" rel="noopener noreferrer" className="hover:text-neutral-800 hover:underline">
-            AGB
+            {tr('AGB', 'Terms')}
           </a>
         </div>
         <p className="mt-1.5 text-neutral-500">© {new Date().getFullYear()} AngebotPilot</p>
@@ -125,7 +128,7 @@ function CompanySwitcher() {
         <button
           type="button"
           className="flex h-9 max-w-[280px] min-w-0 items-center gap-2 rounded-md px-2 text-left hover:bg-neutral-100"
-          aria-label={`Firma: ${membership.companyName}. Firma wechseln`}
+          aria-label={tr(`Firma: ${membership.companyName}. Firma wechseln`, `Company: ${membership.companyName}. Switch company`)}
         >
           <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-neutral-900 text-[11px] font-semibold text-white">
             {membership.companyName.slice(0, 1).toUpperCase()}
@@ -137,7 +140,7 @@ function CompanySwitcher() {
         </button>
       </MenuTrigger>
       <MenuContent align="start" className="w-[280px]">
-        <MenuLabel>Ihre Firmen</MenuLabel>
+        <MenuLabel>{tr('Ihre Firmen', 'Your companies')}</MenuLabel>
         {memberships.map((m) => (
           <MenuItem
             key={m.companyId}
@@ -155,7 +158,7 @@ function CompanySwitcher() {
         ))}
         <MenuSeparator />
         <MenuItem icon={Plus} onSelect={() => void navigate('/onboarding?neu=1')}>
-          Weitere Firma anlegen
+          {tr('Weitere Firma anlegen', 'Add another company')}
         </MenuItem>
       </MenuContent>
     </Menu>
@@ -166,6 +169,9 @@ function UserMenu() {
   const user = useUser();
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const { locale } = useLocale();
+  const changeLanguage = useChangeLanguage();
+  const theme = useTheme();
   const initials = user.displayName
     .split(/\s+/)
     .map((part) => part[0])
@@ -178,7 +184,7 @@ function UserMenu() {
       <MenuTrigger asChild>
         <button
           type="button"
-          aria-label={`Benutzermenü für ${user.displayName}`}
+          aria-label={tr(`Benutzermenü für ${user.displayName}`, `User menu for ${user.displayName}`)}
           className="flex size-9 items-center justify-center rounded-full hover:bg-neutral-100"
         >
           <span className="flex size-8 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-800">
@@ -193,11 +199,28 @@ function UserMenu() {
         </div>
         <MenuSeparator />
         <MenuItem icon={UserRound} onSelect={() => void navigate('/einstellungen/konto')}>
-          Mein Konto
+          {tr('Mein Konto', 'My account')}
         </MenuItem>
         <MenuItem icon={Settings} onSelect={() => void navigate('/einstellungen')}>
-          Einstellungen
+          {tr('Einstellungen', 'Settings')}
         </MenuItem>
+        <MenuSeparator />
+        <MenuLabel>{tr('Sprache', 'Language')}</MenuLabel>
+        <MenuRadioGroup<Locale> label={tr('Sprache', 'Language')} value={locale} onValueChange={(value) => void changeLanguage(value)}>
+          {locales.map((value) => (
+            <MenuRadioItem key={value} value={value} lang={value}>
+              {localeNames[value]}
+            </MenuRadioItem>
+          ))}
+        </MenuRadioGroup>
+        <MenuLabel>{tr('Farbschema', 'Theme')}</MenuLabel>
+        <MenuRadioGroup<ThemePreference> label={tr('Farbschema', 'Theme')} value={theme.preference} onValueChange={theme.setPreference}>
+          {themeOptions().map((option) => (
+            <MenuRadioItem key={option.value} value={option.value} icon={option.icon}>
+              {option.label}
+            </MenuRadioItem>
+          ))}
+        </MenuRadioGroup>
         <MenuSeparator />
         <MenuItem
           icon={LogOut}
@@ -205,7 +228,7 @@ function UserMenu() {
             void logout().then(() => navigate('/login', { replace: true }));
           }}
         >
-          Abmelden
+          {tr('Abmelden', 'Sign out')}
         </MenuItem>
       </MenuContent>
     </Menu>
@@ -227,7 +250,7 @@ export function AppShell() {
         }}
         className="sr-only z-[70] rounded-md bg-white px-3 py-2 text-sm font-medium shadow-md focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
       >
-        Zum Inhalt springen
+        {tr('Zum Inhalt springen', 'Skip to content')}
       </a>
 
       <aside className="no-print fixed inset-y-0 left-0 z-30 hidden w-[240px] border-r border-neutral-200 bg-white lg:block">
@@ -236,14 +259,14 @@ export function AppShell() {
 
       <RadixDialog.Root open={mobileOpen} onOpenChange={setMobileOpen}>
         <RadixDialog.Portal>
-          <RadixDialog.Overlay className="ap-overlay fixed inset-0 z-40 bg-neutral-900/40 lg:hidden" />
+          <RadixDialog.Overlay className="ap-overlay fixed inset-0 z-40 bg-neutral-900/40 lg:hidden dark:bg-[rgb(0_0_0/0.6)]" />
           <RadixDialog.Content className="ap-sheet fixed inset-y-0 left-0 z-50 w-[280px] max-w-[85vw] bg-white shadow-lg focus:outline-none lg:hidden">
-            <RadixDialog.Title className="sr-only">Navigation</RadixDialog.Title>
-            <RadixDialog.Description className="sr-only">Hauptnavigation von AngebotPilot</RadixDialog.Description>
+            <RadixDialog.Title className="sr-only">{tr('Navigation', 'Navigation')}</RadixDialog.Title>
+            <RadixDialog.Description className="sr-only">{tr('Hauptnavigation von AngebotPilot', 'AngebotPilot main navigation')}</RadixDialog.Description>
             <RadixDialog.Close asChild>
               <button
                 type="button"
-                aria-label="Navigation schließen"
+                aria-label={tr('Navigation schließen', 'Close navigation')}
                 className="absolute top-3 right-3 inline-flex size-8 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100"
               >
                 <X aria-hidden size={18} />
@@ -260,7 +283,7 @@ export function AppShell() {
             <button
               type="button"
               onClick={() => setMobileOpen(true)}
-              aria-label="Navigation öffnen"
+              aria-label={tr('Navigation öffnen', 'Open navigation')}
               className="inline-flex size-9 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 lg:hidden"
             >
               <MenuIcon aria-hidden size={20} />
@@ -268,7 +291,7 @@ export function AppShell() {
             <CompanySwitcher />
             <div className="ml-auto flex items-center gap-1 sm:gap-2">
               <ButtonLink to="/angebote/neu" variant="primary" size="sm" icon={Plus} className="hidden sm:inline-flex">
-                Neues Angebot
+                {tr('Neues Angebot', 'New quotation')}
               </ButtonLink>
               <NotificationBell />
               <UserMenu />
@@ -279,7 +302,9 @@ export function AppShell() {
         <VerifyEmailBanner />
         {membership.isDemo && (
           <div className="no-print border-b border-neutral-200 bg-neutral-100 px-4 py-2 text-center text-[13px] text-neutral-700">
-            Sie arbeiten in einer <strong className="font-semibold">Demo-Firma</strong> mit Beispieldaten.
+            {tr('Sie arbeiten in einer ', 'You are working in a ')}
+            <strong className="font-semibold">{tr('Demo-Firma', 'demo company')}</strong>
+            {tr(' mit Beispieldaten.', ' with sample data.')}
           </div>
         )}
         <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">

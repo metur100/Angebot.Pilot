@@ -44,6 +44,7 @@ import { cx } from '@/lib/cx';
 import { downloadDocument } from '@/lib/download';
 import { errorMessage } from '@/lib/errors';
 import { formatDate, formatDateTime, formatEur } from '@/lib/format';
+import { tr } from '@/lib/i18n';
 import { qk } from '@/lib/queryKeys';
 import { CancelInvoiceDialog, IssueDialog, IssueProblemList, PaymentDialog, ReminderDialog, SendInvoiceDialog } from './InvoiceDialogs';
 import { daysText, invoiceAmount, invoiceName, invoiceTitle, invoiceXmlFileName, servicePeriodText, sinceDaysText, useInvalidateInvoice } from './shared';
@@ -83,12 +84,16 @@ function Payments({ invoice, onRecord }: { invoice: InvoiceDto; onRecord: () => 
   return (
     <Card>
       <CardHeader
-        title="Zahlungen"
-        description={invoice.status === 'Paid' && invoice.paidOn ? `Vollständig bezahlt am ${formatDate(invoice.paidOn)}` : undefined}
+        title={tr('Zahlungen', 'Payments')}
+        description={
+          invoice.status === 'Paid' && invoice.paidOn
+            ? tr(`Vollständig bezahlt am ${formatDate(invoice.paidOn)}`, `Paid in full on ${formatDate(invoice.paidOn)}`)
+            : undefined
+        }
         actions={
           can('recordPayment') && (
             <Button size="sm" icon={Plus} onClick={onRecord}>
-              Zahlung
+              {tr('Zahlung', 'Payment')}
             </Button>
           )
         }
@@ -97,21 +102,24 @@ function Payments({ invoice, onRecord }: { invoice: InvoiceDto; onRecord: () => 
         <EmptyState
           compact
           icon={Wallet}
-          title="Noch keine Zahlungen erfasst"
-          description="Erfassen Sie Zahlungseingänge, sobald das Geld auf Ihrem Konto ist – auch Teilzahlungen."
+          title={tr('Noch keine Zahlungen erfasst', 'No payments recorded yet')}
+          description={tr(
+            'Erfassen Sie Zahlungseingänge, sobald das Geld auf Ihrem Konto ist – auch Teilzahlungen.',
+            'Record incoming payments as soon as the money is in your account – partial payments too.',
+          )}
         />
       ) : (
         <div className={table.wrapper}>
           <table className={table.table}>
             <thead>
               <tr>
-                <th scope="col" className={table.th}>Datum</th>
-                <th scope="col" className={cx(table.th, 'text-right')}>Betrag</th>
-                <th scope="col" className={cx(table.th, 'hidden sm:table-cell')}>Zahlungsart & Notiz</th>
-                <th scope="col" className={cx(table.th, 'hidden sm:table-cell')}>Erfasst von</th>
+                <th scope="col" className={table.th}>{tr('Datum', 'Date')}</th>
+                <th scope="col" className={cx(table.th, 'text-right')}>{tr('Betrag', 'Amount')}</th>
+                <th scope="col" className={cx(table.th, 'hidden sm:table-cell')}>{tr('Zahlungsart & Notiz', 'Payment method & note')}</th>
+                <th scope="col" className={cx(table.th, 'hidden sm:table-cell')}>{tr('Erfasst von', 'Recorded by')}</th>
                 {can('removePayment') && (
                   <th scope="col" className={table.th}>
-                    <span className="sr-only">Aktionen</span>
+                    <span className="sr-only">{tr('Aktionen', 'Actions')}</span>
                   </th>
                 )}
               </tr>
@@ -140,7 +148,10 @@ function Payments({ invoice, onRecord }: { invoice: InvoiceDto; onRecord: () => 
                       <IconButton
                         size="sm"
                         icon={Trash2}
-                        label={`Zahlung vom ${formatDate(p.paidOn)} über ${formatEur(p.amount)} entfernen`}
+                        label={tr(
+                          `Zahlung vom ${formatDate(p.paidOn)} über ${formatEur(p.amount)} entfernen`,
+                          `Remove payment of ${formatEur(p.amount)} from ${formatDate(p.paidOn)}`,
+                        )}
                         onClick={() => setRemoving(p)}
                         className="hover:bg-danger-bg! hover:text-danger-text!"
                       />
@@ -154,17 +165,17 @@ function Payments({ invoice, onRecord }: { invoice: InvoiceDto; onRecord: () => 
       )}
       <dl className="grid grid-cols-3 gap-4 border-t border-neutral-100 px-5 py-3 text-sm">
         <div>
-          <dt className="text-xs text-neutral-500">Rechnungsbetrag</dt>
+          <dt className="text-xs text-neutral-500">{tr('Rechnungsbetrag', 'Invoice amount')}</dt>
           <dd className="font-medium tabular">{formatEur(invoice.totals.grossTotal)}</dd>
         </div>
         <div>
-          <dt className="text-xs text-neutral-500">Bezahlt</dt>
+          <dt className="text-xs text-neutral-500">{tr('Bezahlt', 'Paid')}</dt>
           <dd className="font-medium text-success-text tabular" data-testid="paid-amount">
             {formatEur(invoice.paidAmount)}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-neutral-500">Offen</dt>
+          <dt className="text-xs text-neutral-500">{tr('Offen', 'Open')}</dt>
           <dd className={cx('font-semibold tabular', invoice.isOverdue ? 'text-danger-text' : 'text-neutral-900')} data-testid="open-amount">
             {formatEur(invoice.openAmount)}
           </dd>
@@ -173,15 +184,25 @@ function Payments({ invoice, onRecord }: { invoice: InvoiceDto; onRecord: () => 
       <ConfirmDialog
         open={removing !== null}
         onOpenChange={(open) => !open && setRemoving(null)}
-        title="Zahlung entfernen?"
-        description={removing ? `Die Zahlung vom ${formatDate(removing.paidOn)} über ${formatEur(removing.amount)} wird entfernt. Der offene Betrag erhöht sich entsprechend.` : undefined}
-        confirmLabel="Zahlung entfernen"
+        title={tr('Zahlung entfernen?', 'Remove payment?')}
+        description={
+          removing
+            ? tr(
+                `Die Zahlung vom ${formatDate(removing.paidOn)} über ${formatEur(removing.amount)} wird entfernt. Der offene Betrag erhöht sich entsprechend.`,
+                `The payment of ${formatEur(removing.amount)} from ${formatDate(removing.paidOn)} will be removed. The open amount increases accordingly.`,
+              )
+            : undefined
+        }
+        confirmLabel={tr('Zahlung entfernen', 'Remove payment')}
         variant="danger"
         onConfirm={async () => {
           if (!removing) return;
           const updated = await api.invoices.removePayment(companyId, invoice.id, removing.id);
           invalidate(updated);
-          toast.success('Zahlung entfernt', `${formatEur(removing.amount)} vom ${formatDate(removing.paidOn)}`);
+          toast.success(
+            tr('Zahlung entfernt', 'Payment removed'),
+            tr(`${formatEur(removing.amount)} vom ${formatDate(removing.paidOn)}`, `${formatEur(removing.amount)} from ${formatDate(removing.paidOn)}`),
+          );
         }}
       />
     </Card>
@@ -219,18 +240,22 @@ export default function InvoiceDetailPage() {
     mutationFn: () => api.invoices.duplicate(companyId, id),
     onSuccess: (copy) => {
       invalidate(copy);
-      toast.success('Rechnung kopiert', 'Die Kopie wurde als neuer Entwurf angelegt.');
+      toast.success(tr('Rechnung kopiert', 'Invoice copied'), tr('Die Kopie wurde als neuer Entwurf angelegt.', 'The copy was created as a new draft.'));
       void navigate(`/rechnungen/${copy.id}/bearbeiten`);
     },
-    onError: (error) => toast.error('Kopieren fehlgeschlagen', errorMessage(error)),
+    onError: (error) => toast.error(tr('Kopieren fehlgeschlagen', 'Copy failed'), errorMessage(error)),
   });
 
   if (invoice.isPending) return <PageSkeleton rows={10} />;
   if (invoice.isError) {
     return (
       <>
-        <PageHeader title="Rechnung" back={{ to: '/rechnungen', label: 'Rechnungen' }} />
-        <ErrorState error={invoice.error} onRetry={() => void invoice.refetch()} title="Rechnung konnte nicht geladen werden" />
+        <PageHeader title={tr('Rechnung', 'Invoice')} back={{ to: '/rechnungen', label: tr('Rechnungen', 'Invoices') }} />
+        <ErrorState
+          error={invoice.error}
+          onRetry={() => void invoice.refetch()}
+          title={tr('Rechnung konnte nicht geladen werden', 'Invoice could not be loaded')}
+        />
       </>
     );
   }
@@ -245,9 +270,9 @@ export default function InvoiceDetailPage() {
     setDownloadingXml(true);
     try {
       await downloadDocument(() => api.invoices.xml(companyId, i.id), invoiceXmlFileName(i), 'application/xml');
-      toast.success('E-Rechnung heruntergeladen', invoiceXmlFileName(i));
+      toast.success(tr('E-Rechnung heruntergeladen', 'E-invoice downloaded'), invoiceXmlFileName(i));
     } catch (error) {
-      toast.error('Download fehlgeschlagen', errorMessage(error));
+      toast.error(tr('Download fehlgeschlagen', 'Download failed'), errorMessage(error));
     } finally {
       setDownloadingXml(false);
     }
@@ -255,35 +280,46 @@ export default function InvoiceDetailPage() {
 
   const menuItems = [
     !draft && i.hasEInvoice && (
-      <MenuItem key="xml" icon={FileCode2} onSelect={() => void downloadXml()} disabled={downloadingXml} description="UN/CEFACT CII nach EN 16931">
-        E-Rechnung (XML) herunterladen
+      <MenuItem
+        key="xml"
+        icon={FileCode2}
+        onSelect={() => void downloadXml()}
+        disabled={downloadingXml}
+        description={tr('UN/CEFACT CII nach EN 16931', 'UN/CEFACT CII according to EN 16931')}
+      >
+        {tr('E-Rechnung (XML) herunterladen', 'Download e-invoice (XML)')}
       </MenuItem>
     ),
     !draft && can('remind') && (
       <MenuItem key="remind" icon={BellRing} onSelect={() => setDialog('remind')}>
-        Zahlungserinnerung senden …
+        {tr('Zahlungserinnerung senden …', 'Send payment reminder …')}
       </MenuItem>
     ),
     !draft && can('send') && i.sentAt && (
-      <MenuItem key="resend" icon={Send} onSelect={() => setDialog('send')} description="Erneut per E-Mail oder als übermittelt markieren">
-        Erneut senden …
+      <MenuItem
+        key="resend"
+        icon={Send}
+        onSelect={() => setDialog('send')}
+        description={tr('Erneut per E-Mail oder als übermittelt markieren', 'Email again or mark as delivered')}
+      >
+        {tr('Erneut senden …', 'Send again …')}
       </MenuItem>
     ),
     can('duplicate') && (
-      <MenuItem key="copy" icon={Copy} onSelect={() => duplicate.mutate()} disabled={duplicate.isPending} description="Als neuen Entwurf">
-        Kopieren
+      <MenuItem key="copy" icon={Copy} onSelect={() => duplicate.mutate()} disabled={duplicate.isPending} description={tr('Als neuen Entwurf', 'As a new draft')}>
+        {tr('Kopieren', 'Copy')}
       </MenuItem>
     ),
   ].filter(Boolean);
   const dangerItems = [
     can('cancel') && (
       <MenuItem key="cancel" icon={Ban} danger onSelect={() => setDialog('cancel')}>
-        Stornieren …
+        {tr('Stornieren …', 'Cancel invoice …')}
       </MenuItem>
     ),
     draft && can('delete') && (
       <MenuItem key="delete" icon={Trash2} danger onSelect={() => setDialog('delete')}>
-        Entwurf löschen …
+        {tr('Entwurf löschen …', 'Delete draft …')}
       </MenuItem>
     ),
   ].filter(Boolean);
@@ -292,15 +328,15 @@ export default function InvoiceDetailPage() {
     <>
       {can('edit') && (
         <ButtonLink to={`/rechnungen/${i.id}/bearbeiten`} icon={Pencil}>
-          Bearbeiten
+          {tr('Bearbeiten', 'Edit')}
         </ButtonLink>
       )}
       <ButtonLink to={`/rechnungen/${i.id}/pdf`} icon={Eye}>
-        PDF-Vorschau
+        {tr('PDF-Vorschau', 'PDF preview')}
       </ButtonLink>
       {can('issue') && (
         <Button variant="primary" icon={FileCheck2} onClick={() => setDialog('issue')}>
-          Rechnung stellen
+          {tr('Rechnung stellen', 'Issue invoice')}
         </Button>
       )}
     </>
@@ -311,12 +347,12 @@ export default function InvoiceDetailPage() {
       </ButtonLink>
       {can('send') && !i.sentAt && (
         <Button variant="primary" icon={Send} onClick={() => setDialog('send')}>
-          Senden …
+          {tr('Senden …', 'Send …')}
         </Button>
       )}
       {can('recordPayment') && (
         <Button variant={i.sentAt ? 'primary' : 'secondary'} icon={CircleDollarSign} onClick={() => setDialog('payment')}>
-          Zahlung erfassen …
+          {tr('Zahlung erfassen …', 'Record payment …')}
         </Button>
       )}
     </>
@@ -327,12 +363,12 @@ export default function InvoiceDetailPage() {
       <PageHeader
         title={invoiceTitle(i)}
         documentTitle={invoiceName(i)}
-        back={{ to: '/rechnungen', label: 'Rechnungen' }}
+        back={{ to: '/rechnungen', label: tr('Rechnungen', 'Invoices') }}
         meta={<InvoiceStatusBadge status={i.status} kind={i.kind} isOverdue={i.isOverdue} size="md" />}
         description={
           <>
             {i.title} ·{' '}
-            <Link to={`/kunden/${i.customerId}`} className="font-medium text-neutral-700 hover:text-brand-700 hover:underline">
+            <Link to={`/kunden/${i.customerId}`} className="font-medium text-neutral-700 hover:text-brand-700 dark:hover:text-brand-800 hover:underline">
               {i.customerName}
             </Link>
           </>
@@ -343,7 +379,7 @@ export default function InvoiceDetailPage() {
             {(menuItems.length > 0 || dangerItems.length > 0) && (
               <Menu>
                 <MenuTrigger asChild>
-                  <IconButton icon={MoreHorizontal} label="Weitere Aktionen" variant="secondary" />
+                  <IconButton icon={MoreHorizontal} label={tr('Weitere Aktionen', 'More actions')} variant="secondary" />
                 </MenuTrigger>
                 <MenuContent className="w-[280px]">
                   {menuItems}
@@ -358,55 +394,75 @@ export default function InvoiceDetailPage() {
 
       <div className="mb-6 space-y-3 empty:hidden">
         {draft && i.issueProblems.length > 0 && (
-          <Alert tone="warning" title="Vor dem Stellen noch zu erledigen">
+          <Alert tone="warning" title={tr('Vor dem Stellen noch zu erledigen', 'To do before issuing')}>
             <IssueProblemList invoice={i} problems={i.issueProblems} />
           </Alert>
         )}
         {draft && i.issueProblems.length === 0 && (
-          <Alert tone="info" title="Entwurf – noch keine Rechnungsnummer">
-            Alle Pflichtangaben sind vorhanden. {can('issue') ? 'Stellen Sie die Rechnung, um die Rechnungsnummer zu vergeben und sie zu versenden.' : 'Eine Inhaberin bzw. ein Administrator kann die Rechnung jetzt stellen.'}
+          <Alert tone="info" title={tr('Entwurf – noch keine Rechnungsnummer', 'Draft – no invoice number yet')}>
+            {tr('Alle Pflichtangaben sind vorhanden.', 'All mandatory details are present.')}{' '}
+            {can('issue')
+              ? tr(
+                  'Stellen Sie die Rechnung, um die Rechnungsnummer zu vergeben und sie zu versenden.',
+                  'Issue the invoice to assign the invoice number and send it.',
+                )
+              : tr('Eine Inhaberin bzw. ein Administrator kann die Rechnung jetzt stellen.', 'An owner or administrator can issue the invoice now.')}
           </Alert>
         )}
         {i.isOverdue && (
           <Alert
             tone="danger"
             icon={AlarmClock}
-            title={`Seit ${sinceDaysText(i.daysOverdue)} überfällig – offen: ${formatEur(i.openAmount)}`}
+            title={tr(
+              `Seit ${sinceDaysText(i.daysOverdue)} überfällig – offen: ${formatEur(i.openAmount)}`,
+              `Overdue for ${sinceDaysText(i.daysOverdue)} – open: ${formatEur(i.openAmount)}`,
+            )}
             actions={
               can('remind') && (
                 <Button size="sm" icon={BellRing} onClick={() => setDialog('remind')}>
-                  Zahlungserinnerung senden …
+                  {tr('Zahlungserinnerung senden …', 'Send payment reminder …')}
                 </Button>
               )
             }
           >
-            Fällig war der {formatDate(i.dueDate)}.
-            {i.reminderCount > 0 && ` Bisher ${i.reminderCount === 1 ? 'eine Zahlungserinnerung' : `${i.reminderCount} Zahlungserinnerungen`}, zuletzt am ${formatDateTime(i.lastReminderAt)}.`}
+            {tr(`Fällig war der ${formatDate(i.dueDate)}.`, `It was due on ${formatDate(i.dueDate)}.`)}
+            {i.reminderCount > 0 &&
+              tr(
+                ` Bisher ${i.reminderCount === 1 ? 'eine Zahlungserinnerung' : `${i.reminderCount} Zahlungserinnerungen`}, zuletzt am ${formatDateTime(i.lastReminderAt)}.`,
+                ` ${i.reminderCount === 1 ? 'One payment reminder' : `${i.reminderCount} payment reminders`} so far, most recently on ${formatDateTime(i.lastReminderAt)}.`,
+              )}
           </Alert>
         )}
         {i.status === 'Paid' && (
-          <Alert tone="success" title={`Bezahlt am ${formatDate(i.paidOn)}`}>
-            Der Rechnungsbetrag von {formatEur(i.totals.grossTotal)} ist vollständig eingegangen.
+          <Alert tone="success" title={tr(`Bezahlt am ${formatDate(i.paidOn)}`, `Paid on ${formatDate(i.paidOn)}`)}>
+            {tr(
+              `Der Rechnungsbetrag von ${formatEur(i.totals.grossTotal)} ist vollständig eingegangen.`,
+              `The invoice amount of ${formatEur(i.totals.grossTotal)} has been received in full.`,
+            )}
           </Alert>
         )}
         {i.status === 'Cancelled' && (
-          <Alert tone="neutral" title={`Storniert am ${formatDateTime(i.cancelledAt)}`}>
+          <Alert tone="neutral" title={tr(`Storniert am ${formatDateTime(i.cancelledAt)}`, `Cancelled on ${formatDateTime(i.cancelledAt)}`)}>
             {i.cancellationInvoiceId ? (
               <>
-                Aufgehoben durch die Stornorechnung{' '}
-                <Link to={`/rechnungen/${i.cancellationInvoiceId}`}>{i.cancellationInvoiceNumber ?? 'Stornorechnung'}</Link>.
+                {tr('Aufgehoben durch die Stornorechnung', 'Reversed by cancellation invoice')}{' '}
+                <Link to={`/rechnungen/${i.cancellationInvoiceId}`}>{i.cancellationInvoiceNumber ?? tr('Stornorechnung', 'Cancellation invoice')}</Link>.
               </>
             ) : (
-              'Diese Rechnung wurde storniert.'
+              tr('Diese Rechnung wurde storniert.', 'This invoice has been cancelled.')
             )}
-            {i.cancellationReason && ` Grund: „${i.cancellationReason}“`}
+            {i.cancellationReason && tr(` Grund: „${i.cancellationReason}“`, ` Reason: “${i.cancellationReason}”`)}
           </Alert>
         )}
         {cancellation && (
-          <Alert tone="info" title="Stornorechnung">
-            Hebt die Rechnung{' '}
-            {i.cancelledInvoiceId ? <Link to={`/rechnungen/${i.cancelledInvoiceId}`}>{i.cancelledInvoiceNumber ?? 'Originalrechnung'}</Link> : i.cancelledInvoiceNumber}{' '}
-            in voller Höhe auf. Beträge werden negativ dargestellt.
+          <Alert tone="info" title={tr('Stornorechnung', 'Cancellation invoice')}>
+            {tr('Hebt die Rechnung', 'Reverses invoice')}{' '}
+            {i.cancelledInvoiceId ? (
+              <Link to={`/rechnungen/${i.cancelledInvoiceId}`}>{i.cancelledInvoiceNumber ?? tr('Originalrechnung', 'Original invoice')}</Link>
+            ) : (
+              i.cancelledInvoiceNumber
+            )}{' '}
+            {tr('in voller Höhe auf. Beträge werden negativ dargestellt.', 'in full. Amounts are shown as negative.')}
           </Alert>
         )}
       </div>
@@ -416,13 +472,13 @@ export default function InvoiceDetailPage() {
           <Card>
             <CardBody className="grid gap-6 sm:grid-cols-3">
               <div className="min-w-0 sm:col-span-1">
-                <p className="text-xs font-medium text-neutral-500">Empfänger</p>
+                <p className="text-xs font-medium text-neutral-500">{tr('Empfänger', 'Recipient')}</p>
                 <p className="mt-1 text-sm font-medium text-neutral-900">{i.recipientName}</p>
                 {i.recipientContact && !i.recipientName.includes(i.recipientContact) && <p className="text-sm text-neutral-700">{i.recipientContact}</p>}
                 {i.recipientAddress ? (
                   <p className="text-sm whitespace-pre-line text-neutral-700">{i.recipientAddress}</p>
                 ) : (
-                  <p className="text-sm text-warning-text">Keine Rechnungsanschrift hinterlegt</p>
+                  <p className="text-sm text-warning-text">{tr('Keine Rechnungsanschrift hinterlegt', 'No billing address on file')}</p>
                 )}
                 {i.recipientEmail && <p className="mt-1 text-[13px] break-words text-neutral-500">{i.recipientEmail}</p>}
               </div>
@@ -430,35 +486,50 @@ export default function InvoiceDetailPage() {
                 className="sm:col-span-2"
                 columns={2}
                 items={[
-                  { label: 'Rechnungsdatum', value: formatDate(i.issueDate) },
-                  { label: i.serviceDateTo ? 'Leistungszeitraum' : 'Leistungsdatum', value: service ?? <span className="text-warning-text">fehlt</span> },
+                  { label: tr('Rechnungsdatum', 'Invoice date'), value: formatDate(i.issueDate) },
+                  {
+                    label: i.serviceDateTo ? tr('Leistungszeitraum', 'Service period') : tr('Leistungsdatum', 'Service date'),
+                    value: service ?? <span className="text-warning-text">{tr('fehlt', 'missing')}</span>,
+                  },
                   ...(!cancellation
                     ? [
                         {
-                          label: 'Fällig am',
+                          label: tr('Fällig am', 'Due date'),
                           value: (
                             <span className={cx(i.isOverdue && 'font-medium text-danger-text')}>
                               {formatDate(i.dueDate)}
-                              {i.isOverdue && ` · ${daysText(i.daysOverdue)} überfällig`}
+                              {i.isOverdue && tr(` · ${daysText(i.daysOverdue)} überfällig`, ` · ${daysText(i.daysOverdue)} overdue`)}
                             </span>
                           ),
                         },
                       ]
                     : []),
-                  { label: 'Ihre Referenz', value: i.buyerReference },
-                  ...(i.recipientVatId || i.taxMode === 'ReverseCharge' ? [{ label: 'USt-IdNr. Kunde', value: i.recipientVatId }] : []),
-                  { label: i.taxMode === 'Standard' ? 'Brutto' : 'Gesamt', value: <span className="font-semibold tabular">{invoiceAmount(i.totals.grossTotal, i.kind)}</span> },
+                  { label: tr('Ihre Referenz', 'Your reference'), value: i.buyerReference },
+                  ...(i.recipientVatId || i.taxMode === 'ReverseCharge'
+                    ? [{ label: tr('USt-IdNr. Kunde', 'Customer VAT ID (USt-IdNr.)'), value: i.recipientVatId }]
+                    : []),
+                  {
+                    label: i.taxMode === 'Standard' ? tr('Brutto', 'Gross') : tr('Gesamt', 'Total'),
+                    value: <span className="font-semibold tabular">{invoiceAmount(i.totals.grossTotal, i.kind)}</span>,
+                  },
                 ]}
               />
             </CardBody>
           </Card>
 
           <Card>
-            <CardHeader title="Positionen" description={`${i.lineItems.length} ${i.lineItems.length === 1 ? 'Position' : 'Positionen'}`} />
+            <CardHeader
+              title={tr('Positionen', 'Line items')}
+              description={
+                i.lineItems.length === 1
+                  ? tr('1 Position', '1 line item')
+                  : tr(`${i.lineItems.length} Positionen`, `${i.lineItems.length} line items`)
+              }
+            />
             <CardBody>
               {i.introText && <p className="mb-4 text-sm whitespace-pre-line text-neutral-700">{i.introText}</p>}
               {i.lineItems.length === 0 ? (
-                <p className="text-sm text-neutral-500">Noch keine Positionen.</p>
+                <p className="text-sm text-neutral-500">{tr('Noch keine Positionen.', 'No line items yet.')}</p>
               ) : (
                 <DocumentLineItems
                   taxMode={i.taxMode}
@@ -473,7 +544,7 @@ export default function InvoiceDetailPage() {
               {i.closingText && <p className="mt-6 text-sm whitespace-pre-line text-neutral-700">{i.closingText}</p>}
               {i.paymentTerms && (
                 <div className="mt-4 text-[13px] text-neutral-600">
-                  <p className="font-medium text-neutral-800">Zahlungshinweis</p>
+                  <p className="font-medium text-neutral-800">{tr('Zahlungshinweis', 'Payment note')}</p>
                   <p className="whitespace-pre-line">{i.paymentTerms}</p>
                 </div>
               )}
@@ -484,17 +555,23 @@ export default function InvoiceDetailPage() {
 
           <Card>
             <Tabs defaultValue="events">
-              <TabsList label="Rechnungsdetails" className="px-3">
-                <TabsTrigger value="events">Verlauf</TabsTrigger>
+              <TabsList label={tr('Rechnungsdetails', 'Invoice details')} className="px-3">
+                <TabsTrigger value="events">{tr('Verlauf', 'History')}</TabsTrigger>
                 <TabsTrigger value="deliveries" count={deliveries.data && deliveries.data.length > 0 ? deliveries.data.length : undefined}>
-                  E-Mail-Versand
+                  {tr('E-Mail-Versand', 'Email delivery')}
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="events">
                 <EventTimeline query={events} labels={invoiceEventLabel} icons={eventIcons} tones={eventTone} />
               </TabsContent>
               <TabsContent value="deliveries">
-                <DeliveryTable query={deliveries} emptyDescription="Hier erscheinen Rechnungs-E-Mails und Zahlungserinnerungen mit ihrem Versandstatus." />
+                <DeliveryTable
+                  query={deliveries}
+                  emptyDescription={tr(
+                    'Hier erscheinen Rechnungs-E-Mails und Zahlungserinnerungen mit ihrem Versandstatus.',
+                    'Invoice emails and payment reminders appear here with their delivery status.',
+                  )}
+                />
               </TabsContent>
             </Tabs>
           </Card>
@@ -502,31 +579,42 @@ export default function InvoiceDetailPage() {
 
         <aside className="min-w-0 space-y-6">
           <Card>
-            <CardHeader title="Status" as="h2" />
+            <CardHeader title={tr('Status', 'Status')} as="h2" />
             <CardBody>
               <DetailList
                 items={[
-                  { label: 'Erstellt', value: formatDateTime(i.createdAt) },
-                  { label: 'Gestellt', value: i.issuedAt ? formatDateTime(i.issuedAt) : null },
-                  { label: 'Versendet', value: i.sentAt ? formatDateTime(i.sentAt) : null },
-                  ...(!cancellation ? [{ label: 'Bezahlt am', value: i.paidOn ? formatDate(i.paidOn) : null }] : []),
+                  { label: tr('Erstellt', 'Created'), value: formatDateTime(i.createdAt) },
+                  { label: tr('Gestellt', 'Issued'), value: i.issuedAt ? formatDateTime(i.issuedAt) : null },
+                  { label: tr('Versendet', 'Sent'), value: i.sentAt ? formatDateTime(i.sentAt) : null },
+                  ...(!cancellation ? [{ label: tr('Bezahlt am', 'Paid on'), value: i.paidOn ? formatDate(i.paidOn) : null }] : []),
                   ...(!cancellation && !draft
-                    ? [{ label: 'Erinnerungen', value: i.reminderCount > 0 ? `${i.reminderCount} · zuletzt ${formatDateTime(i.lastReminderAt)}` : 'keine' }]
+                    ? [
+                        {
+                          label: tr('Erinnerungen', 'Reminders'),
+                          value:
+                            i.reminderCount > 0
+                              ? tr(
+                                  `${i.reminderCount} · zuletzt ${formatDateTime(i.lastReminderAt)}`,
+                                  `${i.reminderCount} · last ${formatDateTime(i.lastReminderAt)}`,
+                                )
+                              : tr('keine', 'none'),
+                        },
+                      ]
                     : []),
-                  ...(i.cancelledAt ? [{ label: 'Storniert', value: formatDateTime(i.cancelledAt) }] : []),
-                  { label: 'Zuletzt geändert', value: formatDateTime(i.updatedAt) },
+                  ...(i.cancelledAt ? [{ label: tr('Storniert', 'Cancelled'), value: formatDateTime(i.cancelledAt) }] : []),
+                  { label: tr('Zuletzt geändert', 'Last modified'), value: formatDateTime(i.updatedAt) },
                 ]}
               />
             </CardBody>
           </Card>
 
           <Card>
-            <CardHeader title="Kunde & Quelle" as="h2" />
+            <CardHeader title={tr('Kunde & Quelle', 'Customer & source')} as="h2" />
             <CardBody>
               <DetailList
                 items={[
                   {
-                    label: 'Kunde',
+                    label: tr('Kunde', 'Customer'),
                     value: (
                       <Link to={`/kunden/${i.customerId}`} className="font-medium text-brand-700 hover:underline">
                         {i.customerName}
@@ -536,10 +624,10 @@ export default function InvoiceDetailPage() {
                   ...(i.quotationId
                     ? [
                         {
-                          label: 'Angebot',
+                          label: tr('Angebot', 'Quotation'),
                           value: (
                             <Link to={`/angebote/${i.quotationId}`} className="font-medium text-brand-700 hover:underline">
-                              {i.quotationNumber ?? 'Angebot öffnen'}
+                              {i.quotationNumber ?? tr('Angebot öffnen', 'Open quotation')}
                             </Link>
                           ),
                         },
@@ -548,17 +636,17 @@ export default function InvoiceDetailPage() {
                   ...(i.jobId
                     ? [
                         {
-                          label: 'Auftrag',
+                          label: tr('Auftrag', 'Job'),
                           value: (
                             <Link to={`/auftraege/${i.jobId}`} className="inline-flex items-center gap-1.5 font-medium text-brand-700 hover:underline">
                               <Hammer aria-hidden size={14} />
-                              {i.jobNumber ?? 'Auftrag öffnen'}
+                              {i.jobNumber ?? tr('Auftrag öffnen', 'Open job')}
                             </Link>
                           ),
                         },
                       ]
                     : []),
-                  ...(!i.quotationId && !i.jobId && !cancellation ? [{ label: 'Quelle', value: 'Manuell erstellt' }] : []),
+                  ...(!i.quotationId && !i.jobId && !cancellation ? [{ label: tr('Quelle', 'Source'), value: tr('Manuell erstellt', 'Created manually') }] : []),
                 ]}
               />
             </CardBody>
@@ -566,14 +654,17 @@ export default function InvoiceDetailPage() {
 
           {!draft && i.hasEInvoice && (
             <Card>
-              <CardHeader title="E-Rechnung" as="h2" />
+              <CardHeader title={tr('E-Rechnung', 'E-invoice')} as="h2" />
               <CardBody className="space-y-3 text-sm text-neutral-600">
                 <p className="flex gap-2">
                   <ReceiptText aria-hidden size={16} className="mt-0.5 shrink-0 text-success-text" />
-                  Das PDF enthält die E-Rechnung im ZUGFeRD-Format (EN 16931). Für Behörden oder Portale können Sie die XML-Datei auch einzeln laden.
+                  {tr(
+                    'Das PDF enthält die E-Rechnung im ZUGFeRD-Format (EN 16931). Für Behörden oder Portale können Sie die XML-Datei auch einzeln laden.',
+                    'The PDF contains the e-invoice in ZUGFeRD format (EN 16931). For authorities or portals you can also download the XML file separately.',
+                  )}
                 </p>
                 <Button size="sm" icon={FileCode2} loading={downloadingXml} onClick={() => void downloadXml()}>
-                  XML herunterladen
+                  {tr('XML herunterladen', 'Download XML')}
                 </Button>
               </CardBody>
             </Card>
@@ -581,7 +672,7 @@ export default function InvoiceDetailPage() {
 
           {i.internalNotes && (
             <Card className="border-dashed bg-neutral-25">
-              <CardHeader title="Interne Notizen" description="Nur intern sichtbar" />
+              <CardHeader title={tr('Interne Notizen', 'Internal notes')} description={tr('Nur intern sichtbar', 'Only visible internally')} />
               <CardBody>
                 <p className="text-sm whitespace-pre-line text-neutral-700">{i.internalNotes}</p>
               </CardBody>
@@ -604,15 +695,18 @@ export default function InvoiceDetailPage() {
       <ConfirmDialog
         open={dialog === 'delete'}
         onOpenChange={(o) => setDialog(o ? 'delete' : null)}
-        title="Rechnungsentwurf löschen?"
-        description="Der Entwurf wird endgültig gelöscht. Da Entwürfe noch keine Rechnungsnummer haben, entsteht keine Lücke im Nummernkreis."
-        confirmLabel="Löschen"
+        title={tr('Rechnungsentwurf löschen?', 'Delete invoice draft?')}
+        description={tr(
+          'Der Entwurf wird endgültig gelöscht. Da Entwürfe noch keine Rechnungsnummer haben, entsteht keine Lücke im Nummernkreis.',
+          'The draft will be deleted permanently. Drafts have no invoice number yet, so no gap is left in the number sequence.',
+        )}
+        confirmLabel={tr('Löschen', 'Delete')}
         variant="danger"
         onConfirm={async () => {
           await api.invoices.delete(companyId, i.id);
           queryClient.removeQueries({ queryKey: qk.invoice(companyId, i.id) });
           invalidate({ id: i.id, customerId: i.customerId, jobId: i.jobId, quotationId: i.quotationId });
-          toast.success('Entwurf gelöscht');
+          toast.success(tr('Entwurf gelöscht', 'Draft deleted'));
           void navigate('/rechnungen', { replace: true });
         }}
       />

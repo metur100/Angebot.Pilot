@@ -1,4 +1,4 @@
-import { CircleHelp, type LucideIcon } from 'lucide-react';
+import { Check, CircleHelp, type LucideIcon } from 'lucide-react';
 import { DropdownMenu, Popover, Tabs as RadixTabs, Tooltip as RadixTooltip } from 'radix-ui';
 import type { ReactNode } from 'react';
 import { cx } from '@/lib/cx';
@@ -50,6 +50,58 @@ export function MenuItem({ icon: Icon, children, onSelect, disabled, danger, des
         {description && <span className="mt-0.5 block text-xs text-neutral-500">{description}</span>}
       </span>
     </DropdownMenu.Item>
+  );
+}
+
+/** Single-choice group inside a menu (e.g. language, theme). Items keep the menu open when selected. */
+export function MenuRadioGroup<T extends string>({
+  value,
+  onValueChange,
+  label,
+  children,
+}: {
+  value: T;
+  onValueChange: (value: T) => void;
+  /** Accessible name of the group (use a visible <MenuLabel> as well). */
+  label?: string;
+  children: ReactNode;
+}) {
+  return (
+    <DropdownMenu.RadioGroup value={value} onValueChange={(next) => onValueChange(next as T)} aria-label={label}>
+      {children}
+    </DropdownMenu.RadioGroup>
+  );
+}
+
+interface MenuRadioItemProps {
+  value: string;
+  icon?: LucideIcon;
+  children: ReactNode;
+  /** Language of the item text (e.g. language names shown in their own language). */
+  lang?: string;
+  /** Close the menu on selection (default: stay open so the change is visible). */
+  closeOnSelect?: boolean;
+}
+
+export function MenuRadioItem({ value, icon: Icon, children, lang, closeOnSelect = false }: MenuRadioItemProps) {
+  return (
+    <DropdownMenu.RadioItem
+      value={value}
+      lang={lang}
+      onSelect={closeOnSelect ? undefined : (event) => event.preventDefault()}
+      className={cx(
+        'flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-neutral-800 outline-none select-none',
+        'data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 data-[highlighted]:bg-neutral-100',
+      )}
+    >
+      {Icon && <Icon aria-hidden size={16} className="shrink-0 text-neutral-500" />}
+      <span className="min-w-0 flex-1 truncate">{children}</span>
+      <span className="flex size-4 shrink-0 items-center justify-center">
+        <DropdownMenu.ItemIndicator>
+          <Check aria-hidden size={15} className="text-brand-600 dark:text-brand-700" />
+        </DropdownMenu.ItemIndicator>
+      </span>
+    </DropdownMenu.RadioItem>
   );
 }
 

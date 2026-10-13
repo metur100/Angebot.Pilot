@@ -1,7 +1,8 @@
 import { formatPercent, formatQuantity, type TaxMode, type TotalsDto } from '@angebotpilot/api-contracts';
 import { cx } from '@/lib/cx';
-import { formatDate, formatEur } from '@/lib/format';
-import { signedEur, TotalsList } from './Totals';
+import { formatEur } from '@/lib/format';
+import { tr } from '@/lib/i18n';
+import { documentFormat, signedEur, TotalsList } from './Totals';
 
 export interface DocumentLine {
   position: number;
@@ -38,23 +39,42 @@ export interface DocumentData {
   footer?: string | null;
 }
 
-/** Line items table shared by the HTML preview, the public customer page and invoices (negate: cancellation invoices). */
-export function DocumentLineItems({ lines, taxMode, brandColor, negate = false }: { lines: DocumentLine[]; taxMode: TaxMode; brandColor?: string; negate?: boolean }) {
+/**
+ * Line items table shared by the HTML preview, the public customer page and invoices (negate: cancellation invoices).
+ * asDocument: inside the customer document – German headers and number formatting regardless of the UI language.
+ */
+export function DocumentLineItems({
+  lines,
+  taxMode,
+  brandColor,
+  negate = false,
+  asDocument = false,
+}: {
+  lines: DocumentLine[];
+  taxMode: TaxMode;
+  brandColor?: string;
+  negate?: boolean;
+  asDocument?: boolean;
+}) {
   const showVat = taxMode === 'Standard';
   const hasDiscount = lines.some((l) => l.discountPercent > 0);
+  const t = (de: string, en: string) => (asDocument ? de : tr(de, en));
+  const money = asDocument ? documentFormat.eur : formatEur;
+  const quantity = asDocument ? documentFormat.quantity : formatQuantity;
+  const percent = asDocument ? documentFormat.percent : formatPercent;
   return (
     <>
       {/* Table on wide screens */}
       <table className="hidden w-full border-collapse text-[13px] sm:table">
         <thead>
           <tr className="border-b-2 text-left text-xs text-neutral-500" style={{ borderColor: brandColor }}>
-            <th scope="col" className="w-10 py-2 pr-2 font-medium">Pos.</th>
-            <th scope="col" className="py-2 pr-3 font-medium">Bezeichnung</th>
-            <th scope="col" className="py-2 pr-3 text-right font-medium whitespace-nowrap">Menge</th>
-            <th scope="col" className="py-2 pr-3 text-right font-medium whitespace-nowrap">Einzelpreis</th>
-            {hasDiscount && <th scope="col" className="py-2 pr-3 text-right font-medium">Rabatt</th>}
-            {showVat && <th scope="col" className="py-2 pr-3 text-right font-medium">USt.</th>}
-            <th scope="col" className="py-2 text-right font-medium whitespace-nowrap">Gesamt netto</th>
+            <th scope="col" className="w-10 py-2 pr-2 font-medium">{t('Pos.', 'No.')}</th>
+            <th scope="col" className="py-2 pr-3 font-medium">{t('Bezeichnung', 'Item')}</th>
+            <th scope="col" className="py-2 pr-3 text-right font-medium whitespace-nowrap">{t('Menge', 'Quantity')}</th>
+            <th scope="col" className="py-2 pr-3 text-right font-medium whitespace-nowrap">{t('Einzelpreis', 'Unit price')}</th>
+            {hasDiscount && <th scope="col" className="py-2 pr-3 text-right font-medium">{t('Rabatt', 'Discount')}</th>}
+            {showVat && <th scope="col" className="py-2 pr-3 text-right font-medium">{t('USt.', 'VAT')}</th>}
+            <th scope="col" className="py-2 text-right font-medium whitespace-nowrap">{t('Gesamt netto', 'Net total')}</th>
           </tr>
         </thead>
         <tbody>
@@ -66,14 +86,14 @@ export function DocumentLineItems({ lines, taxMode, brandColor, negate = false }
                 {line.description && <p className="mt-0.5 whitespace-pre-line text-neutral-600">{line.description}</p>}
               </td>
               <td className="py-2.5 pr-3 text-right whitespace-nowrap tabular">
-                {formatQuantity(line.quantity)} {line.unit}
+                {quantity(line.quantity)} {line.unit}
               </td>
-              <td className="py-2.5 pr-3 text-right whitespace-nowrap tabular">{formatEur(line.unitPriceNet)}</td>
+              <td className="py-2.5 pr-3 text-right whitespace-nowrap tabular">{money(line.unitPriceNet)}</td>
               {hasDiscount && (
-                <td className="py-2.5 pr-3 text-right whitespace-nowrap tabular">{line.discountPercent > 0 ? formatPercent(line.discountPercent) : '–'}</td>
+                <td className="py-2.5 pr-3 text-right whitespace-nowrap tabular">{line.discountPercent > 0 ? percent(line.discountPercent) : '–'}</td>
               )}
-              {showVat && <td className="py-2.5 pr-3 text-right whitespace-nowrap tabular">{formatPercent(line.taxRatePercent)}</td>}
-              <td className="py-2.5 text-right font-medium whitespace-nowrap tabular">{signedEur(line.lineNet, negate)}</td>
+              {showVat && <td className="py-2.5 pr-3 text-right whitespace-nowrap tabular">{percent(line.taxRatePercent)}</td>}
+              <td className="py-2.5 text-right font-medium whitespace-nowrap tabular">{signedEur(line.lineNet, negate, money)}</td>
             </tr>
           ))}
         </tbody>
@@ -87,13 +107,13 @@ export function DocumentLineItems({ lines, taxMode, brandColor, negate = false }
                 <span className="mr-1.5 text-neutral-500 tabular">{line.position}.</span>
                 {line.title}
               </p>
-              <p className="font-medium whitespace-nowrap tabular">{signedEur(line.lineNet, negate)}</p>
+              <p className="font-medium whitespace-nowrap tabular">{signedEur(line.lineNet, negate, money)}</p>
             </div>
             {line.description && <p className="mt-0.5 whitespace-pre-line text-[13px] text-neutral-600">{line.description}</p>}
             <p className="mt-1 text-[13px] text-neutral-500 tabular">
-              {formatQuantity(line.quantity)} {line.unit} × {formatEur(line.unitPriceNet)}
-              {line.discountPercent > 0 && ` · −${formatPercent(line.discountPercent)}`}
-              {showVat && ` · USt. ${formatPercent(line.taxRatePercent)}`}
+              {quantity(line.quantity)} {line.unit} × {money(line.unitPriceNet)}
+              {line.discountPercent > 0 && ` · −${percent(line.discountPercent)}`}
+              {showVat && ` · ${t('USt.', 'VAT')} ${percent(line.taxRatePercent)}`}
             </p>
           </li>
         ))}
@@ -106,6 +126,8 @@ export function DocumentLineItems({ lines, taxMode, brandColor, negate = false }
 export function QuotationDocument({ data, className }: { data: DocumentData; className?: string }) {
   return (
     <article
+      lang="de"
+      data-theme="light"
       aria-label={`Angebot ${data.number}`}
       className={cx('relative mx-auto w-full max-w-[820px] bg-white shadow-md ring-1 ring-neutral-200 sm:ap-a4', className)}
     >
@@ -146,20 +168,20 @@ export function QuotationDocument({ data, className }: { data: DocumentData; cla
             <dt className="text-neutral-500">Angebotsnr.</dt>
             <dd className="text-right font-medium tabular">{data.number}</dd>
             <dt className="text-neutral-500">Datum</dt>
-            <dd className="text-right tabular">{formatDate(data.issueDate)}</dd>
+            <dd className="text-right tabular">{documentFormat.date(data.issueDate)}</dd>
             <dt className="text-neutral-500">Gültig bis</dt>
-            <dd className="text-right tabular">{formatDate(data.validUntil)}</dd>
+            <dd className="text-right tabular">{documentFormat.date(data.validUntil)}</dd>
           </dl>
         </div>
 
         {data.introText && <p className="mt-6 text-sm whitespace-pre-line text-neutral-800">{data.introText}</p>}
 
         <div className="mt-6">
-          <DocumentLineItems lines={data.lines} taxMode={data.taxMode} brandColor={data.brandColor} />
+          <DocumentLineItems lines={data.lines} taxMode={data.taxMode} brandColor={data.brandColor} asDocument />
         </div>
 
         <div className="mt-4 flex justify-end">
-          <TotalsList totals={data.totals} taxMode={data.taxMode} className="w-full sm:w-[340px]" />
+          <TotalsList totals={data.totals} taxMode={data.taxMode} className="w-full sm:w-[340px]" asDocument />
         </div>
 
         {data.closingText && <p className="mt-8 text-sm whitespace-pre-line text-neutral-800">{data.closingText}</p>}

@@ -1,6 +1,7 @@
 import {
   ApiError,
   emailSchema,
+  getLocale,
   paymentMethodSuggestions,
   todayIso,
   type InvoiceDto,
@@ -23,7 +24,20 @@ import { toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api';
 import { errorMessage, isEmailNotVerified } from '@/lib/errors';
 import { formatDate, formatEur, getDisplayTimeZone } from '@/lib/format';
+import { tr } from '@/lib/i18n';
 import { invoiceName, sinceDaysText, useInvalidateInvoice } from './shared';
+
+// The prefilled email subject and message go to the (German) customer, so they stay German in both UI languages,
+// including the number and date formats.
+const eurDe = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+function dateDe(isoDate: string): string {
+  const [y, m, d] = isoDate.slice(0, 10).split('-');
+  return `${d}.${m}.${y}`;
+}
+function invoiceNameDe(i: Pick<InvoiceDto, 'number' | 'kind'>): string {
+  if (!i.number) return 'Rechnungsentwurf';
+  return `${i.kind === 'Cancellation' ? 'Stornorechnung' : 'Rechnung'} ${i.number}`;
+}
 
 interface DialogProps {
   invoice: InvoiceDto;
@@ -36,11 +50,11 @@ function fieldError(error: unknown, field: string): string | undefined {
   return error instanceof ApiError ? error.fieldErrors[field]?.join(' ') : undefined;
 }
 
-/** Where the user can fix an issue problem reported by the server. */
+/** Where the user can fix an issue problem reported by the server (its texts follow the UI language). */
 export function problemLink(problem: string, invoice: Pick<InvoiceDto, 'id' | 'customerId'>): { to: string; label: string } {
-  if (/Ihrer Firma|Firma\)/.test(problem)) return { to: '/einstellungen/firma', label: 'Firmendaten öffnen' };
-  if (/Kunden|des Kunden/.test(problem)) return { to: `/kunden/${invoice.customerId}/bearbeiten`, label: 'Kunden bearbeiten' };
-  return { to: `/rechnungen/${invoice.id}/bearbeiten`, label: 'Entwurf bearbeiten' };
+  if (/Ihrer Firma|Firma\)|your company|→ Company\)/.test(problem)) return { to: '/einstellungen/firma', label: tr('Firmendaten öffnen', 'Open company details') };
+  if (/Kunden|des Kunden|[Cc]ustomer/.test(problem)) return { to: `/kunden/${invoice.customerId}/bearbeiten`, label: tr('Kunden bearbeiten', 'Edit customer') };
+  return { to: `/rechnungen/${invoice.id}/bearbeiten`, label: tr('Entwurf bearbeiten', 'Edit draft') };
 }
 
 /** Checklist of what is missing before an invoice can be issued (from InvoiceDto.issueProblems). */
@@ -71,7 +85,7 @@ export function IssueDialog({ invoice, open, onOpenChange }: DialogProps) {
     mutationFn: () => api.invoices.issue(companyId, invoice.id),
     onSuccess: (issued) => {
       invalidate(issued);
-      toast.success('Rechnung gestellt', `${issued.number ?? ''} · ${formatEur(issued.totals.grossTotal)}`);
+      toast.success(tr('Rechnung gestellt', 'Invoice issued'), `${issued.number ?? ''} · ${formatEur(issued.totals.grossTotal)}`);
       onOpenChange(false);
     },
   });
@@ -87,70 +101,96 @@ export function IssueDialog({ invoice, open, onOpenChange }: DialogProps) {
         if (!next) mutation.reset();
         onOpenChange(next);
       }}
-      title="Rechnung stellen?"
+      title={tr('Rechnung stellen?', 'Issue invoice?')}
       description={`${invoice.recipientName} · ${formatEur(invoice.totals.grossTotal)}`}
       size="lg"
       footer={
         <>
           <Button onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
-            Abbrechen
+            {tr('Abbrechen', 'Cancel')}
           </Button>
           <Button variant="primary" icon={FileCheck2} loading={mutation.isPending} disabled={problems.length > 0} onClick={() => mutation.mutate()}>
-            Jetzt Rechnung stellen
+            {tr('Jetzt Rechnung stellen', 'Issue invoice now')}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
         {mutation.isError && (
-          <Alert tone={incomplete ? 'warning' : 'danger'} live title={incomplete ? 'Die Rechnung ist noch unvollständig' : undefined}>
+          <Alert
+            tone={incomplete ? 'warning' : 'danger'}
+            live
+            title={incomplete ? tr('Die Rechnung ist noch unvollständig', 'The invoice is still incomplete') : undefined}
+          >
             {errorMessage(mutation.error)}
           </Alert>
         )}
         {problems.length > 0 ? (
-          <Alert tone="warning" title="Vor dem Stellen noch zu erledigen">
+          <Alert tone="warning" title={tr('Vor dem Stellen noch zu erledigen', 'To do before issuing')}>
             <IssueProblemList invoice={invoice} problems={problems} />
           </Alert>
         ) : (
           <Alert tone="success" icon={CircleCheck}>
-            Alle Pflichtangaben sind vorhanden. Die Rechnung kann gestellt werden.
+            {tr('Alle Pflichtangaben sind vorhanden. Die Rechnung kann gestellt werden.', 'All mandatory details are present. The invoice can be issued.')}
           </Alert>
         )}
         <ul className="space-y-2.5 text-sm text-neutral-700">
           <li className="flex gap-2.5">
             <Info aria-hidden size={16} className="mt-0.5 shrink-0 text-neutral-400" />
-            <span>
-              Die Rechnung erhält die nächste fortlaufende Rechnungsnummer (Format <span className="font-medium tabular">{prefix}-{year}-0001</span>).
-              Nummern werden lückenlos vergeben.
-            </span>
+            {getLocale() === 'en' ? (
+              <span>
+                The invoice receives the next sequential invoice number (format{' '}
+                <span className="font-medium tabular">
+                  {prefix}-{year}-0001
+                </span>
+                ). Numbers are assigned without gaps.
+              </span>
+            ) : (
+              <span>
+                Die Rechnung erhält die nächste fortlaufende Rechnungsnummer (Format <span className="font-medium tabular">{prefix}-{year}-0001</span>).
+                Nummern werden lückenlos vergeben.
+              </span>
+            )}
           </li>
           <li className="flex gap-2.5">
             <TriangleAlert aria-hidden size={16} className="mt-0.5 shrink-0 text-warning-text" />
-            <span>
-              Danach ist die Rechnung <strong className="font-medium text-neutral-900">festgeschrieben (GoBD)</strong>: Inhalt und Beträge lassen sich nicht
-              mehr ändern. Korrekturen sind nur noch über eine Stornorechnung möglich.
-            </span>
+            {getLocale() === 'en' ? (
+              <span>
+                After that the invoice is <strong className="font-medium text-neutral-900">locked (GoBD)</strong>: its content and amounts can no longer
+                be changed. Corrections are only possible with a cancellation invoice.
+              </span>
+            ) : (
+              <span>
+                Danach ist die Rechnung <strong className="font-medium text-neutral-900">festgeschrieben (GoBD)</strong>: Inhalt und Beträge lassen sich nicht
+                mehr ändern. Korrekturen sind nur noch über eine Stornorechnung möglich.
+              </span>
+            )}
           </li>
           <li className="flex gap-2.5">
             <Info aria-hidden size={16} className="mt-0.5 shrink-0 text-neutral-400" />
-            <span>Das PDF enthält die E-Rechnung im ZUGFeRD-Format (EN 16931). Versenden können Sie die Rechnung im nächsten Schritt.</span>
+            <span>
+              {tr(
+                'Das PDF enthält die E-Rechnung im ZUGFeRD-Format (EN 16931). Versenden können Sie die Rechnung im nächsten Schritt.',
+                'The PDF contains the e-invoice in ZUGFeRD format (EN 16931). You can send the invoice in the next step.',
+              )}
+            </span>
           </li>
         </ul>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-2 rounded-lg border border-neutral-200 bg-neutral-25 px-4 py-3 text-sm sm:grid-cols-4">
           <div>
-            <dt className="text-xs text-neutral-500">Rechnungsdatum</dt>
+            <dt className="text-xs text-neutral-500">{tr('Rechnungsdatum', 'Invoice date')}</dt>
             <dd className="font-medium tabular">{formatDate(invoice.issueDate)}</dd>
           </div>
           <div>
-            <dt className="text-xs text-neutral-500">Fällig am</dt>
+            <dt className="text-xs text-neutral-500">{tr('Fällig am', 'Due date')}</dt>
             <dd className="font-medium tabular">{formatDate(invoice.dueDate)}</dd>
           </div>
           <div>
-            <dt className="text-xs text-neutral-500">Netto</dt>
+            <dt className="text-xs text-neutral-500">{tr('Netto', 'Net')}</dt>
             <dd className="font-medium tabular">{formatEur(invoice.totals.netTotal)}</dd>
           </div>
           <div>
-            <dt className="text-xs text-neutral-500">Brutto</dt>
+            <dt className="text-xs text-neutral-500">{tr('Brutto', 'Gross')}</dt>
             <dd className="font-semibold tabular">{formatEur(invoice.totals.grossTotal)}</dd>
           </div>
         </dl>
@@ -162,22 +202,22 @@ export function IssueDialog({ invoice, open, onOpenChange }: DialogProps) {
 function VerificationAlert({ error, alternative }: { error: unknown; alternative: string }) {
   const resend = useMutation({
     mutationFn: () => api.auth.resendVerification(),
-    onSuccess: () => toast.success('Bestätigungs-E-Mail gesendet', 'Bitte prüfen Sie Ihr Postfach.'),
-    onError: (e) => toast.error('Senden fehlgeschlagen', errorMessage(e)),
+    onSuccess: () => toast.success(tr('Bestätigungs-E-Mail gesendet', 'Confirmation email sent'), tr('Bitte prüfen Sie Ihr Postfach.', 'Please check your inbox.')),
+    onError: (e) => toast.error(tr('Senden fehlgeschlagen', 'Sending failed'), errorMessage(e)),
   });
   if (isEmailNotVerified(error)) {
     return (
       <Alert
         tone="warning"
         live
-        title="E-Mail-Adresse noch nicht bestätigt"
+        title={tr('E-Mail-Adresse noch nicht bestätigt', 'Email address not confirmed yet')}
         actions={
           <Button size="sm" loading={resend.isPending} onClick={() => resend.mutate()}>
-            Bestätigungs-E-Mail erneut senden
+            {tr('Bestätigungs-E-Mail erneut senden', 'Resend confirmation email')}
           </Button>
         }
       >
-        Bitte bestätigen Sie zuerst Ihre E-Mail-Adresse. {alternative}
+        {tr('Bitte bestätigen Sie zuerst Ihre E-Mail-Adresse.', 'Please confirm your email address first.')} {alternative}
       </Alert>
     );
   }
@@ -194,18 +234,19 @@ export function SendInvoiceDialog({ invoice, open, onOpenChange }: DialogProps) 
   const name = invoiceName(invoice);
   const [mode, setMode] = useState<SendMode>(invoice.recipientEmail ? 'Email' : 'Manual');
   const [recipient, setRecipient] = useState(invoice.recipientEmail ?? '');
-  const [subject, setSubject] = useState(`${name}: ${invoice.title}`);
+  // Customer-facing defaults: German in both UI languages (see eurDe/dateDe above).
+  const [subject, setSubject] = useState(`${invoiceNameDe(invoice)}: ${invoice.title}`);
   const [message, setMessage] = useState(
     invoice.kind === 'Cancellation'
       ? `Guten Tag,\n\nanbei erhalten Sie unsere Stornorechnung ${invoice.number ?? ''} zur Rechnung ${invoice.cancelledInvoiceNumber ?? ''}.`
-      : `Guten Tag ${invoice.recipientContact ?? invoice.recipientName},\n\nvielen Dank für Ihren Auftrag. Anbei erhalten Sie unsere Rechnung ${invoice.number ?? ''} über ${formatEur(invoice.totals.grossTotal)}. Bitte begleichen Sie den Betrag bis zum ${formatDate(invoice.dueDate)}.`,
+      : `Guten Tag ${invoice.recipientContact ?? invoice.recipientName},\n\nvielen Dank für Ihren Auftrag. Anbei erhalten Sie unsere Rechnung ${invoice.number ?? ''} über ${eurDe.format(invoice.totals.grossTotal)}. Bitte begleichen Sie den Betrag bis zum ${dateDe(invoice.dueDate)}.`,
   );
   const [recipientError, setRecipientError] = useState<string | null>(null);
   const send = useMutation({
     mutationFn: (body: SendInvoiceRequest) => api.invoices.send(companyId, invoice.id, body),
     onSuccess: (response) => {
       invalidate(response.invoice);
-      toast.success(mode === 'Email' ? 'Rechnung versendet' : 'Als versendet markiert', invoice.number ?? undefined);
+      toast.success(mode === 'Email' ? tr('Rechnung versendet', 'Invoice sent') : tr('Als versendet markiert', 'Marked as sent'), invoice.number ?? undefined);
       onOpenChange(false);
     },
   });
@@ -215,7 +256,7 @@ export function SendInvoiceDialog({ invoice, open, onOpenChange }: DialogProps) 
     if (mode === 'Email') {
       const parsed = emailSchema.safeParse(recipient);
       if (!parsed.success) {
-        setRecipientError(parsed.error.issues[0]?.message ?? 'Bitte gültige E-Mail-Adresse angeben.');
+        setRecipientError(parsed.error.issues[0]?.message ?? tr('Bitte gültige E-Mail-Adresse angeben.', 'Please enter a valid email address.'));
         return;
       }
     }
@@ -235,53 +276,80 @@ export function SendInvoiceDialog({ invoice, open, onOpenChange }: DialogProps) 
         if (!next) send.reset();
         onOpenChange(next);
       }}
-      title={invoice.sentAt ? `${name} erneut senden` : `${name} senden`}
-      description={`An ${invoice.recipientName}`}
+      title={invoice.sentAt ? tr(`${name} erneut senden`, `Send ${name} again`) : tr(`${name} senden`, `Send ${name}`)}
+      description={tr(`An ${invoice.recipientName}`, `To ${invoice.recipientName}`)}
       size="lg"
       dismissible={false}
       footer={
         <>
           <Button onClick={() => onOpenChange(false)} disabled={send.isPending}>
-            Abbrechen
+            {tr('Abbrechen', 'Cancel')}
           </Button>
           <Button variant="primary" loading={send.isPending} onClick={submit}>
-            {mode === 'Email' ? 'Jetzt senden' : 'Als versendet markieren'}
+            {mode === 'Email' ? tr('Jetzt senden', 'Send now') : tr('Als versendet markieren', 'Mark as sent')}
           </Button>
         </>
       }
     >
       <div className="space-y-5">
         {send.isError && (
-          <VerificationAlert error={send.error} alternative="Alternativ können Sie die Rechnung selbst übermitteln und hier als versendet markieren." />
+          <VerificationAlert
+            error={send.error}
+            alternative={tr(
+              'Alternativ können Sie die Rechnung selbst übermitteln und hier als versendet markieren.',
+              'Alternatively, you can deliver the invoice yourself and mark it as sent here.',
+            )}
+          />
         )}
         <RadioCards<SendMode>
           name="invoice-send-mode"
-          legend="Versandart"
+          legend={tr('Versandart', 'Delivery method')}
           value={mode}
           onChange={setMode}
           options={[
-            { value: 'Email', label: 'Per E-Mail senden', description: 'AngebotPilot sendet die E-Mail mit der Rechnung als PDF im Anhang.' },
-            { value: 'Manual', label: 'Anderweitig übermittelt (z. B. Post)', description: 'Sie haben die Rechnung ausgedruckt, persönlich übergeben oder selbst gemailt.' },
+            {
+              value: 'Email',
+              label: tr('Per E-Mail senden', 'Send by email'),
+              description: tr('AngebotPilot sendet die E-Mail mit der Rechnung als PDF im Anhang.', 'AngebotPilot sends the email with the invoice attached as a PDF.'),
+            },
+            {
+              value: 'Manual',
+              label: tr('Anderweitig übermittelt (z. B. Post)', 'Delivered another way (e.g. by post)'),
+              description: tr(
+                'Sie haben die Rechnung ausgedruckt, persönlich übergeben oder selbst gemailt.',
+                'You printed the invoice, handed it over in person or emailed it yourself.',
+              ),
+            },
           ]}
         />
         {mode === 'Email' ? (
           <div className="space-y-4">
-            <Field label="Empfänger" error={recipientError ?? fieldError(send.error, 'recipientEmail')} required>
+            <Field label={tr('Empfänger', 'Recipient')} error={recipientError ?? fieldError(send.error, 'recipientEmail')} required>
               <Input type="email" value={recipient} onChange={(e) => setRecipient(e.target.value)} autoComplete="off" />
             </Field>
-            <Field label="Betreff">
+            <Field label={tr('Betreff', 'Subject')}>
               <Input value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={200} />
             </Field>
-            <Field label="Nachricht" hint="Ihre E-Mail-Signatur aus den Einstellungen wird automatisch angefügt.">
+            <Field
+              label={tr('Nachricht', 'Message')}
+              hint={tr(
+                'Ihre E-Mail-Signatur aus den Einstellungen wird automatisch angefügt.',
+                'Your customer receives this email in German. Your email signature from Settings is added automatically.',
+              )}
+            >
               <Textarea rows={6} value={message} onChange={(e) => setMessage(e.target.value)} />
             </Field>
           </div>
         ) : (
-          <p className="text-sm text-neutral-600">Der Versand wird im Verlauf vermerkt. Es wird keine E-Mail verschickt.</p>
+          <p className="text-sm text-neutral-600">
+            {tr('Der Versand wird im Verlauf vermerkt. Es wird keine E-Mail verschickt.', 'The delivery is noted in the history. No email is sent.')}
+          </p>
         )}
-        <Alert tone="info" title="E-Rechnung inklusive">
-          Das PDF enthält die E-Rechnung im ZUGFeRD-Format (EN 16931). Ihr Kunde kann sie direkt in seine Buchhaltung übernehmen – das PDF bleibt
-          trotzdem ganz normal lesbar.
+        <Alert tone="info" title={tr('E-Rechnung inklusive', 'E-invoice included')}>
+          {tr(
+            'Das PDF enthält die E-Rechnung im ZUGFeRD-Format (EN 16931). Ihr Kunde kann sie direkt in seine Buchhaltung übernehmen – das PDF bleibt trotzdem ganz normal lesbar.',
+            'The PDF contains the e-invoice in ZUGFeRD format (EN 16931). Your customer can import it straight into their accounting – the PDF still reads like a normal document.',
+          )}
         </Alert>
       </div>
     </Dialog>
@@ -295,7 +363,8 @@ export function PaymentDialog({ invoice, open, onOpenChange }: DialogProps) {
   const today = todayIso(getDisplayTimeZone());
   const [amount, setAmount] = useState(invoice.openAmount);
   const [paidOn, setPaidOn] = useState(today);
-  const [method, setMethod] = useState('Überweisung');
+  // First suggestion = bank transfer, in the UI language (the method is a free-text note for the user's own records).
+  const [method, setMethod] = useState(paymentMethodSuggestions[0] ?? '');
   const [note, setNote] = useState('');
   const [touched, setTouched] = useState(false);
   const mutation = useMutation({
@@ -308,17 +377,24 @@ export function PaymentDialog({ invoice, open, onOpenChange }: DialogProps) {
       }),
     onSuccess: (updated) => {
       invalidate(updated);
-      toast.success(updated.status === 'Paid' ? 'Rechnung vollständig bezahlt' : 'Zahlung erfasst', `${formatEur(amount)} am ${formatDate(paidOn)}`);
+      toast.success(
+        updated.status === 'Paid' ? tr('Rechnung vollständig bezahlt', 'Invoice paid in full') : tr('Zahlung erfasst', 'Payment recorded'),
+        tr(`${formatEur(amount)} am ${formatDate(paidOn)}`, `${formatEur(amount)} on ${formatDate(paidOn)}`),
+      );
       onOpenChange(false);
     },
   });
 
   const amountError = !Number.isFinite(amount) || amount <= 0
-    ? 'Bitte einen Betrag größer als 0 € angeben.'
+    ? tr('Bitte einen Betrag größer als 0 € angeben.', 'Please enter an amount greater than €0.')
     : Math.round(amount * 100) > Math.round(invoice.openAmount * 100)
-      ? `Der Betrag übersteigt den offenen Betrag von ${formatEur(invoice.openAmount)}.`
+      ? tr(`Der Betrag übersteigt den offenen Betrag von ${formatEur(invoice.openAmount)}.`, `The amount exceeds the open amount of ${formatEur(invoice.openAmount)}.`)
       : undefined;
-  const dateError = !paidOn ? 'Bitte Zahlungsdatum angeben.' : paidOn > today ? 'Das Zahlungsdatum darf nicht in der Zukunft liegen.' : undefined;
+  const dateError = !paidOn
+    ? tr('Bitte Zahlungsdatum angeben.', 'Please enter the payment date.')
+    : paidOn > today
+      ? tr('Das Zahlungsdatum darf nicht in der Zukunft liegen.', 'The payment date must not be in the future.')
+      : undefined;
   const invalid = Boolean(amountError || dateError);
   const full = !amountError && Math.round(amount * 100) === Math.round(invoice.openAmount * 100);
 
@@ -326,13 +402,16 @@ export function PaymentDialog({ invoice, open, onOpenChange }: DialogProps) {
     <Dialog
       open={open}
       onOpenChange={(next) => !mutation.isPending && onOpenChange(next)}
-      title="Zahlung erfassen"
-      description={`${invoiceName(invoice)} · offen ${formatEur(invoice.openAmount)} von ${formatEur(invoice.totals.grossTotal)}`}
+      title={tr('Zahlung erfassen', 'Record payment')}
+      description={tr(
+        `${invoiceName(invoice)} · offen ${formatEur(invoice.openAmount)} von ${formatEur(invoice.totals.grossTotal)}`,
+        `${invoiceName(invoice)} · ${formatEur(invoice.openAmount)} of ${formatEur(invoice.totals.grossTotal)} open`,
+      )}
       dismissible={false}
       footer={
         <>
           <Button onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
-            Abbrechen
+            {tr('Abbrechen', 'Cancel')}
           </Button>
           <Button
             variant="primary"
@@ -342,7 +421,7 @@ export function PaymentDialog({ invoice, open, onOpenChange }: DialogProps) {
               if (!invalid) mutation.mutate();
             }}
           >
-            Zahlung speichern
+            {tr('Zahlung speichern', 'Save payment')}
           </Button>
         </>
       }
@@ -355,18 +434,22 @@ export function PaymentDialog({ invoice, open, onOpenChange }: DialogProps) {
         )}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
-            label="Betrag"
+            label={tr('Betrag', 'Amount')}
             required
             error={(touched || Number.isFinite(amount) ? amountError : undefined) ?? fieldError(mutation.error, 'amount')}
-            hint={full ? 'Entspricht dem offenen Betrag – die Rechnung gilt danach als bezahlt.' : 'Teilzahlungen sind möglich.'}
+            hint={
+              full
+                ? tr('Entspricht dem offenen Betrag – die Rechnung gilt danach als bezahlt.', 'Matches the open amount – the invoice is then marked as paid.')
+                : tr('Teilzahlungen sind möglich.', 'Partial payments are possible.')
+            }
           >
             <NumberInput value={amount} onValueChange={setAmount} minFractionDigits={2} suffix="€" align="left" />
           </Field>
-          <Field label="Zahlungsdatum" required error={dateError ?? fieldError(mutation.error, 'paidOn')}>
+          <Field label={tr('Zahlungsdatum', 'Payment date')} required error={dateError ?? fieldError(mutation.error, 'paidOn')}>
             <Input type="date" value={paidOn} max={today} onChange={(e) => setPaidOn(e.target.value)} />
           </Field>
         </div>
-        <Field label="Zahlungsart" optional hint="Vorschlag wählen oder frei eingeben.">
+        <Field label={tr('Zahlungsart', 'Payment method')} optional hint={tr('Vorschlag wählen oder frei eingeben.', 'Choose a suggestion or type your own.')}>
           <Input list={methodsId} value={method} onChange={(e) => setMethod(e.target.value)} maxLength={50} autoComplete="off" />
         </Field>
         <datalist id={methodsId}>
@@ -374,8 +457,14 @@ export function PaymentDialog({ invoice, open, onOpenChange }: DialogProps) {
             <option key={m} value={m} />
           ))}
         </datalist>
-        <Field label="Notiz" optional>
-          <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="z. B. Verwendungszweck oder Kontoauszug" />
+        <Field label={tr('Notiz', 'Note')} optional>
+          <Textarea
+            rows={2}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={500}
+            placeholder={tr('z. B. Verwendungszweck oder Kontoauszug', 'e.g. payment reference or bank statement')}
+          />
         </Field>
       </div>
     </Dialog>
@@ -392,7 +481,10 @@ export function ReminderDialog({ invoice, open, onOpenChange }: DialogProps) {
     mutationFn: () => api.invoices.remind(companyId, invoice.id, { recipientEmail: recipient.trim() || null, message: message.trim() || null }),
     onSuccess: (response) => {
       invalidate(response.invoice);
-      toast.success('Zahlungserinnerung versendet', `${invoice.number ?? ''} an ${recipient.trim()}`);
+      toast.success(
+        tr('Zahlungserinnerung versendet', 'Payment reminder sent'),
+        tr(`${invoice.number ?? ''} an ${recipient.trim()}`, `${invoice.number ?? ''} to ${recipient.trim()}`),
+      );
       onOpenChange(false);
     },
   });
@@ -400,7 +492,7 @@ export function ReminderDialog({ invoice, open, onOpenChange }: DialogProps) {
     setRecipientError(null);
     const parsed = emailSchema.safeParse(recipient);
     if (!parsed.success) {
-      setRecipientError(parsed.error.issues[0]?.message ?? 'Bitte gültige E-Mail-Adresse angeben.');
+      setRecipientError(parsed.error.issues[0]?.message ?? tr('Bitte gültige E-Mail-Adresse angeben.', 'Please enter a valid email address.'));
       return;
     }
     mutation.mutate();
@@ -413,30 +505,52 @@ export function ReminderDialog({ invoice, open, onOpenChange }: DialogProps) {
         if (!next) mutation.reset();
         onOpenChange(next);
       }}
-      title="Zahlungserinnerung senden"
-      description={`${invoiceName(invoice)} · offen ${formatEur(invoice.openAmount)}${invoice.isOverdue ? ` · seit ${sinceDaysText(invoice.daysOverdue)} überfällig` : ''}`}
+      title={tr('Zahlungserinnerung senden', 'Send payment reminder')}
+      description={tr(
+        `${invoiceName(invoice)} · offen ${formatEur(invoice.openAmount)}${invoice.isOverdue ? ` · seit ${sinceDaysText(invoice.daysOverdue)} überfällig` : ''}`,
+        `${invoiceName(invoice)} · ${formatEur(invoice.openAmount)} open${invoice.isOverdue ? ` · overdue for ${sinceDaysText(invoice.daysOverdue)}` : ''}`,
+      )}
       dismissible={false}
       footer={
         <>
           <Button onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
-            Abbrechen
+            {tr('Abbrechen', 'Cancel')}
           </Button>
           <Button variant="primary" loading={mutation.isPending} onClick={submit}>
-            Erinnerung senden
+            {tr('Erinnerung senden', 'Send reminder')}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
-        {mutation.isError && <VerificationAlert error={mutation.error} alternative="Danach können Sie Zahlungserinnerungen per E-Mail versenden." />}
+        {mutation.isError && (
+          <VerificationAlert
+            error={mutation.error}
+            alternative={tr('Danach können Sie Zahlungserinnerungen per E-Mail versenden.', 'Then you can send payment reminders by email.')}
+          />
+        )}
         <p className="text-sm text-neutral-600">
-          Eine freundliche E-Mail mit Rechnungsnummer, offenem Betrag, Fälligkeit und der Rechnung als PDF im Anhang.
-          {invoice.reminderCount > 0 && ` Bisher ${invoice.reminderCount === 1 ? 'eine Erinnerung' : `${invoice.reminderCount} Erinnerungen`} versendet.`}
+          {tr(
+            'Eine freundliche E-Mail mit Rechnungsnummer, offenem Betrag, Fälligkeit und der Rechnung als PDF im Anhang.',
+            'A friendly email with the invoice number, open amount, due date and the invoice attached as a PDF.',
+          )}
+          {invoice.reminderCount > 0 &&
+            tr(
+              ` Bisher ${invoice.reminderCount === 1 ? 'eine Erinnerung' : `${invoice.reminderCount} Erinnerungen`} versendet.`,
+              ` ${invoice.reminderCount === 1 ? 'One reminder' : `${invoice.reminderCount} reminders`} sent so far.`,
+            )}
         </p>
-        <Field label="Empfänger" error={recipientError ?? fieldError(mutation.error, 'recipientEmail')} required>
+        <Field label={tr('Empfänger', 'Recipient')} error={recipientError ?? fieldError(mutation.error, 'recipientEmail')} required>
           <Input type="email" value={recipient} onChange={(e) => setRecipient(e.target.value)} autoComplete="off" />
         </Field>
-        <Field label="Persönliche Nachricht" optional hint="Wird zusätzlich zum Standardtext eingefügt.">
+        <Field
+          label={tr('Persönliche Nachricht', 'Personal message')}
+          optional
+          hint={tr(
+            'Wird zusätzlich zum Standardtext eingefügt.',
+            'Added to the standard text. Your customer receives this email in German – consider writing your message in German too.',
+          )}
+        >
           <Textarea rows={4} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={4000} />
         </Field>
       </div>
@@ -452,7 +566,15 @@ export function CancelInvoiceDialog({ invoice, open, onOpenChange }: DialogProps
     mutationFn: () => api.invoices.cancel(companyId, invoice.id, { reason: reason.trim() || null }),
     onSuccess: (cancelled) => {
       invalidate(cancelled);
-      toast.success('Rechnung storniert', cancelled.cancellationInvoiceNumber ? `Stornorechnung ${cancelled.cancellationInvoiceNumber} wurde erstellt.` : undefined);
+      toast.success(
+        tr('Rechnung storniert', 'Invoice cancelled'),
+        cancelled.cancellationInvoiceNumber
+          ? tr(
+              `Stornorechnung ${cancelled.cancellationInvoiceNumber} wurde erstellt.`,
+              `Cancellation invoice ${cancelled.cancellationInvoiceNumber} has been created.`,
+            )
+          : undefined,
+      );
       onOpenChange(false);
     },
   });
@@ -460,15 +582,18 @@ export function CancelInvoiceDialog({ invoice, open, onOpenChange }: DialogProps
     <Dialog
       open={open}
       onOpenChange={(next) => !mutation.isPending && onOpenChange(next)}
-      title={`${invoiceName(invoice)} stornieren?`}
-      description="Es wird eine Stornorechnung mit eigener Rechnungsnummer erstellt, die diese Rechnung in voller Höhe aufhebt."
+      title={tr(`${invoiceName(invoice)} stornieren?`, `Cancel ${invoiceName(invoice)}?`)}
+      description={tr(
+        'Es wird eine Stornorechnung mit eigener Rechnungsnummer erstellt, die diese Rechnung in voller Höhe aufhebt.',
+        'A cancellation invoice with its own invoice number is created that reverses this invoice in full.',
+      )}
       footer={
         <>
           <Button onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
-            Abbrechen
+            {tr('Abbrechen', 'Back')}
           </Button>
           <Button variant="danger" loading={mutation.isPending} onClick={() => mutation.mutate()}>
-            Stornorechnung erstellen
+            {tr('Stornorechnung erstellen', 'Create cancellation invoice')}
           </Button>
         </>
       }
@@ -480,16 +605,24 @@ export function CancelInvoiceDialog({ invoice, open, onOpenChange }: DialogProps
           </Alert>
         )}
         <p className="text-sm text-neutral-600">
-          Die ursprüngliche Rechnung bleibt unverändert erhalten (GoBD) und erhält den Status „Storniert“. Offene Zahlungserinnerungen werden
-          gestoppt. Senden Sie die Stornorechnung anschließend an Ihren Kunden.
+          {tr(
+            'Die ursprüngliche Rechnung bleibt unverändert erhalten (GoBD) und erhält den Status „Storniert“. Offene Zahlungserinnerungen werden gestoppt. Senden Sie die Stornorechnung anschließend an Ihren Kunden.',
+            'The original invoice is kept unchanged (GoBD) and gets the status “Cancelled”. Pending payment reminders are stopped. Then send the cancellation invoice to your customer.',
+          )}
         </p>
         {invoice.paidAmount > 0 && (
           <Alert tone="warning">
-            Es wurden bereits {formatEur(invoice.paidAmount)} gezahlt. Die Zahlungen bleiben erfasst – erstatten oder verrechnen Sie den Betrag mit
-            Ihrem Kunden.
+            {tr(
+              `Es wurden bereits ${formatEur(invoice.paidAmount)} gezahlt. Die Zahlungen bleiben erfasst – erstatten oder verrechnen Sie den Betrag mit Ihrem Kunden.`,
+              `${formatEur(invoice.paidAmount)} has already been paid. The payments stay recorded – refund or offset the amount with your customer.`,
+            )}
           </Alert>
         )}
-        <Field label="Grund" optional hint="Erscheint auf der Stornorechnung.">
+        <Field
+          label={tr('Grund', 'Reason')}
+          optional
+          hint={tr('Erscheint auf der Stornorechnung.', 'Appears on the cancellation invoice, which is in German.')}
+        >
           <Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={1000} />
         </Field>
       </div>

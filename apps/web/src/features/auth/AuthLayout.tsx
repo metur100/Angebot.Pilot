@@ -2,31 +2,45 @@ import { BellRing, FileCheck2, Hammer } from 'lucide-react';
 import { forwardRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { BrandLogo } from '@/components/layout/Brand';
+import { PreferenceBar } from '@/components/layout/Preferences';
 import { controlBase, useFieldControl } from '@/components/ui/Field';
 import { cx } from '@/lib/cx';
 import { legalLinks } from '@/lib/env';
 import { useDocumentTitle } from '@/lib/hooks';
+import { tr } from '@/lib/i18n';
 
-const benefits = [
-  { icon: FileCheck2, title: 'Angebote in Minuten', text: 'Positionen, Vorlagen und Summen inkl. USt. – sauber als PDF.' },
-  { icon: BellRing, title: 'Automatisch nachfassen', text: 'Freundliche Erinnerungen, bis Ihr Kunde entschieden hat.' },
-  { icon: Hammer, title: 'Vom Angebot zum Auftrag', text: 'Online annehmen lassen und mit einem Klick zum Auftrag machen.' },
+const benefits = () => [
+  {
+    icon: FileCheck2,
+    title: tr('Angebote in Minuten', 'Quotations in minutes'),
+    text: tr('Positionen, Vorlagen und Summen inkl. USt. – sauber als PDF.', 'Line items, templates and totals incl. VAT – as a clean PDF.'),
+  },
+  {
+    icon: BellRing,
+    title: tr('Automatisch nachfassen', 'Automatic follow-ups'),
+    text: tr('Freundliche Erinnerungen, bis Ihr Kunde entschieden hat.', 'Friendly reminders until your customer has decided.'),
+  },
+  {
+    icon: Hammer,
+    title: tr('Vom Angebot zum Auftrag', 'From quotation to job'),
+    text: tr('Online annehmen lassen und mit einem Klick zum Auftrag machen.', 'Let customers accept online and turn it into a job with one click.'),
+  },
 ];
 
 export function LegalFooter({ className }: { className?: string }) {
   return (
-    <nav aria-label="Rechtliches" className={cx('flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-neutral-600', className)}>
+    <nav aria-label={tr('Rechtliches', 'Legal')} className={cx('flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-neutral-600', className)}>
       <a href={legalLinks.home} target="_blank" rel="noopener noreferrer" className="hover:text-neutral-800 hover:underline">
         AngebotPilot
       </a>
       <a href={legalLinks.impressum} target="_blank" rel="noopener noreferrer" className="hover:text-neutral-800 hover:underline">
-        Impressum
+        {tr('Impressum', 'Legal notice')}
       </a>
       <a href={legalLinks.datenschutz} target="_blank" rel="noopener noreferrer" className="hover:text-neutral-800 hover:underline">
-        Datenschutz
+        {tr('Datenschutz', 'Privacy')}
       </a>
       <a href={legalLinks.agb} target="_blank" rel="noopener noreferrer" className="hover:text-neutral-800 hover:underline">
-        AGB
+        {tr('AGB', 'Terms')}
       </a>
     </nav>
   );
@@ -47,7 +61,7 @@ export function AuthLayout({ title, description, children, footer, compact }: Au
     <div className="flex min-h-dvh bg-white">
       <div className="flex min-w-0 flex-1 flex-col px-5 py-6 sm:px-10">
         <header>
-          <a href={legalLinks.home} className="inline-block rounded" aria-label="AngebotPilot Startseite">
+          <a href={legalLinks.home} className="inline-block rounded" aria-label={tr('AngebotPilot Startseite', 'AngebotPilot home page')}>
             <BrandLogo />
           </a>
         </header>
@@ -60,19 +74,20 @@ export function AuthLayout({ title, description, children, footer, compact }: Au
           </div>
         </main>
         <LegalFooter />
+        <PreferenceBar className="mt-3 justify-start" />
       </div>
       {!compact && (
         <aside className="relative hidden w-[44%] max-w-[640px] overflow-hidden border-l border-neutral-200 bg-neutral-50 lg:flex lg:flex-col lg:justify-center lg:px-14">
           <div aria-hidden className="absolute -top-32 -right-32 size-[420px] rounded-full bg-brand-100/60 blur-3xl" />
           <div className="relative">
-            <p className="text-[13px] font-semibold tracking-wide text-brand-700 uppercase">Für Handwerk & Dienstleister</p>
+            <p className="text-[13px] font-semibold tracking-wide text-brand-700 uppercase">{tr('Für Handwerk & Dienstleister', 'For trades & service providers')}</p>
             <p className="mt-3 max-w-md text-[26px] leading-[34px] font-semibold tracking-[-0.02em] text-neutral-900">
-              Weniger Papierkram. Mehr Zusagen.
+              {tr('Weniger Papierkram. Mehr Zusagen.', 'Less paperwork. More wins.')}
             </p>
             <ul className="mt-9 space-y-6">
-              {benefits.map((b) => (
+              {benefits().map((b) => (
                 <li key={b.title} className="flex gap-4">
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white text-brand-600 shadow-sm">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white text-brand-600 dark:text-brand-700 shadow-sm">
                     <b.icon aria-hidden size={19} />
                   </span>
                   <span>
@@ -82,7 +97,12 @@ export function AuthLayout({ title, description, children, footer, compact }: Au
                 </li>
               ))}
             </ul>
-            <p className="mt-10 text-[13px] text-neutral-600">Für Elektrobetriebe, Reinigungsfirmen, Hausmeisterdienste, Webdesign und Beratung.</p>
+            <p className="mt-10 text-[13px] text-neutral-600">
+              {tr(
+                'Für Elektrobetriebe, Reinigungsfirmen, Hausmeisterdienste, Webdesign und Beratung.',
+                'For electricians, cleaning companies, caretaker services, web design and consulting.',
+              )}
+            </p>
           </div>
         </aside>
       )}
@@ -103,7 +123,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HT
       <button
         type="button"
         onClick={() => setVisible((v) => !v)}
-        aria-label={visible ? 'Passwort verbergen' : 'Passwort anzeigen'}
+        aria-label={visible ? tr('Passwort verbergen', 'Hide password') : tr('Passwort anzeigen', 'Show password')}
         aria-pressed={visible}
         className="absolute top-1/2 right-1 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
       >
@@ -116,14 +136,15 @@ export const PasswordInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HT
 /** Live password requirement checklist (mirrors passwordSchema). */
 export function PasswordHints({ password }: { password: string }) {
   const checks = [
-    { ok: password.length >= 10, label: 'Mindestens 10 Zeichen' },
-    { ok: /[A-Za-zÄÖÜäöüß]/.test(password), label: 'Mindestens ein Buchstabe' },
-    { ok: /\d/.test(password), label: 'Mindestens eine Ziffer' },
+    { ok: password.length >= 10, label: tr('Mindestens 10 Zeichen', 'At least 10 characters') },
+    { ok: /[A-Za-zÄÖÜäöüß]/.test(password), label: tr('Mindestens ein Buchstabe', 'At least one letter') },
+    { ok: /\d/.test(password), label: tr('Mindestens eine Ziffer', 'At least one digit') },
   ];
   const bonus = (password.length >= 14 ? 1 : 0) + (/[^A-Za-z0-9]/.test(password) ? 1 : 0) + (/[a-z]/.test(password) && /[A-Z]/.test(password) ? 1 : 0);
   const passed = checks.filter((c) => c.ok).length;
   const score = passed < 3 ? passed : 3 + bonus; // 0..6
-  const strength = score <= 2 ? 'schwach' : score <= 3 ? 'ausreichend' : score <= 4 ? 'gut' : 'stark';
+  const strength =
+    score <= 2 ? tr('schwach', 'weak') : score <= 3 ? tr('ausreichend', 'fair') : score <= 4 ? tr('gut', 'good') : tr('stark', 'strong');
   const bar = score <= 2 ? 'bg-danger-solid' : score <= 3 ? 'bg-warning-solid' : 'bg-success-solid';
   return (
     <div className="mt-2" aria-live="polite">
@@ -131,14 +152,14 @@ export function PasswordHints({ password }: { password: string }) {
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-100">
           <div className={cx('h-full rounded-full transition-all', bar)} style={{ width: `${Math.max(8, (score / 6) * 100)}%` }} />
         </div>
-        <span className="w-20 text-right text-xs text-neutral-600">{password ? `Stärke: ${strength}` : ''}</span>
+        <span className="w-20 text-right text-xs text-neutral-600">{password ? tr(`Stärke: ${strength}`, `Strength: ${strength}`) : ''}</span>
       </div>
       <ul className="mt-2 grid gap-1 text-[13px] sm:grid-cols-1">
         {checks.map((c) => (
           <li key={c.label} className={cx('flex items-center gap-2', c.ok ? 'text-success-text' : 'text-neutral-500')}>
             <span aria-hidden className={cx('inline-block size-1.5 rounded-full', c.ok ? 'bg-success-solid' : 'bg-neutral-300')} />
             {c.label}
-            <span className="sr-only">{c.ok ? '(erfüllt)' : '(nicht erfüllt)'}</span>
+            <span className="sr-only">{c.ok ? tr('(erfüllt)', '(met)') : tr('(nicht erfüllt)', '(not met)')}</span>
           </li>
         ))}
       </ul>

@@ -33,7 +33,8 @@ import { PageHeader } from '@/components/ui/Page';
 import { toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api';
 import { applyServerErrors, errorMessage, hasFieldErrors, isConflict } from '@/lib/errors';
-import { daysUntil, formatEur } from '@/lib/format';
+import { daysUntil, formatEur, plural } from '@/lib/format';
+import { tr } from '@/lib/i18n';
 import { qk } from '@/lib/queryKeys';
 import { CustomerPicker } from './CustomerPicker';
 import { LineItemsEditor, newLineItem, type LineItemValue } from './LineItemsEditor';
@@ -140,7 +141,7 @@ function TemplateDialog({ open, onOpenChange, onApply }: { open: boolean; onOpen
       onApply(await api.templates.get(companyId, id));
       onOpenChange(false);
     } catch (error) {
-      toast.error('Vorlage konnte nicht geladen werden', errorMessage(error));
+      toast.error(tr('Vorlage konnte nicht geladen werden', 'Template could not be loaded'), errorMessage(error));
     } finally {
       setLoadingId(null);
     }
@@ -149,8 +150,11 @@ function TemplateDialog({ open, onOpenChange, onApply }: { open: boolean; onOpen
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Mit Vorlage starten"
-      description="Texte und Positionen der Vorlage werden übernommen und ersetzen die aktuellen Positionen. Sie können alles anschließend anpassen."
+      title={tr('Mit Vorlage starten', 'Start from a template')}
+      description={tr(
+        'Texte und Positionen der Vorlage werden übernommen und ersetzen die aktuellen Positionen. Sie können alles anschließend anpassen.',
+        'The template’s texts and line items are applied and replace the current line items. You can adjust everything afterwards.',
+      )}
       size="lg"
     >
       {templates.isPending ? (
@@ -161,9 +165,12 @@ function TemplateDialog({ open, onOpenChange, onApply }: { open: boolean; onOpen
         <EmptyState
           compact
           icon={FileStack}
-          title="Noch keine Vorlagen"
-          description="Speichern Sie ein Angebot als Vorlage oder legen Sie unter „Vorlagen“ eine neue an."
-          action={<ButtonLink to="/vorlagen/neu">Vorlage anlegen</ButtonLink>}
+          title={tr('Noch keine Vorlagen', 'No templates yet')}
+          description={tr(
+            'Speichern Sie ein Angebot als Vorlage oder legen Sie unter „Vorlagen“ eine neue an.',
+            'Save a quotation as a template or create a new one under “Templates”.',
+          )}
+          action={<ButtonLink to="/vorlagen/neu">{tr('Vorlage anlegen', 'Create template')}</ButtonLink>}
         />
       ) : (
         <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
@@ -179,10 +186,16 @@ function TemplateDialog({ open, onOpenChange, onApply }: { open: boolean; onOpen
                   <span className="block font-medium text-neutral-900">{t.name}</span>
                   <span className="block truncate text-[13px] text-neutral-500">
                     {t.description ? `${t.description} · ` : ''}
-                    {t.lineItemCount} Positionen
+                    {plural(t.lineItemCount, tr('Position', 'line item'), tr('Positionen', 'line items'))}
                   </span>
                 </span>
-                {loadingId === t.id ? <Spinner label="" /> : <span className="text-sm font-medium whitespace-nowrap text-neutral-700 tabular">{formatEur(t.netTotal)} netto</span>}
+                {loadingId === t.id ? (
+                  <Spinner label="" />
+                ) : (
+                  <span className="text-sm font-medium whitespace-nowrap text-neutral-700 tabular">
+                    {tr(`${formatEur(t.netTotal)} netto`, `${formatEur(t.netTotal)} net`)}
+                  </span>
+                )}
               </button>
             </li>
           ))}
@@ -240,9 +253,9 @@ function EditorForm({ quotation, initial, taxRates, settings }: EditorFormProps)
       setServerTotals(fresh.totals);
       setConflictOpen(false);
       setFormError(null);
-      toast.info('Aktuelle Fassung geladen');
+      toast.info(tr('Aktuelle Fassung geladen', 'Latest version loaded'));
     },
-    onError: (error) => toast.error('Neu laden fehlgeschlagen', errorMessage(error)),
+    onError: (error) => toast.error(tr('Neu laden fehlgeschlagen', 'Reloading failed'), errorMessage(error)),
   });
 
   const applyTemplate = (template: TemplateDto) => {
@@ -269,7 +282,7 @@ function EditorForm({ quotation, initial, taxRates, settings }: EditorFormProps)
         { shouldDirty: true },
       );
     }
-    toast.success('Vorlage übernommen', template.name);
+    toast.success(tr('Vorlage übernommen', 'Template applied'), template.name);
   };
 
   // ?vorlage=<id>: apply that template once when creating a new quotation.
@@ -281,7 +294,7 @@ function EditorForm({ quotation, initial, taxRates, settings }: EditorFormProps)
     api.templates
       .get(companyId, templateParam)
       .then(applyTemplate)
-      .catch((error: unknown) => toast.error('Vorlage konnte nicht geladen werden', errorMessage(error)));
+      .catch((error: unknown) => toast.error(tr('Vorlage konnte nicht geladen werden', 'Template could not be loaded'), errorMessage(error)));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once for the URL parameter
   }, [templateParam]);
 
@@ -313,7 +326,7 @@ function EditorForm({ quotation, initial, taxRates, settings }: EditorFormProps)
           reset(quotationToForm(saved));
           setRowVersion(saved.rowVersion);
           setServerTotals(saved.totals);
-          toast.success(isNew ? 'Entwurf angelegt' : 'Entwurf gespeichert', `${saved.number} · ${formatEur(saved.totals.grossTotal)}`);
+          toast.success(isNew ? tr('Entwurf angelegt', 'Draft created') : tr('Entwurf gespeichert', 'Draft saved'), `${saved.number} · ${formatEur(saved.totals.grossTotal)}`);
           if (mode !== 'stay' || isNew) {
             bypassGuard.current = true;
             const target =
@@ -324,7 +337,7 @@ function EditorForm({ quotation, initial, taxRates, settings }: EditorFormProps)
           if (isConflict(error)) {
             setConflictOpen(true);
           } else if (error instanceof ApiError && error.code === 'quotation_not_editable') {
-            toast.error('Nicht mehr bearbeitbar', errorMessage(error));
+            toast.error(tr('Nicht mehr bearbeitbar', 'No longer editable'), errorMessage(error));
             bypassGuard.current = true;
             void navigate(`/angebote/${quotation?.id ?? ''}`);
           } else {
@@ -333,7 +346,7 @@ function EditorForm({ quotation, initial, taxRates, settings }: EditorFormProps)
               setFormError(rest.join(' ') || errorMessage(error));
               window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
-              toast.error('Bitte prüfen Sie die markierten Felder.');
+              toast.error(tr('Bitte prüfen Sie die markierten Felder.', 'Please check the highlighted fields.'));
             }
           }
         } finally {
@@ -341,28 +354,28 @@ function EditorForm({ quotation, initial, taxRates, settings }: EditorFormProps)
         }
       },
       () => {
-        toast.error('Bitte prüfen Sie die markierten Felder.');
+        toast.error(tr('Bitte prüfen Sie die markierten Felder.', 'Please check the highlighted fields.'));
       },
     )();
 
-  const title = isNew ? 'Neues Angebot' : `Angebot ${quotation.number} bearbeiten`;
+  const title = isNew ? tr('Neues Angebot', 'New quotation') : tr(`Angebot ${quotation.number} bearbeiten`, `Edit quotation ${quotation.number}`);
 
   return (
     <>
       <PageHeader
         title={title}
-        back={isNew ? { to: '/angebote', label: 'Angebote' } : { to: `/angebote/${quotation.id}`, label: quotation.number }}
+        back={isNew ? { to: '/angebote', label: tr('Angebote', 'Quotations') } : { to: `/angebote/${quotation.id}`, label: quotation.number }}
         meta={<QuotationStatusBadge status="Draft" />}
         actions={
           <>
             {isNew && (
               <Button icon={FileStack} onClick={() => setTemplateOpen(true)}>
-                Vorlage verwenden
+                {tr('Vorlage verwenden', 'Use template')}
               </Button>
             )}
             {!isNew && (
               <ButtonLink to={`/angebote/${quotation.id}/vorschau`} icon={Eye}>
-                Vorschau
+                {tr('Vorschau', 'Preview')}
               </ButtonLink>
             )}
           </>
@@ -379,13 +392,13 @@ function EditorForm({ quotation, initial, taxRates, settings }: EditorFormProps)
         aria-label={title}
       >
         {formError && (
-          <Alert tone="danger" live title="Speichern nicht möglich">
+          <Alert tone="danger" live title={tr('Speichern nicht möglich', 'Could not save')}>
             {formError}
           </Alert>
         )}
 
         <Card>
-          <CardHeader title="Kunde & Eckdaten" />
+          <CardHeader title={tr('Kunde & Eckdaten', 'Customer & key details')} />
           <CardBody className="grid gap-5 lg:grid-cols-2">
             <Controller
               control={control}
@@ -393,27 +406,34 @@ function EditorForm({ quotation, initial, taxRates, settings }: EditorFormProps)
               render={({ field }) => <CustomerPicker value={field.value} onChange={field.onChange} error={errors.customerId?.message} />}
             />
             <div className="space-y-4">
-              <Field label="Betreff" error={errors.title?.message} required>
-                <Input placeholder="z. B. Erneuerung Unterverteilung EG" {...register('title')} />
+              <Field label={tr('Betreff', 'Subject')} error={errors.title?.message} required>
+                <Input placeholder={tr('z. B. Erneuerung Unterverteilung EG', 'e.g. Renewal of ground-floor sub-distribution board')} {...register('title')} />
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Angebotsdatum" error={errors.issueDate?.message} required>
+                <Field label={tr('Angebotsdatum', 'Quotation date')} error={errors.issueDate?.message} required>
                   <Input type="date" {...register('issueDate')} />
                 </Field>
                 <Field
-                  label="Gültig bis"
+                  label={tr('Gültig bis', 'Valid until')}
                   error={errors.validUntil?.message}
                   required
-                  hint={validityDays !== null && validityDays >= 0 ? `${validityDays} Tage gültig (Standard: ${settings.defaultValidityDays} Tage)` : undefined}
+                  hint={
+                    validityDays !== null && validityDays >= 0
+                      ? tr(
+                          `${validityDays} Tage gültig (Standard: ${settings.defaultValidityDays} Tage)`,
+                          `Valid for ${validityDays} days (default: ${settings.defaultValidityDays} days)`,
+                        )
+                      : undefined
+                  }
                 >
                   <Input type="date" {...register('validUntil')} />
                 </Field>
               </div>
               <Field
-                label="Besteuerung"
+                label={tr('Besteuerung', 'Tax mode')}
                 error={errors.taxMode?.message}
                 labelAside={
-                  <HelpPopover label="Erklärung zur Besteuerung">
+                  <HelpPopover label={tr('Erklärung zur Besteuerung', 'About the tax mode')}>
                     <p className="font-medium text-neutral-900">{taxModeShort[taxMode]}</p>
                     <p className="mt-1">{taxModeExplanation[taxMode]}</p>
                     <p className="mt-2 text-neutral-500">{TAX_DISCLAIMER}</p>
@@ -421,9 +441,9 @@ function EditorForm({ quotation, initial, taxRates, settings }: EditorFormProps)
                 }
               >
                 <Select {...register('taxMode')}>
-                  <option value="Standard">Regelbesteuerung (USt. je Position)</option>
-                  <option value="SmallBusiness">Kleinunternehmerregelung (§ 19 UStG)</option>
-                  <option value="ReverseCharge">Reverse Charge (§ 13b UStG)</option>
+                  <option value="Standard">{tr('Regelbesteuerung (USt. je Position)', 'Standard taxation (VAT per line item)')}</option>
+                  <option value="SmallBusiness">{tr('Kleinunternehmerregelung (§ 19 UStG)', 'Small business scheme (§ 19 UStG)')}</option>
+                  <option value="ReverseCharge">{tr('Reverse Charge (§ 13b UStG)', 'Reverse charge (§ 13b UStG)')}</option>
                 </Select>
               </Field>
             </div>
@@ -431,16 +451,26 @@ function EditorForm({ quotation, initial, taxRates, settings }: EditorFormProps)
         </Card>
 
         <Card>
-          <CardHeader title="Einleitung" description="Erscheint vor den Positionen, z. B. Anrede und Bezug auf Ihre Anfrage." />
+          <CardHeader
+            title={tr('Einleitung', 'Introduction')}
+            description={tr('Erscheint vor den Positionen, z. B. Anrede und Bezug auf Ihre Anfrage.', 'Appears before the line items, e.g. greeting and reference to the enquiry.')}
+          />
           <CardBody>
-            <Field label="Einleitungstext" hideLabel error={errors.introText?.message}>
-              <Textarea rows={3} placeholder="Sehr geehrte Damen und Herren, vielen Dank für Ihre Anfrage …" {...register('introText')} />
+            <Field label={tr('Einleitungstext', 'Introduction text')} hideLabel error={errors.introText?.message}>
+              <Textarea
+                rows={3}
+                placeholder={tr('Sehr geehrte Damen und Herren, vielen Dank für Ihre Anfrage …', 'Dear Sir or Madam, thank you for your enquiry …')}
+                {...register('introText')}
+              />
             </Field>
           </CardBody>
         </Card>
 
         <Card>
-          <CardHeader title="Positionen" description="Mengen und Preise akzeptieren deutsche Schreibweise, z. B. 1.234,56." />
+          <CardHeader
+            title={tr('Positionen', 'Line items')}
+            description={tr('Mengen und Preise akzeptieren deutsche Schreibweise, z. B. 1.234,56.', 'Quantities and prices accept English number format, e.g. 1,234.56.')}
+          />
           <CardBody>
             <LineItemsEditor control={control} register={register} taxRates={taxRates} defaultTaxRate={defaultTaxRateOf(taxRates)} vatEnabled={taxMode === 'Standard'} />
             <div className="mt-5 flex justify-end">
@@ -448,8 +478,11 @@ function EditorForm({ quotation, initial, taxRates, settings }: EditorFormProps)
                 <TotalsList totals={showServerTotals && serverTotals ? serverTotals : totals} taxMode={taxMode} />
                 <p className="mt-2 text-xs text-neutral-500">
                   {showServerTotals
-                    ? 'Gespeichert – Beträge vom Server berechnet.'
-                    : 'Live-Vorschau. Verbindlich sind die beim Speichern vom Server berechneten Beträge.'}
+                    ? tr('Gespeichert – Beträge vom Server berechnet.', 'Saved – amounts calculated by the server.')
+                    : tr(
+                        'Live-Vorschau. Verbindlich sind die beim Speichern vom Server berechneten Beträge.',
+                        'Live preview. The amounts calculated by the server when saving are binding.',
+                      )}
                 </p>
               </div>
             </div>
@@ -457,16 +490,16 @@ function EditorForm({ quotation, initial, taxRates, settings }: EditorFormProps)
         </Card>
 
         <Card>
-          <CardHeader title="Abschluss & Bedingungen" />
+          <CardHeader title={tr('Abschluss & Bedingungen', 'Closing & terms')} />
           <CardBody className="space-y-4">
-            <Field label="Schlusstext" error={errors.closingText?.message} optional>
+            <Field label={tr('Schlusstext', 'Closing text')} error={errors.closingText?.message} optional>
               <Textarea rows={3} {...register('closingText')} />
             </Field>
             <div className="grid gap-4 lg:grid-cols-2">
-              <Field label="Zahlungsbedingungen" error={errors.paymentTerms?.message} optional>
-                <Textarea rows={3} placeholder="z. B. Zahlbar innerhalb von 14 Tagen ohne Abzug." {...register('paymentTerms')} />
+              <Field label={tr('Zahlungsbedingungen', 'Payment terms')} error={errors.paymentTerms?.message} optional>
+                <Textarea rows={3} placeholder={tr('z. B. Zahlbar innerhalb von 14 Tagen ohne Abzug.', 'e.g. Payable within 14 days without deduction.')} {...register('paymentTerms')} />
               </Field>
-              <Field label="Weitere Bedingungen" error={errors.terms?.message} optional>
+              <Field label={tr('Weitere Bedingungen', 'Further terms')} error={errors.terms?.message} optional>
                 <Textarea rows={3} {...register('terms')} />
               </Field>
             </div>
@@ -477,14 +510,14 @@ function EditorForm({ quotation, initial, taxRates, settings }: EditorFormProps)
           <CardHeader
             title={
               <span className="inline-flex items-center gap-2">
-                <Lock aria-hidden size={15} className="text-neutral-500" /> Interne Notizen
+                <Lock aria-hidden size={15} className="text-neutral-500" /> {tr('Interne Notizen', 'Internal notes')}
               </span>
             }
-            description="Nur intern – erscheint weder im PDF noch auf der Kundenseite."
+            description={tr('Nur intern – erscheint weder im PDF noch auf der Kundenseite.', 'Internal only – appears neither in the PDF nor on the customer page.')}
           />
           <CardBody>
-            <Field label="Interne Notizen (nur intern)" hideLabel error={errors.internalNotes?.message}>
-              <Textarea rows={2} placeholder="z. B. Material bei Großhändler reservieren" {...register('internalNotes')} />
+            <Field label={tr('Interne Notizen (nur intern)', 'Internal notes (internal only)')} hideLabel error={errors.internalNotes?.message}>
+              <Textarea rows={2} placeholder={tr('z. B. Material bei Großhändler reservieren', 'e.g. Reserve materials at the wholesaler')} {...register('internalNotes')} />
             </Field>
           </CardBody>
         </Card>
@@ -492,22 +525,22 @@ function EditorForm({ quotation, initial, taxRates, settings }: EditorFormProps)
         <div className="sticky bottom-0 z-10 -mx-4 border-t border-neutral-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[13px] text-neutral-500">{taxMode === 'Standard' ? 'Gesamt brutto' : 'Gesamtbetrag'}</p>
+              <p className="text-[13px] text-neutral-500">{taxMode === 'Standard' ? tr('Gesamt brutto', 'Gross total') : tr('Gesamtbetrag', 'Total')}</p>
               <p className="text-lg leading-6 font-semibold text-neutral-900 tabular" data-testid="sticky-gross">
                 {formatEur((showServerTotals && serverTotals ? serverTotals : totals).grossTotal)}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <span className="mr-1 hidden text-[13px] text-neutral-500 md:inline" aria-live="polite">
-                {isDirty ? 'Ungespeicherte Änderungen' : isNew ? '' : 'Alle Änderungen gespeichert'}
+                {isDirty ? tr('Ungespeicherte Änderungen', 'Unsaved changes') : isNew ? '' : tr('Alle Änderungen gespeichert', 'All changes saved')}
               </span>
               <Button type="submit" icon={Save} loading={saving === 'stay'} disabled={saving !== null}>
-                <span className="sm:hidden">Speichern</span>
-                <span className="hidden sm:inline">Entwurf speichern</span>
+                <span className="sm:hidden">{tr('Speichern', 'Save')}</span>
+                <span className="hidden sm:inline">{tr('Entwurf speichern', 'Save draft')}</span>
               </Button>
               <Button variant="primary" icon={Send} loading={saving === 'send'} disabled={saving !== null} onClick={() => void save('send')}>
-                <span className="sm:hidden">Senden …</span>
-                <span className="hidden sm:inline">Speichern & versenden …</span>
+                <span className="sm:hidden">{tr('Senden …', 'Send …')}</span>
+                <span className="hidden sm:inline">{tr('Speichern & versenden …', 'Save & send …')}</span>
               </Button>
             </div>
           </div>
@@ -519,19 +552,25 @@ function EditorForm({ quotation, initial, taxRates, settings }: EditorFormProps)
       <Dialog
         open={conflictOpen}
         onOpenChange={setConflictOpen}
-        title="Das Angebot wurde zwischenzeitlich geändert"
-        description="Jemand anderes hat diesen Entwurf gespeichert, während Sie ihn bearbeitet haben. Ihre Änderungen wurden nicht gespeichert."
+        title={tr('Das Angebot wurde zwischenzeitlich geändert', 'The quotation has been changed in the meantime')}
+        description={tr(
+          'Jemand anderes hat diesen Entwurf gespeichert, während Sie ihn bearbeitet haben. Ihre Änderungen wurden nicht gespeichert.',
+          'Someone else saved this draft while you were editing it. Your changes have not been saved.',
+        )}
         footer={
           <>
-            <Button onClick={() => setConflictOpen(false)}>Weiter bearbeiten</Button>
+            <Button onClick={() => setConflictOpen(false)}>{tr('Weiter bearbeiten', 'Continue editing')}</Button>
             <Button variant="primary" icon={RefreshCw} loading={reload.isPending} onClick={() => reload.mutate()}>
-              Aktuelle Fassung laden
+              {tr('Aktuelle Fassung laden', 'Load latest version')}
             </Button>
           </>
         }
       >
         <p className="text-sm text-neutral-600">
-          Beim Neuladen gehen Ihre ungespeicherten Änderungen verloren. Kopieren Sie wichtige Texte ggf. vorher heraus.
+          {tr(
+            'Beim Neuladen gehen Ihre ungespeicherten Änderungen verloren. Kopieren Sie wichtige Texte ggf. vorher heraus.',
+            'Reloading discards your unsaved changes. Copy any important texts out first if needed.',
+          )}
         </p>
       </Dialog>
     </>
@@ -564,18 +603,21 @@ export default function QuotationEditorPage() {
   if (quotation.data && quotation.data.status !== 'Draft') {
     return (
       <>
-        <PageHeader title={`Angebot ${quotation.data.number}`} back={{ to: `/angebote/${quotation.data.id}`, label: quotation.data.number }} />
+        <PageHeader title={tr(`Angebot ${quotation.data.number}`, `Quotation ${quotation.data.number}`)} back={{ to: `/angebote/${quotation.data.id}`, label: quotation.data.number }} />
         <Alert
           tone="info"
-          title="Nur Entwürfe können bearbeitet werden"
+          title={tr('Nur Entwürfe können bearbeitet werden', 'Only drafts can be edited')}
           actions={
             <ButtonLink to={`/angebote/${quotation.data.id}`} variant="primary">
-              Zum Angebot
+              {tr('Zum Angebot', 'Go to quotation')}
             </ButtonLink>
           }
         >
-          Dieses Angebot wurde bereits versendet oder abgeschlossen. Um Änderungen vorzunehmen, erstellen Sie in der Angebotsansicht eine Revision.{' '}
-          <Link to={`/angebote/${quotation.data.id}`}>Angebot öffnen</Link>
+          {tr(
+            'Dieses Angebot wurde bereits versendet oder abgeschlossen. Um Änderungen vorzunehmen, erstellen Sie in der Angebotsansicht eine Revision.',
+            'This quotation has already been sent or completed. To make changes, create a revision from the quotation view.',
+          )}{' '}
+          <Link to={`/angebote/${quotation.data.id}`}>{tr('Angebot öffnen', 'Open quotation')}</Link>
         </Alert>
       </>
     );

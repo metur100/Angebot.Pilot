@@ -35,14 +35,17 @@ import { api } from '@/lib/api';
 import { cx } from '@/lib/cx';
 import { datePresetLabel, rangeForPreset, type DatePreset } from '@/lib/dateRange';
 import { daysUntil, formatDate, formatDateTime, formatEur, formatRelative, plural } from '@/lib/format';
+import { currentIntlLocale, tr } from '@/lib/i18n';
 import { useListParams } from '@/lib/listParams';
 import { qk } from '@/lib/queryKeys';
 
-const percentFormat = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 });
+function formatPercentValue(value: number) {
+  return new Intl.NumberFormat(currentIntlLocale(), { maximumFractionDigits: 1 }).format(value);
+}
 
 function greeting(now = new Date()) {
   const hour = now.getHours();
-  return hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Guten Tag' : 'Guten Abend';
+  return hour < 11 ? tr('Guten Morgen', 'Good morning') : hour < 18 ? tr('Guten Tag', 'Good afternoon') : tr('Guten Abend', 'Good evening');
 }
 
 interface KpiProps {
@@ -58,7 +61,7 @@ interface KpiProps {
 }
 
 const toneClass = {
-  brand: 'bg-brand-50 text-brand-600',
+  brand: 'bg-brand-50 text-brand-600 dark:text-brand-700',
   success: 'bg-success-bg text-success-text',
   danger: 'bg-danger-bg text-danger-text',
   warning: 'bg-warning-bg text-warning-text',
@@ -103,6 +106,12 @@ function KpiSkeleton() {
   );
 }
 
+function expiryText(days: number, validUntil: string) {
+  if (days < 0) return tr(`abgelaufen am ${formatDate(validUntil)}`, `expired on ${formatDate(validUntil)}`);
+  if (days === 0) return tr('läuft heute ab', 'expires today');
+  return tr(`noch ${days} ${days === 1 ? 'Tag' : 'Tage'}`, `${days} ${days === 1 ? 'day' : 'days'} left`);
+}
+
 function QuotationRows({ items, empty, showExpiry }: { items: QuotationListItemDto[]; empty: string; showExpiry?: boolean }) {
   const today = todayIso();
   if (items.length === 0) return <p className="px-5 py-6 text-sm text-neutral-500">{empty}</p>;
@@ -123,10 +132,12 @@ function QuotationRows({ items, empty, showExpiry }: { items: QuotationListItemD
                 <p className="text-sm font-medium text-neutral-900 tabular">{formatEur(q.grossTotal)}</p>
                 {showExpiry ? (
                   <p className={cx('text-xs', days < 0 ? 'text-danger-text' : days <= 3 ? 'text-warning-text' : 'text-neutral-500')}>
-                    {days < 0 ? `abgelaufen am ${formatDate(q.validUntil)}` : days === 0 ? 'läuft heute ab' : `noch ${days} ${days === 1 ? 'Tag' : 'Tage'}`}
+                    {expiryText(days, q.validUntil)}
                   </p>
                 ) : (
-                  <p className="text-xs text-neutral-500">{q.sentAt ? `versendet ${formatRelative(q.sentAt)}` : formatDate(q.issueDate)}</p>
+                  <p className="text-xs text-neutral-500">
+                    {q.sentAt ? tr(`versendet ${formatRelative(q.sentAt)}`, `sent ${formatRelative(q.sentAt)}`) : formatDate(q.issueDate)}
+                  </p>
                 )}
               </div>
             </Link>
@@ -139,24 +150,49 @@ function QuotationRows({ items, empty, showExpiry }: { items: QuotationListItemD
 
 function GettingStarted({ hasCustomers, hasQuotations, hasSent }: { hasCustomers: boolean; hasQuotations: boolean; hasSent: boolean }) {
   const steps = [
-    { done: hasCustomers, title: 'Kunden anlegen', text: 'Firma oder Privatperson mit Adresse und E-Mail.', to: '/kunden/neu', cta: 'Kunden anlegen', icon: UserPlus },
-    { done: hasQuotations, title: 'Angebot erstellen', text: 'Positionen erfassen – Summen und USt. rechnet AngebotPilot.', to: '/angebote/neu', cta: 'Angebot erstellen', icon: FilePlus2 },
-    { done: hasSent, title: 'Angebot versenden', text: 'Per E-Mail mit Kundenlink – Ihr Kunde kann online annehmen.', to: '/angebote?status=Draft', cta: 'Entwurf öffnen', icon: Send },
+    {
+      done: hasCustomers,
+      title: tr('Kunden anlegen', 'Add a customer'),
+      text: tr('Firma oder Privatperson mit Adresse und E-Mail.', 'Company or private person with address and email.'),
+      to: '/kunden/neu',
+      cta: tr('Kunden anlegen', 'Add customer'),
+      icon: UserPlus,
+    },
+    {
+      done: hasQuotations,
+      title: tr('Angebot erstellen', 'Create a quotation'),
+      text: tr('Positionen erfassen – Summen und USt. rechnet AngebotPilot.', 'Enter line items – AngebotPilot calculates totals and VAT.'),
+      to: '/angebote/neu',
+      cta: tr('Angebot erstellen', 'Create quotation'),
+      icon: FilePlus2,
+    },
+    {
+      done: hasSent,
+      title: tr('Angebot versenden', 'Send the quotation'),
+      text: tr('Per E-Mail mit Kundenlink – Ihr Kunde kann online annehmen.', 'By email with a customer link – your customer can accept online.'),
+      to: '/angebote?status=Draft',
+      cta: tr('Entwurf öffnen', 'Open draft'),
+      icon: Send,
+    },
   ];
   const next = steps.findIndex((s) => !s.done);
   return (
     <Card className="mb-6 overflow-hidden">
       <div className="border-b border-neutral-100 bg-gradient-to-r from-brand-50 to-white px-5 py-4">
-        <h2 className="text-[15px] font-semibold text-neutral-900">Willkommen bei AngebotPilot – in drei Schritten zum ersten Angebot</h2>
-        <p className="mt-0.5 text-[13px] text-neutral-600">Sobald Sie Angebote versenden, erscheinen hier Ihre Kennzahlen.</p>
+        <h2 className="text-[15px] font-semibold text-neutral-900">
+          {tr('Willkommen bei AngebotPilot – in drei Schritten zum ersten Angebot', 'Welcome to AngebotPilot – your first quotation in three steps')}
+        </h2>
+        <p className="mt-0.5 text-[13px] text-neutral-600">
+          {tr('Sobald Sie Angebote versenden, erscheinen hier Ihre Kennzahlen.', 'Your key figures will appear here once you send quotations.')}
+        </p>
       </div>
       <ol className="grid divide-y divide-neutral-100 md:grid-cols-3 md:divide-x md:divide-y-0">
         {steps.map((step, index) => (
-          <li key={step.title} className="flex gap-3 px-5 py-4">
+          <li key={step.to} className="flex gap-3 px-5 py-4">
             <span
               className={cx(
                 'flex size-7 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold',
-                step.done ? 'bg-success-bg text-success-text' : index === next ? 'bg-brand-600 text-white' : 'bg-neutral-100 text-neutral-500',
+                step.done ? 'bg-success-bg text-success-text' : index === next ? 'bg-brand-600 text-on-brand' : 'bg-neutral-100 text-neutral-500',
               )}
             >
               {step.done ? <CircleCheck aria-hidden size={16} /> : index + 1}
@@ -164,7 +200,7 @@ function GettingStarted({ hasCustomers, hasQuotations, hasSent }: { hasCustomers
             <div className="min-w-0">
               <p className="text-sm font-medium text-neutral-900">
                 {step.title}
-                {step.done && <span className="ml-1.5 text-xs font-normal text-success-text">erledigt</span>}
+                {step.done && <span className="ml-1.5 text-xs font-normal text-success-text">{tr('erledigt', 'done')}</span>}
               </p>
               <p className="mt-0.5 text-[13px] text-neutral-500">{step.text}</p>
               {!step.done && (
@@ -181,39 +217,47 @@ function GettingStarted({ hasCustomers, hasQuotations, hasSent }: { hasCustomers
 }
 
 function Kpis({ data }: { data: DashboardDto }) {
-  const conversion =
-    data.conversionRatePercent === null ? '–' : `${percentFormat.format(data.conversionRatePercent)} %`;
+  const conversion = data.conversionRatePercent === null ? '–' : `${formatPercentValue(data.conversionRatePercent)} %`;
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-      <Kpi label="Entwürfe" value={data.draftCount} icon={FilePen} to="/angebote?status=Draft" />
-      <Kpi label="Offen / versendet" value={data.sentCount} icon={Send} tone="brand" to="/angebote?status=Sent" />
-      <Kpi label="Angenommen" value={data.acceptedCount} icon={CircleCheck} tone="success" to="/angebote?status=Accepted" />
-      <Kpi label="Abgelehnt" value={data.rejectedCount} icon={CircleX} tone="danger" to="/angebote?status=Rejected" />
+      <Kpi label={tr('Entwürfe', 'Drafts')} value={data.draftCount} icon={FilePen} to="/angebote?status=Draft" />
+      <Kpi label={tr('Offen / versendet', 'Open / sent')} value={data.sentCount} icon={Send} tone="brand" to="/angebote?status=Sent" />
+      <Kpi label={tr('Angenommen', 'Accepted')} value={data.acceptedCount} icon={CircleCheck} tone="success" to="/angebote?status=Accepted" />
+      <Kpi label={tr('Abgelehnt', 'Declined')} value={data.rejectedCount} icon={CircleX} tone="danger" to="/angebote?status=Rejected" />
       <Kpi
-        label="Ablaufend / abgelaufen"
+        label={tr('Ablaufend / abgelaufen', 'Expiring / expired')}
         value={`${data.expiringSoonCount} / ${data.expiredCount}`}
         icon={Hourglass}
         tone="warning"
-        hint="in 7 Tagen / im Zeitraum"
+        hint={tr('in 7 Tagen / im Zeitraum', 'in 7 days / in period')}
         to="/angebote?status=Sent&sort=validUntil"
       />
-      <Kpi label="Angebotsvolumen netto" value={formatEur(data.quotedValueNet)} icon={Wallet} hint="versendete Angebote" />
-      <Kpi label="Angenommen netto" value={formatEur(data.acceptedValueNet)} icon={TrendingUp} tone="success" />
       <Kpi
-        label="Abschlussquote"
+        label={tr('Angebotsvolumen netto', 'Quoted value (net)')}
+        value={formatEur(data.quotedValueNet)}
+        icon={Wallet}
+        hint={tr('versendete Angebote', 'sent quotations')}
+      />
+      <Kpi label={tr('Angenommen netto', 'Accepted (net)')} value={formatEur(data.acceptedValueNet)} icon={TrendingUp} tone="success" />
+      <Kpi
+        label={tr('Abschlussquote', 'Conversion rate')}
         value={conversion}
         icon={Percent}
         tone="brand"
-        hint={data.conversionRatePercent === null ? 'noch keine Entscheidungen im Zeitraum' : undefined}
+        hint={data.conversionRatePercent === null ? tr('noch keine Entscheidungen im Zeitraum', 'no decisions in this period yet') : undefined}
         help={
-          <HelpPopover label="Wie wird die Abschlussquote berechnet?">
+          <HelpPopover label={tr('Wie wird die Abschlussquote berechnet?', 'How is the conversion rate calculated?')}>
             <p>{data.conversionRateDefinition}</p>
-            {data.conversionRatePercent === null && <p className="mt-2 text-neutral-500">Ohne entschiedene Angebote gibt es noch keine Quote.</p>}
+            {data.conversionRatePercent === null && (
+              <p className="mt-2 text-neutral-500">
+                {tr('Ohne entschiedene Angebote gibt es noch keine Quote.', 'There is no rate until quotations have been decided.')}
+              </p>
+            )}
           </HelpPopover>
         }
       />
-      <Kpi label="Fällige Erinnerungen" value={data.followUpsDueCount} icon={BellRing} />
-      <Kpi label="Offene Aufträge" value={data.openJobsCount} icon={Hammer} to="/auftraege?status=Open,InProgress" />
+      <Kpi label={tr('Fällige Erinnerungen', 'Reminders due')} value={data.followUpsDueCount} icon={BellRing} />
+      <Kpi label={tr('Offene Aufträge', 'Open jobs')} value={data.openJobsCount} icon={Hammer} to="/auftraege?status=Open,InProgress" />
     </div>
   );
 }
@@ -223,31 +267,48 @@ function InvoiceKpis({ data }: { data: DashboardDto }) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <Kpi
-        label="Offene Rechnungen"
+        label={tr('Offene Rechnungen', 'Open invoices')}
         value={formatEur(data.openInvoicesAmount)}
         icon={ReceiptText}
         tone="brand"
-        hint={data.openInvoicesCount === 0 ? 'keine offenen Rechnungen' : `${plural(data.openInvoicesCount, 'Rechnung', 'Rechnungen')} offen`}
+        hint={
+          data.openInvoicesCount === 0
+            ? tr('keine offenen Rechnungen', 'no open invoices')
+            : tr(`${plural(data.openInvoicesCount, 'Rechnung', 'Rechnungen')} offen`, `${plural(data.openInvoicesCount, 'invoice', 'invoices')} open`)
+        }
         to="/rechnungen?status=Issued,PartiallyPaid"
       />
       <Kpi
-        label="Überfällig"
+        label={tr('Überfällig', 'Overdue')}
         value={formatEur(data.overdueInvoicesAmount)}
         icon={AlarmClock}
         tone={overdue ? 'danger' : 'neutral'}
         valueTone={overdue ? 'danger' : undefined}
-        hint={overdue ? `${plural(data.overdueInvoicesCount, 'Rechnung', 'Rechnungen')} überfällig` : 'nichts überfällig'}
+        hint={
+          overdue
+            ? tr(`${plural(data.overdueInvoicesCount, 'Rechnung', 'Rechnungen')} überfällig`, `${plural(data.overdueInvoicesCount, 'invoice', 'invoices')} overdue`)
+            : tr('nichts überfällig', 'nothing overdue')
+        }
         to="/rechnungen?ueberfaellig=1"
       />
-      <Kpi label="Zahlungseingang" value={formatEur(data.paymentsReceived)} icon={Banknote} tone="success" hint="Zahlungen im Zeitraum" />
       <Kpi
-        label="Abgerechnet netto"
+        label={tr('Zahlungseingang', 'Payments received')}
+        value={formatEur(data.paymentsReceived)}
+        icon={Banknote}
+        tone="success"
+        hint={tr('Zahlungen im Zeitraum', 'payments in period')}
+      />
+      <Kpi
+        label={tr('Abgerechnet netto', 'Invoiced (net)')}
         value={formatEur(data.invoicedNet)}
         icon={TrendingUp}
-        hint="gestellte Rechnungen im Zeitraum"
+        hint={tr('gestellte Rechnungen im Zeitraum', 'invoices issued in period')}
         help={
-          <HelpPopover label="Was zählt als abgerechnet?">
-            Nettobetrag aller im Zeitraum gestellten Rechnungen (nach Rechnungsdatum). Stornorechnungen werden abgezogen, Entwürfe zählen nicht.
+          <HelpPopover label={tr('Was zählt als abgerechnet?', 'What counts as invoiced?')}>
+            {tr(
+              'Nettobetrag aller im Zeitraum gestellten Rechnungen (nach Rechnungsdatum). Stornorechnungen werden abgezogen, Entwürfe zählen nicht.',
+              'Net amount of all invoices issued in the period (by invoice date). Cancellation invoices are deducted, drafts do not count.',
+            )}
           </HelpPopover>
         }
       />
@@ -256,7 +317,12 @@ function InvoiceKpis({ data }: { data: DashboardDto }) {
 }
 
 function OverdueInvoices({ items }: { items: InvoiceListItemDto[] }) {
-  if (items.length === 0) return <p className="px-5 py-6 text-sm text-neutral-500">Keine überfälligen Rechnungen – alles im Zahlungsziel.</p>;
+  if (items.length === 0)
+    return (
+      <p className="px-5 py-6 text-sm text-neutral-500">
+        {tr('Keine überfälligen Rechnungen – alles im Zahlungsziel.', 'No overdue invoices – everything is within payment terms.')}
+      </p>
+    );
   return (
     <ul className="divide-y divide-neutral-100">
       {items.map((i) => (
@@ -265,13 +331,16 @@ function OverdueInvoices({ items }: { items: InvoiceListItemDto[] }) {
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-neutral-900">{i.customerName}</p>
               <p className="truncate text-[13px] text-neutral-500">
-                {i.number ?? 'Entwurf'} · {i.title}
+                {i.number ?? tr('Entwurf', 'Draft')} · {i.title}
               </p>
             </div>
             <div className="shrink-0 text-right">
               <p className="text-sm font-medium text-neutral-900 tabular">{formatEur(i.openAmount)}</p>
               <p className="text-xs text-danger-text">
-                {i.daysOverdue} {i.daysOverdue === 1 ? 'Tag' : 'Tage'} überfällig
+                {tr(
+                  `${i.daysOverdue} ${i.daysOverdue === 1 ? 'Tag' : 'Tage'} überfällig`,
+                  `${i.daysOverdue} ${i.daysOverdue === 1 ? 'day' : 'days'} overdue`,
+                )}
               </p>
             </div>
           </Link>
@@ -307,12 +376,12 @@ export default function DashboardPage() {
       <PageHeader
         title={`${greeting()}, ${firstName}`}
         documentTitle="Dashboard"
-        description={`Überblick für ${membership.companyName}`}
+        description={tr(`Überblick für ${membership.companyName}`, `Overview for ${membership.companyName}`)}
         actions={
           <>
             <div className="flex flex-wrap items-center gap-2">
               <label htmlFor="dashboard-range" className="sr-only">
-                Zeitraum
+                {tr('Zeitraum', 'Period')}
               </label>
               <Select
                 id="dashboard-range"
@@ -335,13 +404,27 @@ export default function DashboardPage() {
               </Select>
               {preset === 'custom' && (
                 <>
-                  <Input type="date" inputSize="sm" aria-label="Von" className="w-[150px]" value={params.from} onChange={(e) => update({ from: e.target.value })} />
-                  <Input type="date" inputSize="sm" aria-label="Bis" className="w-[150px]" value={params.to} onChange={(e) => update({ to: e.target.value })} />
+                  <Input
+                    type="date"
+                    inputSize="sm"
+                    aria-label={tr('Von', 'From')}
+                    className="w-[150px]"
+                    value={params.from}
+                    onChange={(e) => update({ from: e.target.value })}
+                  />
+                  <Input
+                    type="date"
+                    inputSize="sm"
+                    aria-label={tr('Bis', 'To')}
+                    className="w-[150px]"
+                    value={params.to}
+                    onChange={(e) => update({ to: e.target.value })}
+                  />
                 </>
               )}
             </div>
             <ButtonLink to="/angebote/neu" variant="primary" icon={Plus} size="sm" className="sm:hidden">
-              Angebot
+              {tr('Angebot', 'Quotation')}
             </ButtonLink>
           </>
         }
@@ -372,9 +455,12 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className={cx('space-y-6', dashboard.isPlaceholderData && 'opacity-60 transition-opacity')}>
-          <section aria-label="Kennzahlen">
+          <section aria-label={tr('Kennzahlen', 'Key figures')}>
             <p className="mb-2 text-xs text-neutral-600">
-              Zeitraum: {formatDate(dashboard.data.from)} – {formatDate(dashboard.data.to)} (nach Angebotsdatum)
+              {tr(
+                `Zeitraum: ${formatDate(dashboard.data.from)} – ${formatDate(dashboard.data.to)} (nach Angebotsdatum)`,
+                `Period: ${formatDate(dashboard.data.from)} – ${formatDate(dashboard.data.to)} (by quotation date)`,
+              )}
             </p>
             <Kpis data={dashboard.data} />
           </section>
@@ -382,17 +468,20 @@ export default function DashboardPage() {
           <section aria-labelledby="dashboard-invoices" className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
             <div>
               <h2 id="dashboard-invoices" className="mb-2 text-xs text-neutral-600">
-                Rechnungen: offen und überfällig zum heutigen Stand, Zahlungen und Abrechnung im Zeitraum
+                {tr(
+                  'Rechnungen: offen und überfällig zum heutigen Stand, Zahlungen und Abrechnung im Zeitraum',
+                  'Invoices: open and overdue as of today, payments and invoicing in the period',
+                )}
               </h2>
               <InvoiceKpis data={dashboard.data} />
             </div>
             <Card className="self-start">
               <CardHeader
-                title="Überfällige Rechnungen"
-                description="Zahlungsziel überschritten – Zeit für eine Erinnerung"
+                title={tr('Überfällige Rechnungen', 'Overdue invoices')}
+                description={tr('Zahlungsziel überschritten – Zeit für eine Erinnerung', 'Payment terms exceeded – time for a reminder')}
                 actions={
-                  <Link to="/rechnungen?ueberfaellig=1" className="text-[13px] font-medium text-brand-600 hover:underline">
-                    Alle
+                  <Link to="/rechnungen?ueberfaellig=1" className="text-[13px] font-medium text-brand-600 dark:text-brand-700 hover:underline">
+                    {tr('Alle', 'All')}
                   </Link>
                 }
               />
@@ -402,17 +491,31 @@ export default function DashboardPage() {
 
           <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
             <Card>
-              <CardHeader title="Warten auf Entscheidung" description="Versendete Angebote ohne Antwort" actions={<Link to="/angebote?status=Sent" className="text-[13px] font-medium text-brand-600 hover:underline">Alle</Link>} />
-              <QuotationRows items={dashboard.data.awaitingDecision} empty="Keine offenen Angebote – alles entschieden." />
+              <CardHeader
+                title={tr('Warten auf Entscheidung', 'Awaiting decision')}
+                description={tr('Versendete Angebote ohne Antwort', 'Sent quotations without a response')}
+                actions={
+                  <Link to="/angebote?status=Sent" className="text-[13px] font-medium text-brand-600 dark:text-brand-700 hover:underline">
+                    {tr('Alle', 'All')}
+                  </Link>
+                }
+              />
+              <QuotationRows items={dashboard.data.awaitingDecision} empty={tr('Keine offenen Angebote – alles entschieden.', 'No open quotations – all decided.')} />
             </Card>
             <Card>
-              <CardHeader title="Läuft bald ab" description="Gültigkeit endet in den nächsten Tagen" />
-              <QuotationRows items={dashboard.data.expiringSoon} empty="Keine Angebote laufen in Kürze ab." showExpiry />
+              <CardHeader
+                title={tr('Läuft bald ab', 'Expiring soon')}
+                description={tr('Gültigkeit endet in den nächsten Tagen', 'Validity ends in the next few days')}
+              />
+              <QuotationRows items={dashboard.data.expiringSoon} empty={tr('Keine Angebote laufen in Kürze ab.', 'No quotations expire soon.')} showExpiry />
             </Card>
             <Card>
-              <CardHeader title="Anstehende Erinnerungen" description="Automatische Nachfass-E-Mails" />
+              <CardHeader
+                title={tr('Anstehende Erinnerungen', 'Upcoming reminders')}
+                description={tr('Automatische Nachfass-E-Mails', 'Automatic follow-up emails')}
+              />
               {dashboard.data.upcomingFollowUps.length === 0 ? (
-                <p className="px-5 py-6 text-sm text-neutral-500">Keine Erinnerungen geplant.</p>
+                <p className="px-5 py-6 text-sm text-neutral-500">{tr('Keine Erinnerungen geplant.', 'No reminders scheduled.')}</p>
               ) : (
                 <ul className="divide-y divide-neutral-100">
                   {dashboard.data.upcomingFollowUps.map((f) => (
@@ -432,9 +535,9 @@ export default function DashboardPage() {
               )}
             </Card>
             <Card>
-              <CardHeader title="Letzte Aktivitäten" />
+              <CardHeader title={tr('Letzte Aktivitäten', 'Recent activity')} />
               {dashboard.data.recentActivity.length === 0 ? (
-                <p className="px-5 py-6 text-sm text-neutral-500">Noch keine Aktivitäten.</p>
+                <p className="px-5 py-6 text-sm text-neutral-500">{tr('Noch keine Aktivitäten.', 'No activity yet.')}</p>
               ) : (
                 <ul className="divide-y divide-neutral-100">
                   {dashboard.data.recentActivity.map((a) => {

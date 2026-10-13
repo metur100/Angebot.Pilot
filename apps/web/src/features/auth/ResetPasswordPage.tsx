@@ -10,11 +10,12 @@ import { Alert } from '@/components/ui/Feedback';
 import { Field } from '@/components/ui/Field';
 import { errorMessage } from '@/lib/errors';
 import { api } from '@/lib/api';
+import { tr } from '@/lib/i18n';
 import { AuthLayout, PasswordHints, PasswordInput } from './AuthLayout';
 
 const schema = z
   .object({ password: passwordSchema, confirm: z.string() })
-  .refine((v) => v.password === v.confirm, { path: ['confirm'], message: 'Die Passwörter stimmen nicht überein.' });
+  .refine((v) => v.password === v.confirm, { path: ['confirm'], error: () => tr('Die Passwörter stimmen nicht überein.', 'The passwords do not match.') });
 
 export default function ResetPasswordPage() {
   const [params] = useSearchParams();
@@ -38,7 +39,7 @@ export default function ResetPasswordPage() {
     } catch (error) {
       setFormError(
         error instanceof ApiError && error.status === 400 && !Object.keys(error.fieldErrors).length
-          ? 'Der Link ist ungültig oder abgelaufen. Bitte fordern Sie einen neuen Link an.'
+          ? tr('Der Link ist ungültig oder abgelaufen. Bitte fordern Sie einen neuen Link an.', 'The link is invalid or has expired. Please request a new link.')
           : errorMessage(error),
       );
     }
@@ -46,12 +47,15 @@ export default function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <AuthLayout title="Link unvollständig" compact>
+      <AuthLayout title={tr('Link unvollständig', 'Incomplete link')} compact>
         <Alert tone="warning">
-          Dieser Link enthält keinen gültigen Code. Bitte öffnen Sie den Link direkt aus der E-Mail oder fordern Sie einen neuen an.
+          {tr(
+            'Dieser Link enthält keinen gültigen Code. Bitte öffnen Sie den Link direkt aus der E-Mail oder fordern Sie einen neuen an.',
+            'This link does not contain a valid code. Please open the link directly from the email or request a new one.',
+          )}
         </Alert>
         <ButtonLink to="/passwort-vergessen" variant="primary" size="lg" className="mt-6 w-full">
-          Neuen Link anfordern
+          {tr('Neuen Link anfordern', 'Request new link')}
         </ButtonLink>
       </AuthLayout>
     );
@@ -59,12 +63,15 @@ export default function ResetPasswordPage() {
 
   if (done) {
     return (
-      <AuthLayout title="Passwort geändert" compact>
+      <AuthLayout title={tr('Passwort geändert', 'Password changed')} compact>
         <Alert tone="success" icon={CircleCheck}>
-          Ihr neues Passwort ist gespeichert. Aus Sicherheitsgründen wurden Sie auf allen Geräten abgemeldet.
+          {tr(
+            'Ihr neues Passwort ist gespeichert. Aus Sicherheitsgründen wurden Sie auf allen Geräten abgemeldet.',
+            'Your new password has been saved. For security reasons you have been signed out on all devices.',
+          )}
         </Alert>
         <ButtonLink to="/login" variant="primary" size="lg" className="mt-6 w-full">
-          Jetzt anmelden
+          {tr('Jetzt anmelden', 'Sign in now')}
         </ButtonLink>
       </AuthLayout>
     );
@@ -72,11 +79,11 @@ export default function ResetPasswordPage() {
 
   return (
     <AuthLayout
-      title="Neues Passwort festlegen"
-      description="Wählen Sie ein sicheres Passwort, das Sie nirgendwo anders verwenden."
+      title={tr('Neues Passwort festlegen', 'Set a new password')}
+      description={tr('Wählen Sie ein sicheres Passwort, das Sie nirgendwo anders verwenden.', 'Choose a secure password that you do not use anywhere else.')}
       footer={
-        <Link to="/login" className="font-medium text-brand-600 hover:text-brand-700 hover:underline">
-          Zurück zur Anmeldung
+        <Link to="/login" className="font-medium text-brand-600 dark:text-brand-700 hover:text-brand-700 dark:hover:text-brand-800 hover:underline">
+          {tr('Zurück zur Anmeldung', 'Back to sign in')}
         </Link>
       }
     >
@@ -85,19 +92,19 @@ export default function ResetPasswordPage() {
           <Alert tone="danger" live>
             {formError}{' '}
             <Link to="/passwort-vergessen" className="font-medium underline">
-              Neuen Link anfordern
+              {tr('Neuen Link anfordern', 'Request new link')}
             </Link>
           </Alert>
         )}
-        <Field label="Neues Passwort" error={errors.password?.message} required>
+        <Field label={tr('Neues Passwort', 'New password')} error={errors.password?.message} required>
           <PasswordInput autoComplete="new-password" {...register('password')} />
         </Field>
         <PasswordHints password={password} />
-        <Field label="Passwort wiederholen" error={errors.confirm?.message} required>
+        <Field label={tr('Passwort wiederholen', 'Repeat password')} error={errors.confirm?.message} required>
           <PasswordInput autoComplete="new-password" {...register('confirm')} />
         </Field>
         <Button type="submit" variant="primary" size="lg" className="w-full" loading={isSubmitting}>
-          Passwort speichern
+          {tr('Passwort speichern', 'Save password')}
         </Button>
       </form>
     </AuthLayout>

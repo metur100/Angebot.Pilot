@@ -14,7 +14,7 @@ function authResponse(refreshToken: string | null): AuthResponse {
     accessTokenExpiresAt: '2026-10-12T12:00:00Z',
     refreshToken,
     refreshTokenExpiresAt: '2026-11-12T12:00:00Z',
-    user: { id: 'u1', email: 'a@b.de', displayName: 'A B', emailVerified: true, companies: [] },
+    user: { id: 'u1', email: 'a@b.de', displayName: 'A B', emailVerified: true, language: 'de', companies: [] },
   };
 }
 

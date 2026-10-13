@@ -2,6 +2,7 @@ import { FileWarning } from 'lucide-react';
 import type * as PdfJsModule from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { useEffect, useRef, useState } from 'react';
 import { Spinner } from '@/components/ui/Feedback';
+import { tr } from '@/lib/i18n';
 
 type PdfJs = typeof PdfJsModule;
 
@@ -63,15 +64,17 @@ export function PdfViewer({ data, label }: PdfViewerProps) {
           canvas.style.maxWidth = '100%';
           canvas.style.height = 'auto';
           canvas.className = 'mx-auto block bg-white shadow-md ring-1 ring-neutral-200';
+          // A page is paper: keep the light palette (white background, light ring) in dark mode too.
+          canvas.dataset.theme = 'light';
           canvas.setAttribute('role', 'img');
-          canvas.setAttribute('aria-label', `${label} – Seite ${pageNumber} von ${pdf.numPages}`);
+          canvas.setAttribute('aria-label', tr(`${label} – Seite ${pageNumber} von ${pdf.numPages}`, `${label} – page ${pageNumber} of ${pdf.numPages}`));
           canvas.dataset.testid = 'pdf-page';
           container.appendChild(canvas);
           await page.render({ canvas, viewport }).promise;
         }
         if (!cancelled) setState({ kind: 'ready', pages: pdf.numPages });
       } catch (error) {
-        if (!cancelled) setState({ kind: 'error', message: error instanceof Error ? error.message : 'Unbekannter Fehler' });
+        if (!cancelled) setState({ kind: 'error', message: error instanceof Error ? error.message : tr('Unbekannter Fehler', 'Unknown error') });
       }
     })();
 
@@ -85,13 +88,13 @@ export function PdfViewer({ data, label }: PdfViewerProps) {
     <div>
       {state.kind === 'loading' && (
         <div className="flex justify-center py-16">
-          <Spinner label="PDF wird dargestellt …" />
+          <Spinner label={tr('PDF wird dargestellt …', 'Rendering PDF …')} />
         </div>
       )}
       {state.kind === 'error' && (
         <div role="alert" className="flex flex-col items-center gap-2 py-16 text-center text-sm text-neutral-600">
           <FileWarning aria-hidden size={22} className="text-danger-text" />
-          Das PDF konnte nicht angezeigt werden. Sie können es trotzdem herunterladen.
+          {tr('Das PDF konnte nicht angezeigt werden. Sie können es trotzdem herunterladen.', 'The PDF could not be displayed. You can still download it.')}
           <span className="text-xs text-neutral-500">{state.message}</span>
         </div>
       )}

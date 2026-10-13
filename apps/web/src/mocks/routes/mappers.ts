@@ -73,7 +73,7 @@ export function toMe(user: UserRec): MeDto {
       return company ? [{ companyId: company.id, companyName: company.name, role: m.role, membershipId: m.id, isDemo: company.isDemo }] : [];
     })
     .sort((a, b) => a.companyName.localeCompare(b.companyName, 'de-DE'));
-  return { id: user.id, email: user.email, displayName: user.displayName, emailVerified: user.emailVerified, companies };
+  return { id: user.id, email: user.email, displayName: user.displayName, emailVerified: user.emailVerified, language: user.language ?? 'de', companies };
 }
 
 export function toCompany(company: CompanyRec, role: MembershipRole): CompanyDto {

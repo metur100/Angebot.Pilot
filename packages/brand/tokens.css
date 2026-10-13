@@ -1,5 +1,6 @@
-/* AngebotPilot design tokens – mirrors tokens.ts */
-:root {
+/* AngebotPilot design tokens – mirrors tokens.ts. [data-theme='light'] also scopes the light palette to a subtree (e.g. paper-white document previews inside the dark UI). */
+:root,
+[data-theme='light'] {
   --ap-on-brand: #FFFFFF;
   --ap-brand-50: #EEF2FF; --ap-brand-100: #E0E7FF; --ap-brand-200: #C7D2FE; --ap-brand-300: #A5B4FC; --ap-brand-400: #7C8CF8;
   --ap-brand-500: #4F63F0; --ap-brand-600: #2F45D8; --ap-brand-700: #2537B0; --ap-brand-800: #1F2E8A; --ap-brand-900: #1C296E;

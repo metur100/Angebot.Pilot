@@ -9,7 +9,7 @@ export function BrandLogo({ className, size = 'md' }: { className?: string; size
     <span className={cx('inline-flex items-center gap-2', className)}>
       <img src={iconUrl} alt="" aria-hidden className={cx(icon, 'shrink-0')} />
       <span className={cx(text, 'font-bold tracking-[-0.02em] text-neutral-900')}>
-        Angebot<span className="text-brand-600">Pilot</span>
+        Angebot<span className="text-brand-600 dark:text-brand-700">Pilot</span>
       </span>
     </span>
   );

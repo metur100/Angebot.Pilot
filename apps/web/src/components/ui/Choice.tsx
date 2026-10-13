@@ -91,7 +91,7 @@ export function Switch({ checked, onCheckedChange, label, description, disabled,
       >
         <RadixSwitch.Thumb
           className={cx(
-            'block size-4 rounded-full bg-white shadow-sm transition-transform',
+            'block size-4 rounded-full bg-on-brand shadow-sm transition-transform',
             checked ? 'translate-x-[18px]' : 'translate-x-0.5',
           )}
         />
