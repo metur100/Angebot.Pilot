@@ -1,5 +1,6 @@
 /* AngebotPilot design tokens – mirrors tokens.ts */
 :root {
+  --ap-on-brand: #FFFFFF;
   --ap-brand-50: #EEF2FF; --ap-brand-100: #E0E7FF; --ap-brand-200: #C7D2FE; --ap-brand-300: #A5B4FC; --ap-brand-400: #7C8CF8;
   --ap-brand-500: #4F63F0; --ap-brand-600: #2F45D8; --ap-brand-700: #2537B0; --ap-brand-800: #1F2E8A; --ap-brand-900: #1C296E;
   --ap-neutral-0: #FFFFFF; --ap-neutral-25: #FBFCFD; --ap-neutral-50: #F6F7F9; --ap-neutral-100: #EEF0F3; --ap-neutral-200: #E2E5EA;
@@ -16,4 +17,23 @@
   --ap-shadow-md: 0 2px 4px -2px rgba(16, 24, 40, 0.06), 0 4px 8px -2px rgba(16, 24, 40, 0.10);
   --ap-shadow-lg: 0 12px 16px -4px rgba(16, 24, 40, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.03);
   --ap-focus: 0 0 0 3px rgba(79, 99, 240, 0.45);
+}
+
+/* Dark theme – mirrors darkColors in tokens.ts. Applied via <html data-theme="dark">. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --ap-brand-50: #1A2042; --ap-brand-100: #212A57; --ap-brand-200: #2E3A75; --ap-brand-300: #4555A8; --ap-brand-400: #6A7BF2;
+  --ap-brand-500: #7C8CF8; --ap-brand-600: #5468F2; --ap-brand-700: #A3B0FF; --ap-brand-800: #C1CAFF; --ap-brand-900: #DCE1FF;
+  --ap-neutral-0: #171B23; --ap-neutral-25: #1B2029; --ap-neutral-50: #0F1217; --ap-neutral-100: #222833; --ap-neutral-200: #2C333F;
+  --ap-neutral-300: #3B4351; --ap-neutral-400: #5F6879; --ap-neutral-500: #8D96A6; --ap-neutral-600: #AAB2C0; --ap-neutral-700: #C7CDD7;
+  --ap-neutral-800: #DEE2E9; --ap-neutral-900: #F2F4F7;
+  --ap-success-bg: #0F2A1E; --ap-success-border: #1E5A3D; --ap-success-text: #75E0A7; --ap-success-solid: #17B26A;
+  --ap-warning-bg: #2D2210; --ap-warning-border: #6A4A12; --ap-warning-text: #FEC84B; --ap-warning-solid: #F79009;
+  --ap-danger-bg: #2E1517; --ap-danger-border: #7A2A24; --ap-danger-text: #FDA29B; --ap-danger-solid: #F04438;
+  --ap-info-bg: #1A2042; --ap-info-border: #2E3A75; --ap-info-text: #A3B0FF; --ap-info-solid: #5468F2;
+  --ap-muted-bg: #1F242D; --ap-muted-border: #2C333F; --ap-muted-text: #AAB2C0; --ap-muted-solid: #6B7485;
+  --ap-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --ap-shadow-md: 0 2px 4px -2px rgba(0, 0, 0, 0.4), 0 4px 8px -2px rgba(0, 0, 0, 0.5);
+  --ap-shadow-lg: 0 12px 16px -4px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --ap-focus: 0 0 0 3px rgba(124, 140, 248, 0.5);
 }

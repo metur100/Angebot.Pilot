@@ -1,4 +1,5 @@
 import type * as T from './types';
+import { getLocale, tr } from './locale';
 
 export class ApiError extends Error {
   readonly status: number;
@@ -24,7 +25,7 @@ export class ApiError extends Error {
 /** Thrown when the device is offline or the server cannot be reached. */
 export class NetworkError extends Error {
   constructor(cause?: unknown) {
-    super('Keine Verbindung zum Server. Bitte prüfen Sie Ihre Internetverbindung.');
+    super(tr('Keine Verbindung zum Server. Bitte prüfen Sie Ihre Internetverbindung.', 'Cannot reach the server. Please check your internet connection.'));
     this.name = 'NetworkError';
     this.cause = cause;
   }
@@ -71,7 +72,13 @@ export function createApiClient(options: ApiClientOptions) {
   const url = (path: string, query?: Query) => `${api}${path}${toQueryString(query)}`;
 
   function headers(extra?: Record<string, string>): Record<string, string> {
-    const h: Record<string, string> = { 'X-AngebotPilot-Client': options.client, Accept: 'application/json', ...extra };
+    const h: Record<string, string> = {
+      'X-AngebotPilot-Client': options.client,
+      Accept: 'application/json',
+      // Server messages (validation, errors) follow the UI language.
+      'Accept-Language': getLocale(),
+      ...extra,
+    };
     const token = options.getAccessToken();
     if (token) h.Authorization = `Bearer ${token}`;
     return h;
@@ -323,18 +330,18 @@ export function extractPublicToken(input: string): string | null {
   return /^[A-Za-z0-9_-]{20,}$/.test(trimmed) ? trimmed : null;
 }
 
-/** German, user-facing message for any error thrown by the client. */
+/** User-facing message (in the UI language) for any error thrown by the client. */
 export function errorMessage(error: unknown): string {
   if (error instanceof NetworkError) return error.message;
   if (error instanceof ApiError) {
     if (error.status === 409 && error.code === 'concurrency_conflict') {
-      return 'Der Datensatz wurde zwischenzeitlich geändert. Bitte laden Sie die Seite neu.';
+      return tr('Der Datensatz wurde zwischenzeitlich geändert. Bitte laden Sie die Seite neu.', 'This record was changed in the meantime. Please reload the page.');
     }
-    if (error.status === 403) return error.problem.detail ?? 'Für diese Aktion fehlt Ihnen die Berechtigung.';
-    if (error.status === 404) return error.problem.detail ?? 'Der Eintrag wurde nicht gefunden.';
-    if (error.status === 429) return 'Zu viele Anfragen. Bitte warten Sie einen Moment.';
-    if (error.status >= 500) return 'Ein Serverfehler ist aufgetreten. Bitte versuchen Sie es später erneut.';
-    return error.problem.detail ?? error.problem.title ?? 'Die Anfrage ist fehlgeschlagen.';
+    if (error.status === 403) return error.problem.detail ?? tr('Für diese Aktion fehlt Ihnen die Berechtigung.', 'You do not have permission for this action.');
+    if (error.status === 404) return error.problem.detail ?? tr('Der Eintrag wurde nicht gefunden.', 'The entry was not found.');
+    if (error.status === 429) return tr('Zu viele Anfragen. Bitte warten Sie einen Moment.', 'Too many requests. Please wait a moment.');
+    if (error.status >= 500) return tr('Ein Serverfehler ist aufgetreten. Bitte versuchen Sie es später erneut.', 'A server error occurred. Please try again later.');
+    return error.problem.detail ?? error.problem.title ?? tr('Die Anfrage ist fehlgeschlagen.', 'The request failed.');
   }
-  return 'Ein unerwarteter Fehler ist aufgetreten.';
+  return tr('Ein unerwarteter Fehler ist aufgetreten.', 'An unexpected error occurred.');
 }

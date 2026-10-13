@@ -45,3 +45,30 @@ export const focusRing = { color: colors.brand[500], width: 3, offset: 2 } as co
 
 /** Minimum touch target (WCAG 2.5.8 / platform guidelines). */
 export const minTouchTarget = 44;
+
+/**
+ * Dark theme. Same keys as `colors`; the neutral scale is inverted (0 = raised surface, 900 = primary text), the
+ * brand scale is lifted so that 600 still works as a filled button with white text and 700 reads as link text on
+ * dark surfaces. Status colours keep their meaning: dark tinted backgrounds, light text, unchanged solids.
+ */
+export const darkColors = {
+  brand: {
+    50: '#1A2042', 100: '#212A57', 200: '#2E3A75', 300: '#4555A8', 400: '#6A7BF2',
+    500: '#7C8CF8', 600: '#5468F2', 700: '#A3B0FF', 800: '#C1CAFF', 900: '#DCE1FF',
+  },
+  neutral: {
+    0: '#171B23', 25: '#1B2029', 50: '#0F1217', 100: '#222833', 200: '#2C333F', 300: '#3B4351',
+    400: '#5F6879', 500: '#8D96A6', 600: '#AAB2C0', 700: '#C7CDD7', 800: '#DEE2E9', 900: '#F2F4F7',
+  },
+  success: { bg: '#0F2A1E', border: '#1E5A3D', text: '#75E0A7', solid: '#17B26A' },
+  warning: { bg: '#2D2210', border: '#6A4A12', text: '#FEC84B', solid: '#F79009' },
+  danger: { bg: '#2E1517', border: '#7A2A24', text: '#FDA29B', solid: '#F04438' },
+  info: { bg: '#1A2042', border: '#2E3A75', text: '#A3B0FF', solid: '#5468F2' },
+  muted: { bg: '#1F242D', border: '#2C333F', text: '#AAB2C0', solid: '#6B7485' },
+} as const satisfies { [K in keyof typeof colors]: { [P in keyof (typeof colors)[K]]: string } };
+
+/** Text/icon colour on filled brand or solid status backgrounds, in both themes. */
+export const onBrand = '#FFFFFF';
+
+export type ColorScheme = 'light' | 'dark';
+export type ThemePreference = ColorScheme | 'system';
