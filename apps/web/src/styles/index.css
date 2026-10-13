@@ -1,0 +1,187 @@
+@import 'tailwindcss';
+@import '@angebotpilot/brand/tokens.css';
+
+/* Self-hosted Inter (SIL OFL 1.1) – no external font CDN (privacy). */
+@import '@fontsource/inter/latin-400.css';
+@import '@fontsource/inter/latin-500.css';
+@import '@fontsource/inter/latin-600.css';
+@import '@fontsource/inter/latin-700.css';
+@import '@fontsource/inter/latin-ext-400.css';
+@import '@fontsource/inter/latin-ext-500.css';
+@import '@fontsource/inter/latin-ext-600.css';
+@import '@fontsource/inter/latin-ext-700.css';
+
+/*
+ * The Tailwind theme is derived exclusively from the brand tokens (packages/brand/tokens.css).
+ * The default Tailwind palette is removed so that no off-brand colours can creep in.
+ */
+@theme inline {
+  --color-*: initial;
+  --color-white: var(--ap-neutral-0);
+  --color-brand-50: var(--ap-brand-50);
+  --color-brand-100: var(--ap-brand-100);
+  --color-brand-200: var(--ap-brand-200);
+  --color-brand-300: var(--ap-brand-300);
+  --color-brand-400: var(--ap-brand-400);
+  --color-brand-500: var(--ap-brand-500);
+  --color-brand-600: var(--ap-brand-600);
+  --color-brand-700: var(--ap-brand-700);
+  --color-brand-800: var(--ap-brand-800);
+  --color-brand-900: var(--ap-brand-900);
+  --color-neutral-0: var(--ap-neutral-0);
+  --color-neutral-25: var(--ap-neutral-25);
+  --color-neutral-50: var(--ap-neutral-50);
+  --color-neutral-100: var(--ap-neutral-100);
+  --color-neutral-200: var(--ap-neutral-200);
+  --color-neutral-300: var(--ap-neutral-300);
+  --color-neutral-400: var(--ap-neutral-400);
+  --color-neutral-500: var(--ap-neutral-500);
+  --color-neutral-600: var(--ap-neutral-600);
+  --color-neutral-700: var(--ap-neutral-700);
+  --color-neutral-800: var(--ap-neutral-800);
+  --color-neutral-900: var(--ap-neutral-900);
+  --color-success-bg: var(--ap-success-bg);
+  --color-success-border: var(--ap-success-border);
+  --color-success-text: var(--ap-success-text);
+  --color-success-solid: var(--ap-success-solid);
+  --color-warning-bg: var(--ap-warning-bg);
+  --color-warning-border: var(--ap-warning-border);
+  --color-warning-text: var(--ap-warning-text);
+  --color-warning-solid: var(--ap-warning-solid);
+  --color-danger-bg: var(--ap-danger-bg);
+  --color-danger-border: var(--ap-danger-border);
+  --color-danger-text: var(--ap-danger-text);
+  --color-danger-solid: var(--ap-danger-solid);
+  --color-info-bg: var(--ap-info-bg);
+  --color-info-border: var(--ap-info-border);
+  --color-info-text: var(--ap-info-text);
+  --color-info-solid: var(--ap-info-solid);
+  --color-muted-bg: var(--ap-muted-bg);
+  --color-muted-border: var(--ap-muted-border);
+  --color-muted-text: var(--ap-muted-text);
+  --color-muted-solid: var(--ap-muted-solid);
+
+  --font-sans: var(--ap-font);
+  --radius-sm: var(--ap-radius-sm);
+  --radius-md: var(--ap-radius-md);
+  --radius-lg: var(--ap-radius-lg);
+  --radius-xl: var(--ap-radius-xl);
+  --shadow-sm: var(--ap-shadow-sm);
+  --shadow-md: var(--ap-shadow-md);
+  --shadow-lg: var(--ap-shadow-lg);
+  --shadow-focus: var(--ap-focus);
+}
+
+@layer base {
+  html {
+    font-family: var(--ap-font);
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: var(--ap-neutral-900);
+    background: var(--ap-neutral-50);
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    min-height: 100dvh;
+    font-size: 14px;
+    line-height: 20px;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ap-brand-500);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--ap-brand-100);
+  }
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Overlay and content animations for Radix dialogs/popovers. */
+  .ap-overlay[data-state='open'] {
+    animation: ap-fade-in 150ms ease-out;
+  }
+  .ap-dialog[data-state='open'] {
+    animation: ap-scale-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ap-popover[data-state='open'] {
+    animation: ap-fade-in 120ms ease-out;
+  }
+  .ap-sheet[data-state='open'] {
+    animation: ap-slide-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ap-skeleton {
+    background: linear-gradient(90deg, var(--ap-neutral-100) 0%, var(--ap-neutral-50) 50%, var(--ap-neutral-100) 100%);
+    background-size: 200% 100%;
+    animation: ap-shimmer 1.4s ease-in-out infinite;
+  }
+}
+
+/* A4 document preview (grows with content) */
+@utility ap-a4 {
+  aspect-ratio: 210 / 297;
+}
+
+@keyframes ap-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ap-scale-in {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes ap-slide-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes ap-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  /* PDF page: print only the rendered pdf.js pages, one per sheet. */
+  body:has(.ap-print-area) * {
+    visibility: hidden;
+  }
+  body:has(.ap-print-area) .ap-print-area,
+  body:has(.ap-print-area) .ap-print-area * {
+    visibility: visible;
+  }
+  .ap-print-area {
+    position: absolute;
+    inset: 0;
+    padding: 0 !important;
+    background: none !important;
+  }
+  .ap-print-area canvas {
+    width: 100% !important;
+    box-shadow: none !important;
+    break-after: page;
+  }
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}

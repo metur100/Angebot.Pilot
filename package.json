@@ -1,0 +1,29 @@
+{
+  "name": "angebotpilot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AngebotPilot – Angebote, Kunden, Nachfassen und Aufträge für kleine Betriebe.",
+  "author": "Medin Turkes",
+  "license": "UNLICENSED",
+  "workspaces": [
+    "packages/*",
+    "apps/web"
+  ],
+  "scripts": {
+    "api": "dotnet run --project apps/api/src/AngebotPilot.Api",
+    "web": "npm run dev --workspace apps/web",
+    "mobile": "npm run start --workspace apps/mobile",
+    "build:api": "dotnet build AngebotPilot.sln -c Release",
+    "build:web": "npm run build --workspace apps/web",
+    "test:api": "dotnet test AngebotPilot.sln",
+    "test:contracts": "npm run test --workspace packages/api-contracts",
+    "test:web": "npm run test --workspace apps/web",
+    "test:mobile": "npm run test --workspace apps/mobile",
+    "e2e": "npm run e2e --workspace apps/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

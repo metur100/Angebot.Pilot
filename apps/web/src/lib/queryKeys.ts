@@ -1,0 +1,33 @@
+import type { CustomerListQuery, JobListQuery, QuotationListQuery } from '@angebotpilot/api-contracts';
+
+/** Query keys. Everything company-scoped starts with ['c', companyId] so switching companies never mixes data. */
+export const qk = {
+  company: (c: string) => ['c', c, 'company'] as const,
+  settings: (c: string) => ['c', c, 'settings'] as const,
+  taxRates: (c: string) => ['c', c, 'taxRates'] as const,
+  members: (c: string) => ['c', c, 'members'] as const,
+  invitations: (c: string) => ['c', c, 'invitations'] as const,
+  subscription: (c: string) => ['c', c, 'subscription'] as const,
+  logo: (c: string) => ['c', c, 'logo'] as const,
+  dashboard: (c: string, range: { from?: string; to?: string }) => ['c', c, 'dashboard', range] as const,
+  customers: (c: string) => ['c', c, 'customers'] as const,
+  customerList: (c: string, query: CustomerListQuery) => ['c', c, 'customers', 'list', query] as const,
+  customer: (c: string, id: string) => ['c', c, 'customers', 'detail', id] as const,
+  customerQuotations: (c: string, id: string) => ['c', c, 'customers', 'detail', id, 'quotations'] as const,
+  customerJobs: (c: string, id: string) => ['c', c, 'customers', 'detail', id, 'jobs'] as const,
+  quotations: (c: string) => ['c', c, 'quotations'] as const,
+  quotationList: (c: string, query: QuotationListQuery) => ['c', c, 'quotations', 'list', query] as const,
+  quotation: (c: string, id: string) => ['c', c, 'quotations', 'detail', id] as const,
+  quotationEvents: (c: string, id: string) => ['c', c, 'quotations', 'detail', id, 'events'] as const,
+  quotationDeliveries: (c: string, id: string) => ['c', c, 'quotations', 'detail', id, 'deliveries'] as const,
+  quotationFollowUps: (c: string, id: string) => ['c', c, 'quotations', 'detail', id, 'followUps'] as const,
+  quotationPdf: (c: string, id: string, rowVersion: string) => ['c', c, 'quotations', 'detail', id, 'pdf', rowVersion] as const,
+  templates: (c: string) => ['c', c, 'templates'] as const,
+  template: (c: string, id: string) => ['c', c, 'templates', id] as const,
+  jobs: (c: string) => ['c', c, 'jobs'] as const,
+  jobList: (c: string, query: JobListQuery) => ['c', c, 'jobs', 'list', query] as const,
+  job: (c: string, id: string) => ['c', c, 'jobs', 'detail', id] as const,
+  notifications: (c: string) => ['c', c, 'notifications'] as const,
+  unreadCount: (c: string) => ['c', c, 'notifications', 'unread'] as const,
+  activity: (c: string, page: number) => ['c', c, 'activity', page] as const,
+};
