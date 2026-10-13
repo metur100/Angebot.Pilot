@@ -60,7 +60,8 @@ export interface ApiProblem {
 }
 
 // ---------- Auth ----------
-export interface RegisterRequest { email: string; password: string; displayName: string; acceptTerms: boolean; client?: ClientKind }
+/** `language`: initial UI language (verification email uses it); defaults to German. */
+export interface RegisterRequest { email: string; password: string; displayName: string; acceptTerms: boolean; client?: ClientKind; language?: UiLanguage }
 export interface LoginRequest { email: string; password: string; client?: ClientKind }
 export interface RefreshRequest { refreshToken?: string | null }
 export interface LogoutRequest { refreshToken?: string | null }
@@ -68,7 +69,8 @@ export interface ForgotPasswordRequest { email: string }
 export interface ResetPasswordRequest { token: string; newPassword: string }
 export interface VerifyEmailRequest { token: string }
 export interface ChangePasswordRequest { currentPassword: string; newPassword: string }
-export interface UpdateProfileRequest { displayName: string }
+/** `language` is optional so older clients keep working; omitted = unchanged. */
+export interface UpdateProfileRequest { displayName: string; language?: UiLanguage }
 export interface DeleteAccountRequest { password: string }
 
 /** refreshToken is null only when the API is configured for the HttpOnly cookie transport (same-site web deployments). */
@@ -79,7 +81,10 @@ export interface AuthResponse {
   refreshTokenExpiresAt: IsoDateTime;
   user: MeDto;
 }
-export interface MeDto { id: Guid; email: string; displayName: string; emailVerified: boolean; companies: MembershipDto[] }
+/** UI language preference stored on the user; account emails (verification, password reset, notifications) use it. */
+export type UiLanguage = 'de' | 'en';
+
+export interface MeDto { id: Guid; email: string; displayName: string; emailVerified: boolean; language: UiLanguage; companies: MembershipDto[] }
 export interface MembershipDto { companyId: Guid; companyName: string; role: MembershipRole; membershipId: Guid; isDemo: boolean }
 export interface InvitationPreviewDto { companyName: string; email: string; role: MembershipRole; expiresAt: IsoDateTime }
 export interface AcceptInvitationRequest { token: string }
