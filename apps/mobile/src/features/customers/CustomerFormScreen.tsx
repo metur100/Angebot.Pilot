@@ -13,6 +13,7 @@ import { FormScroll, Screen } from '@/components/Layout';
 import { ErrorState, InlineError, LoadingView } from '@/components/States';
 import { useToast } from '@/components/Toast';
 import { applyServerErrors, emptyToNull, isConflict } from '@/lib/forms';
+import { useLocale } from '@/lib/i18n';
 import { keys, useCustomer } from '@/lib/queries';
 import { api, useCompanyId } from '@/lib/session';
 import { space } from '@/theme';
@@ -101,6 +102,7 @@ function CustomerFormBody({
   editId, initial, rowVersion: initialRowVersion, onReload,
 }: { editId?: string; initial: CustomerForm; rowVersion: string | null; onReload?: () => Promise<void> }) {
   const companyId = useCompanyId();
+  const { tr } = useLocale();
   const router = useRouter();
   const navigation = useNavigation();
   const queryClient = useQueryClient();
@@ -121,13 +123,13 @@ function CustomerFormBody({
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
       if (allowLeave.current || !isDirty) return;
       e.preventDefault();
-      Alert.alert('Änderungen verwerfen?', 'Die Eingaben wurden noch nicht gespeichert.', [
-        { text: 'Weiter bearbeiten', style: 'cancel' },
-        { text: 'Verwerfen', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+      Alert.alert(tr('Änderungen verwerfen?', 'Discard changes?'), tr('Die Eingaben wurden noch nicht gespeichert.', 'Your entries have not been saved yet.'), [
+        { text: tr('Weiter bearbeiten', 'Keep editing'), style: 'cancel' },
+        { text: tr('Verwerfen', 'Discard'), style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
       ]);
     });
     return unsubscribe;
-  }, [navigation, isDirty]);
+  }, [navigation, isDirty, tr]);
 
   const onValid = async (values: CustomerForm) => {
     setFormError(null);
@@ -137,15 +139,20 @@ function CustomerFormBody({
       queryClient.setQueryData(keys.customer(companyId, saved.id), saved);
       void queryClient.invalidateQueries({ queryKey: keys.customers(companyId) });
       allowLeave.current = true;
-      toast(editId ? 'Kunde gespeichert' : 'Kunde angelegt');
+      toast(editId ? tr('Kunde gespeichert', 'Customer saved') : tr('Kunde angelegt', 'Customer created'));
       if (editId) router.back();
       else router.replace(`/customer/${saved.id}`);
     } catch (error) {
       if (isConflict(error)) {
-        setFormError('Der Kunde wurde zwischenzeitlich geändert. Bitte neu laden – Ihre Eingaben gehen dabei verloren.');
-        Alert.alert('Kunde wurde geändert', 'Eine andere Person hat diesen Kunden gespeichert.', [
-          { text: 'Abbrechen', style: 'cancel' },
-          { text: 'Neu laden', onPress: () => void onReload?.() },
+        setFormError(
+          tr(
+            'Der Kunde wurde zwischenzeitlich geändert. Bitte neu laden – Ihre Eingaben gehen dabei verloren.',
+            'The customer was changed in the meantime. Please reload – your entries will be lost.',
+          ),
+        );
+        Alert.alert(tr('Kunde wurde geändert', 'Customer was changed'), tr('Eine andere Person hat diesen Kunden gespeichert.', 'Someone else has saved this customer.'), [
+          { text: tr('Abbrechen', 'Cancel'), style: 'cancel' },
+          { text: tr('Neu laden', 'Reload'), onPress: () => void onReload?.() },
         ]);
         return;
       }
@@ -167,17 +174,17 @@ function CustomerFormBody({
 
   return (
     <Screen>
-      <Stack.Screen options={{ title: editId ? 'Kunde bearbeiten' : 'Neuer Kunde' }} />
+      <Stack.Screen options={{ title: editId ? tr('Kunde bearbeiten', 'Edit customer') : tr('Neuer Kunde', 'New customer') }} />
       <FormScroll>
         <Controller
           control={control}
           name="type"
           render={({ field: { onChange, value } }) => (
             <SegmentedControl
-              accessibilityLabel="Kundenart"
+              accessibilityLabel={tr('Kundenart', 'Customer type')}
               options={[
-                { value: 'Business', label: 'Geschäftskunde' },
-                { value: 'Private', label: 'Privatkunde' },
+                { value: 'Business', label: tr('Geschäftskunde', 'Business customer') },
+                { value: 'Private', label: tr('Privatkunde', 'Private customer') },
               ]}
               value={value}
               onChange={onChange}
@@ -185,24 +192,24 @@ function CustomerFormBody({
           )}
         />
         <Card style={styles.card}>
-          {type === 'Business' ? field('companyName', 'Firmenname', { required: true, autoComplete: 'organization' }) : null}
-          {field('salutation', 'Anrede', { placeholder: 'z. B. Frau, Herr' })}
+          {type === 'Business' ? field('companyName', tr('Firmenname', 'Company name'), { required: true, autoComplete: 'organization' }) : null}
+          {field('salutation', tr('Anrede', 'Salutation'), { placeholder: tr('z. B. Frau, Herr', 'e.g. Frau, Herr (as printed)') })}
           <View style={styles.row}>
-            <View style={styles.flex}>{field('firstName', 'Vorname', { autoComplete: 'given-name' })}</View>
-            <View style={styles.flex}>{field('lastName', 'Nachname', { required: type === 'Private', autoComplete: 'family-name' })}</View>
+            <View style={styles.flex}>{field('firstName', tr('Vorname', 'First name'), { autoComplete: 'given-name' })}</View>
+            <View style={styles.flex}>{field('lastName', tr('Nachname', 'Last name'), { required: type === 'Private', autoComplete: 'family-name' })}</View>
           </View>
-          {field('email', 'E-Mail', { keyboardType: 'email-address', autoCapitalize: 'none', autoComplete: 'email' })}
-          {field('phone', 'Telefon', { keyboardType: 'phone-pad', autoComplete: 'tel' })}
+          {field('email', tr('E-Mail', 'Email'), { keyboardType: 'email-address', autoCapitalize: 'none', autoComplete: 'email' })}
+          {field('phone', tr('Telefon', 'Phone'), { keyboardType: 'phone-pad', autoComplete: 'tel' })}
         </Card>
 
-        <SectionHeader title="Rechnungsadresse" />
+        <SectionHeader title={tr('Rechnungsadresse', 'Billing address')} />
         <Card style={styles.card}>
-          {field('billingStreet', 'Straße und Hausnummer', { autoComplete: 'street-address' })}
+          {field('billingStreet', tr('Straße und Hausnummer', 'Street and number'), { autoComplete: 'street-address' })}
           <View style={styles.row}>
-            <View style={styles.postal}>{field('billingPostalCode', 'PLZ', { keyboardType: 'number-pad', autoComplete: 'postal-code' })}</View>
-            <View style={styles.flex}>{field('billingCity', 'Ort')}</View>
+            <View style={styles.postal}>{field('billingPostalCode', tr('PLZ', 'Postcode'), { keyboardType: 'number-pad', autoComplete: 'postal-code' })}</View>
+            <View style={styles.flex}>{field('billingCity', tr('Ort', 'City'))}</View>
           </View>
-          {field('billingCountry', 'Land (ISO-Code)', { autoCapitalize: 'characters', maxLength: 2, hint: 'z. B. DE, AT, CH' })}
+          {field('billingCountry', tr('Land (ISO-Code)', 'Country (ISO code)'), { autoCapitalize: 'characters', maxLength: 2, hint: tr('z. B. DE, AT, CH', 'e.g. DE, AT, CH') })}
         </Card>
 
         <Card style={styles.card}>
@@ -210,36 +217,40 @@ function CustomerFormBody({
             control={control}
             name="hasServiceAddress"
             render={({ field: { onChange, value } }) => (
-              <SwitchRow label="Abweichende Leistungsadresse" description="z. B. Baustelle oder Objektadresse" value={value} onChange={onChange} />
+              <SwitchRow
+                label={tr('Abweichende Leistungsadresse', 'Different service address')}
+                description={tr('z. B. Baustelle oder Objektadresse', 'e.g. construction site or property address')} value={value} onChange={onChange} />
             )}
           />
           {hasServiceAddress ? (
             <>
-              {field('serviceStreet', 'Straße und Hausnummer')}
+              {field('serviceStreet', tr('Straße und Hausnummer', 'Street and number'))}
               <View style={styles.row}>
-                <View style={styles.postal}>{field('servicePostalCode', 'PLZ', { keyboardType: 'number-pad' })}</View>
-                <View style={styles.flex}>{field('serviceCity', 'Ort')}</View>
+                <View style={styles.postal}>{field('servicePostalCode', tr('PLZ', 'Postcode'), { keyboardType: 'number-pad' })}</View>
+                <View style={styles.flex}>{field('serviceCity', tr('Ort', 'City'))}</View>
               </View>
-              {field('serviceCountry', 'Land (ISO-Code)', { autoCapitalize: 'characters', maxLength: 2 })}
+              {field('serviceCountry', tr('Land (ISO-Code)', 'Country (ISO code)'), { autoCapitalize: 'characters', maxLength: 2 })}
             </>
           ) : null}
         </Card>
 
-        <SectionHeader title="Weitere Angaben" />
+        <SectionHeader title={tr('Weitere Angaben', 'Additional details')} />
         <Card style={styles.card}>
-          {type === 'Business' ? field('vatId', 'USt-IdNr.', { autoCapitalize: 'characters' }) : null}
-          {field('notes', 'Notizen (intern)', { multiline: true })}
+          {type === 'Business' ? field('vatId', tr('USt-IdNr.', 'VAT ID'), { autoCapitalize: 'characters' }) : null}
+          {field('notes', tr('Notizen (intern)', 'Notes (internal)'), { multiline: true })}
           <Controller
             control={control}
             name="followUpOptOut"
             render={({ field: { onChange, value } }) => (
-              <SwitchRow label="Keine automatischen Erinnerungen" description="Für diesen Kunden werden keine Nachfass-E-Mails geplant." value={value} onChange={onChange} />
+              <SwitchRow
+                label={tr('Keine automatischen Erinnerungen', 'No automatic reminders')}
+                description={tr('Für diesen Kunden werden keine Nachfass-E-Mails geplant.', 'No follow-up emails are scheduled for this customer.')} value={value} onChange={onChange} />
             )}
           />
         </Card>
 
         <InlineError message={formError} />
-        <Button label={editId ? 'Änderungen speichern' : 'Kunde anlegen'} icon="save-outline" onPress={() => void onSubmit()} loading={isSubmitting} testID="customer-submit" />
+        <Button label={editId ? tr('Änderungen speichern', 'Save changes') : tr('Kunde anlegen', 'Create customer')} icon="save-outline" onPress={() => void onSubmit()} loading={isSubmitting} testID="customer-submit" />
       </FormScroll>
     </Screen>
   );

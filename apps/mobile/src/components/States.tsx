@@ -3,7 +3,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Animated, StyleSheet, View } from 'react-native';
 
-import { colors, radius, space } from '@/theme';
+import { useLocale } from '@/lib/i18n';
+import { makeStyles, radius, space, useTheme } from '@/theme';
 
 import { Button, type IconName } from './Button';
 import { Text } from './Text';
@@ -11,10 +12,12 @@ import { Text } from './Text';
 export function EmptyState({
   icon, title, message, actionLabel, onAction, testID,
 }: { icon: IconName; title: string; message?: string; actionLabel?: string; onAction?: () => void; testID?: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.center} testID={testID}>
       <View style={styles.iconCircle}>
-        <Ionicons name={icon} size={30} color={colors.brand} />
+        <Ionicons name={icon} size={30} color={colors.brandText} />
       </View>
       <Text variant="heading" align="center" accessibilityRole="header">
         {title}
@@ -30,18 +33,23 @@ export function EmptyState({
 }
 
 export function ErrorState({ error, onRetry, compact }: { error: unknown; onRetry?: () => void; compact?: boolean }) {
+  const { colors } = useTheme();
+  const { tr } = useLocale();
+  const styles = useStyles();
   return (
     <View style={compact ? styles.compact : styles.center} accessibilityRole="alert" testID="error-state">
       <Ionicons name="cloud-offline-outline" size={compact ? 22 : 32} color={colors.danger} />
       <Text variant="body" align="center" style={styles.message}>
         {errorMessage(error)}
       </Text>
-      {onRetry ? <Button label="Erneut versuchen" icon="refresh" variant="outline" onPress={onRetry} fullWidth={false} /> : null}
+      {onRetry ? <Button label={tr('Erneut versuchen', 'Try again')} icon="refresh" variant="outline" onPress={onRetry} fullWidth={false} /> : null}
     </View>
   );
 }
 
 export function InlineError({ message, testID }: { message: string | null | undefined; testID?: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   if (!message) return null;
   return (
     <View style={styles.inlineError} accessibilityRole="alert" accessibilityLiveRegion="polite" testID={testID ?? 'form-error'}>
@@ -53,15 +61,19 @@ export function InlineError({ message, testID }: { message: string | null | unde
   );
 }
 
-export function LoadingView({ label = 'Wird geladen …' }: { label?: string }) {
+export function LoadingView({ label }: { label?: string }) {
+  const { colors } = useTheme();
+  const { tr } = useLocale();
+  const styles = useStyles();
   return (
-    <View style={styles.center} accessibilityLabel={label} accessibilityRole="progressbar">
-      <ActivityIndicator size="large" color={colors.brand} />
+    <View style={styles.center} accessibilityLabel={label ?? tr('Wird geladen …', 'Loading …')} accessibilityRole="progressbar">
+      <ActivityIndicator size="large" color={colors.brandText} />
     </View>
   );
 }
 
 export function Skeleton({ height = 16, width = '100%', style }: { height?: number; width?: number | `${number}%`; style?: object }) {
+  const { colors } = useTheme();
   const [opacity] = useState(() => new Animated.Value(0.5));
   useEffect(() => {
     const loop = Animated.loop(
@@ -78,8 +90,10 @@ export function Skeleton({ height = 16, width = '100%', style }: { height?: numb
 
 /** Placeholder cards shown while a list loads. */
 export function ListSkeleton({ rows = 5 }: { rows?: number }) {
+  const { tr } = useLocale();
+  const styles = useStyles();
   return (
-    <View style={styles.skeletonList} accessibilityLabel="Wird geladen" accessibilityRole="progressbar" testID="list-skeleton">
+    <View style={styles.skeletonList} accessibilityLabel={tr('Wird geladen', 'Loading')} accessibilityRole="progressbar" testID="list-skeleton">
       {Array.from({ length: rows }, (_, i) => (
         <View key={i} style={styles.skeletonCard}>
           <Skeleton height={14} width="40%" />
@@ -91,7 +105,7 @@ export function ListSkeleton({ rows = 5 }: { rows?: number }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space[6], gap: space[3] },
   compact: { alignItems: 'center', padding: space[4], gap: space[2] },
   iconCircle: {
@@ -110,4 +124,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface, borderRadius: radius.xl, padding: space[4], gap: space[2],
     borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
   },
-});
+}));

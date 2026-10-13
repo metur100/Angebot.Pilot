@@ -1,7 +1,7 @@
-// Create/edit a quotation, optimised for small screens: four steps (Kunde, Basis, Positionen, Texte), line items as
+// Create/edit a quotation, optimised for small screens: four steps (customer, basics, items, texts), line items as
 // stacked cards edited in a focused bottom sheet, and a sticky live-totals bar (calculateTotals = server preview).
 import {
-  addDaysIso, ApiError, calculateTotals, errorMessage, formatEur, quotationSchema, todayIso,
+  addDaysIso, ApiError, calculateTotals, errorMessage, formatEur, quotationSchema, todayIso, tr,
   type QuotationDto, type QuotationForm,
 } from '@angebotpilot/api-contracts';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,27 +10,32 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Controller, useFieldArray, useForm, useWatch, type FieldErrors } from 'react-hook-form';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, View } from 'react-native';
 
 import { Button, IconButton } from '@/components/Button';
 import { Card, SectionHeader } from '@/components/Card';
 import { DateField, SelectField, TextField } from '@/components/Field';
 import { BottomBar, FormScroll, Screen } from '@/components/Layout';
 import { ErrorState, InlineError, LoadingView } from '@/components/States';
-import { TAX_DISCLAIMER, taxModeOptions } from '@/components/TaxModeInfo';
+import { taxDisclaimer, taxModeOptions } from '@/components/TaxModeInfo';
 import { Text } from '@/components/Text';
 import { useToast } from '@/components/Toast';
 import { emptyToNull, isConflict } from '@/lib/forms';
+import { useLocale } from '@/lib/i18n';
 import { keys, useCompanySettings, useCustomer, useQuotation, useTaxRates } from '@/lib/queries';
 import { api, useCompanyId } from '@/lib/session';
-import { colors, radius, space } from '@/theme';
+import { makeStyles, radius, space, useTheme } from '@/theme';
 
 import { CustomerPicker } from './CustomerPicker';
 import { LineCard, StepIndicator } from './EditorParts';
 import { LineItemEditor } from './LineItemEditor';
 import { TemplatePicker } from './TemplatePicker';
 
-const STEPS = ['Kunde', 'Basis', 'Positionen', 'Texte'] as const;
+const STEP_COUNT = 4;
+
+function stepLabels(): string[] {
+  return [tr('Kunde', 'Customer'), tr('Basis', 'Basics'), tr('Positionen', 'Items'), tr('Texte', 'Texts')];
+}
 
 const STEP_FIELDS: (keyof QuotationForm)[][] = [
   ['customerId'],
@@ -90,6 +95,7 @@ export default function QuotationEditorScreen() {
   const existing = useQuotation(editId);
   const settings = useCompanySettings();
   const presetCustomer = useCustomer(editId ? undefined : params.customerId);
+  const { tr } = useLocale();
   const [reloadCount, setReloadCount] = useState(0);
 
   if (editId) {
@@ -105,7 +111,15 @@ export default function QuotationEditorScreen() {
       return (
         <Screen>
           <ErrorState
-            error={new ApiError({ status: 409, detail: 'Nur Entwürfe können bearbeitet werden. Erstellen Sie eine Revision, um ein versendetes Angebot zu ändern.' })}
+            error={
+              new ApiError({
+                status: 409,
+                detail: tr(
+                  'Nur Entwürfe können bearbeitet werden. Erstellen Sie eine Revision, um ein versendetes Angebot zu ändern.',
+                  'Only drafts can be edited. Create a revision to change a quotation that has been sent.',
+                ),
+              })
+            }
           />
         </Screen>
       );
@@ -146,6 +160,9 @@ export default function QuotationEditorScreen() {
 
 function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () => Promise<void> }) {
   const editId = init.editId;
+  const { tr } = useLocale();
+  const { colors } = useTheme();
+  const styles = useStyles();
   const companyId = useCompanyId();
   const router = useRouter();
   const navigation = useNavigation();
@@ -204,14 +221,14 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
           },
           { keepDefaultValues: true },
         );
-        toast(`Vorlage „${t.name}“ übernommen`, 'info');
+        toast(tr(`Vorlage „${t.name}“ übernommen`, `Template “${t.name}” applied`), 'info');
       } catch (error) {
-        Alert.alert('Vorlage konnte nicht geladen werden', errorMessage(error));
+        Alert.alert(tr('Vorlage konnte nicht geladen werden', 'Template could not be loaded'), errorMessage(error));
       } finally {
         setApplyingTemplate(false);
       }
     },
-    [companyId, form, queryClient, reset, toast],
+    [companyId, form, queryClient, reset, toast, tr],
   );
 
   // Template chosen on the templates screen (?templateId=…): apply once after mount.
@@ -227,13 +244,13 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
       if (allowLeave.current || !isDirty) return;
       e.preventDefault();
-      Alert.alert('Änderungen verwerfen?', 'Ihre Änderungen an diesem Angebot sind noch nicht gespeichert.', [
-        { text: 'Weiter bearbeiten', style: 'cancel' },
-        { text: 'Verwerfen', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+      Alert.alert(tr('Änderungen verwerfen?', 'Discard changes?'), tr('Ihre Änderungen an diesem Angebot sind noch nicht gespeichert.', 'Your changes to this quotation have not been saved yet.'), [
+        { text: tr('Weiter bearbeiten', 'Keep editing'), style: 'cancel' },
+        { text: tr('Verwerfen', 'Discard'), style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
       ]);
     });
     return unsubscribe;
-  }, [navigation, isDirty]);
+  }, [navigation, isDirty, tr]);
 
   const onValid = async (v: QuotationForm) => {
     setFormError(null);
@@ -258,25 +275,28 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
       void queryClient.invalidateQueries({ queryKey: keys.quotations(companyId) });
       void queryClient.invalidateQueries({ queryKey: keys.dashboard(companyId) });
       allowLeave.current = true;
-      toast(editId ? 'Angebot gespeichert' : `Entwurf ${saved.number} angelegt`);
+      toast(editId ? tr('Angebot gespeichert', 'Quotation saved') : tr(`Entwurf ${saved.number} angelegt`, `Draft ${saved.number} created`));
       if (editId) router.back();
       else router.replace(`/quotation/${saved.id}`);
     } catch (error) {
       if (isConflict(error)) {
-        setFormError('Speichern nicht möglich: Das Angebot wurde zwischenzeitlich geändert.');
+        setFormError(tr('Speichern nicht möglich: Das Angebot wurde zwischenzeitlich geändert.', 'Cannot save: the quotation was changed in the meantime.'));
         Alert.alert(
-          'Angebot wurde zwischenzeitlich geändert',
-          'Eine andere Person hat dieses Angebot gespeichert. Laden Sie die aktuelle Fassung neu – Ihre Eingaben in diesem Formular gehen dabei verloren.',
+          tr('Angebot wurde zwischenzeitlich geändert', 'Quotation was changed in the meantime'),
+          tr(
+            'Eine andere Person hat dieses Angebot gespeichert. Laden Sie die aktuelle Fassung neu – Ihre Eingaben in diesem Formular gehen dabei verloren.',
+            'Someone else has saved this quotation. Reload the current version – your entries in this form will be lost.',
+          ),
           [
-            { text: 'Abbrechen', style: 'cancel' },
-            { text: 'Neu laden', onPress: () => void onReload?.() },
+            { text: tr('Abbrechen', 'Cancel'), style: 'cancel' },
+            { text: tr('Neu laden', 'Reload'), onPress: () => void onReload?.() },
           ],
         );
         return;
       }
       if (error instanceof ApiError && Object.keys(error.fieldErrors).length) {
         const messages: string[] = [];
-        let firstStep: number = STEPS.length;
+        let firstStep: number = STEP_COUNT;
         for (const [key, msgs] of Object.entries(error.fieldErrors)) {
           const path = key.replace(/\[(\d+)\]/g, '.$1');
           const top = path.split('.')[0] as keyof QuotationForm;
@@ -286,10 +306,10 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
             firstStep = Math.min(firstStep, stepIndex);
           }
           const lineMatch = /^lineItems\.(\d+)/.exec(path);
-          messages.push(lineMatch ? `Position ${Number(lineMatch[1]) + 1}: ${msgs[0]}` : (msgs[0] ?? ''));
+          messages.push(lineMatch ? `${tr('Position', 'Item')} ${Number(lineMatch[1]) + 1}: ${msgs[0]}` : (msgs[0] ?? ''));
         }
         setFormError(messages.join('\n'));
-        if (firstStep < STEPS.length) setStep(firstStep);
+        if (firstStep < STEP_COUNT) setStep(firstStep);
         return;
       }
       setFormError(errorMessage(error));
@@ -298,7 +318,7 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
 
   const onInvalid = (invalid: FieldErrors<QuotationForm>) => {
     setStep(firstStepWithError(invalid));
-    setFormError('Bitte prüfen Sie die markierten Angaben.');
+    setFormError(tr('Bitte prüfen Sie die markierten Angaben.', 'Please check the highlighted fields.'));
   };
 
   const save = () => handleSubmit(onValid, onInvalid)();
@@ -312,16 +332,16 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
   const editingItem = editingIndex !== null && editingIndex >= 0 ? (lineItems?.[editingIndex] ?? null) : null;
 
   const confirmDelete = (index: number) =>
-    Alert.alert('Position löschen?', `„${lineItems?.[index]?.title ?? ''}“ wird aus dem Angebot entfernt.`, [
-      { text: 'Abbrechen', style: 'cancel' },
-      { text: 'Löschen', style: 'destructive', onPress: () => lines.remove(index) },
+    Alert.alert(tr('Position löschen?', 'Delete item?'), tr(`„${lineItems?.[index]?.title ?? ''}“ wird aus dem Angebot entfernt.`, `“${lineItems?.[index]?.title ?? ''}” will be removed from the quotation.`), [
+      { text: tr('Abbrechen', 'Cancel'), style: 'cancel' },
+      { text: tr('Löschen', 'Delete'), style: 'destructive', onPress: () => lines.remove(index) },
     ]);
 
   const openTemplatePicker = () => {
     if (lineCount > 0) {
-      Alert.alert('Vorlage übernehmen?', 'Die vorhandenen Positionen werden durch die Positionen der Vorlage ersetzt.', [
-        { text: 'Abbrechen', style: 'cancel' },
-        { text: 'Vorlage wählen', onPress: () => setTemplatePickerOpen(true) },
+      Alert.alert(tr('Vorlage übernehmen?', 'Apply template?'), tr('Die vorhandenen Positionen werden durch die Positionen der Vorlage ersetzt.', 'The existing line items will be replaced by the template’s line items.'), [
+        { text: tr('Abbrechen', 'Cancel'), style: 'cancel' },
+        { text: tr('Vorlage wählen', 'Choose template'), onPress: () => setTemplatePickerOpen(true) },
       ]);
     } else {
       setTemplatePickerOpen(true);
@@ -332,38 +352,38 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
     <Screen>
       <Stack.Screen
         options={{
-          title: editId ? `${init.number ?? 'Angebot'} bearbeiten` : 'Neues Angebot',
+          title: editId ? tr(`${init.number ?? 'Angebot'} bearbeiten`, `Edit ${init.number ?? 'quotation'}`) : tr('Neues Angebot', 'New quotation'),
           gestureEnabled: !isDirty,
           headerRight: () => (
-            <Button label="Speichern" variant="ghost" size="sm" fullWidth={false} onPress={() => void save()} loading={isSubmitting} testID="editor-save-header" />
+            <Button label={tr('Speichern', 'Save')} variant="ghost" size="sm" fullWidth={false} onPress={() => void save()} loading={isSubmitting} testID="editor-save-header" />
           ),
         }}
       />
-      <StepIndicator steps={STEPS} step={step} onSelect={setStep} errorSteps={errorSteps} />
+      <StepIndicator steps={stepLabels()} step={step} onSelect={setStep} errorSteps={errorSteps} />
       <FormScroll bottomInset={false} contentStyle={styles.content}>
         <InlineError message={formError} testID="editor-error" />
 
         {step === 0 ? (
           <>
-            <SectionHeader title="Kunde" />
+            <SectionHeader title={tr('Kunde', 'Customer')} />
             <Controller
               control={control}
               name="customerId"
               render={({ field: { value } }) =>
                 value ? (
                   <Card style={styles.customerCard} testID="selected-customer">
-                    <Ionicons name="person-circle-outline" size={32} color={colors.brand} />
+                    <Ionicons name="person-circle-outline" size={32} color={colors.brandText} />
                     <View style={styles.flex}>
                       <Text variant="bodyStrong">{customerName}</Text>
                       <Text variant="caption" tone="secondary">
-                        Empfänger des Angebots
+                        {tr('Empfänger des Angebots', 'Recipient of the quotation')}
                       </Text>
                     </View>
-                    <Button label="Ändern" variant="ghost" size="sm" fullWidth={false} onPress={() => setCustomerPickerOpen(true)} />
+                    <Button label={tr('Ändern', 'Change')} variant="ghost" size="sm" fullWidth={false} onPress={() => setCustomerPickerOpen(true)} />
                   </Card>
                 ) : (
                   <View style={styles.gap}>
-                    <Button label="Kunde wählen" icon="people-outline" variant="outline" onPress={() => setCustomerPickerOpen(true)} testID="pick-customer" />
+                    <Button label={tr('Kunde wählen', 'Choose customer')} icon="people-outline" variant="outline" onPress={() => setCustomerPickerOpen(true)} testID="pick-customer" />
                     {errors.customerId ? (
                       <Text variant="caption" tone="danger" accessibilityRole="alert">
                         {errors.customerId.message}
@@ -375,13 +395,13 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
             />
             {!editId ? (
               <>
-                <SectionHeader title="Vorlage (optional)" />
+                <SectionHeader title={tr('Vorlage (optional)', 'Template (optional)')} />
                 <Card style={styles.gap}>
                   <Text variant="caption" tone="secondary">
-                    Starten Sie mit Positionen und Texten aus einer gespeicherten Vorlage.
+                    {tr('Starten Sie mit Positionen und Texten aus einer gespeicherten Vorlage.', 'Start with line items and texts from a saved template.')}
                   </Text>
                   <Button
-                    label={templateId ? 'Andere Vorlage wählen' : 'Vorlage wählen'}
+                    label={templateId ? tr('Andere Vorlage wählen', 'Choose another template') : tr('Vorlage wählen', 'Choose template')}
                     icon="albums-outline"
                     variant="secondary"
                     onPress={openTemplatePicker}
@@ -400,7 +420,16 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
               control={control}
               name="title"
               render={({ field: { onChange, onBlur, value } }) => (
-                <TextField label="Betreff" value={value} onChangeText={onChange} onBlur={onBlur} error={errors.title?.message} required placeholder="z. B. Badsanierung EG" testID="editor-title" />
+                <TextField
+                  label={tr('Betreff', 'Subject')}
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  error={errors.title?.message}
+                  required
+                  placeholder={tr('z. B. Badsanierung EG', 'e.g. Badsanierung EG (printed in German)')}
+                  testID="editor-title"
+                />
               )}
             />
             <View style={styles.row}>
@@ -408,7 +437,7 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
                 <Controller
                   control={control}
                   name="issueDate"
-                  render={({ field: { onChange, value } }) => <DateField label="Angebotsdatum" value={value} onChange={onChange} error={errors.issueDate?.message} required testID="editor-issueDate" />}
+                  render={({ field: { onChange, value } }) => <DateField label={tr('Angebotsdatum', 'Quotation date')} value={value} onChange={onChange} error={errors.issueDate?.message} required testID="editor-issueDate" />}
                 />
               </View>
               <View style={styles.flex}>
@@ -416,7 +445,7 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
                   control={control}
                   name="validUntil"
                   render={({ field: { onChange, value } }) => (
-                    <DateField label="Gültig bis" value={value} onChange={onChange} error={errors.validUntil?.message} minimumDate={issueDate} required testID="editor-validUntil" />
+                    <DateField label={tr('Gültig bis', 'Valid until')} value={value} onChange={onChange} error={errors.validUntil?.message} minimumDate={issueDate} required testID="editor-validUntil" />
                   )}
                 />
               </View>
@@ -424,10 +453,10 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
             <Controller
               control={control}
               name="taxMode"
-              render={({ field: { onChange, value } }) => <SelectField label="Besteuerung" value={value} options={taxModeOptions} onChange={onChange} testID="editor-taxMode" />}
+              render={({ field: { onChange, value } }) => <SelectField label={tr('Besteuerung', 'Tax treatment')} value={value} options={taxModeOptions()} onChange={onChange} testID="editor-taxMode" />}
             />
             <Text variant="small" tone="muted">
-              {TAX_DISCLAIMER}
+              {taxDisclaimer()}
             </Text>
           </Card>
         ) : null}
@@ -453,9 +482,9 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
             })}
             {lineCount === 0 ? (
               <Card style={styles.emptyLines}>
-                <Ionicons name="list-outline" size={28} color={colors.brand} />
+                <Ionicons name="list-outline" size={28} color={colors.brandText} />
                 <Text variant="body" tone="secondary" align="center">
-                  Noch keine Positionen. Fügen Sie Leistungen oder Material hinzu.
+                  {tr('Noch keine Positionen. Fügen Sie Leistungen oder Material hinzu.', 'No line items yet. Add services or materials.')}
                 </Text>
               </Card>
             ) : null}
@@ -464,7 +493,7 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
                 {errors.lineItems?.message ?? errors.lineItems?.root?.message}
               </Text>
             ) : null}
-            <Button label="Position hinzufügen" icon="add-circle-outline" variant="secondary" onPress={() => setEditingIndex(-1)} testID="add-line" />
+            <Button label={tr('Position hinzufügen', 'Add item')} icon="add-circle-outline" variant="secondary" onPress={() => setEditingIndex(-1)} testID="add-line" />
           </>
         ) : null}
 
@@ -472,11 +501,11 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
           <Card style={styles.gap}>
             {(
               [
-                ['introText', 'Einleitung', 'Text vor den Positionen'],
-                ['closingText', 'Schlusstext', 'Text nach den Positionen'],
-                ['paymentTerms', 'Zahlungsbedingungen', 'z. B. 14 Tage netto'],
-                ['terms', 'Bedingungen / Hinweise', undefined],
-                ['internalNotes', 'Interne Notiz', 'Nur intern sichtbar, nicht im PDF'],
+                ['introText', tr('Einleitung', 'Introduction'), tr('Text vor den Positionen', 'Text before the line items')],
+                ['closingText', tr('Schlusstext', 'Closing text'), tr('Text nach den Positionen', 'Text after the line items')],
+                ['paymentTerms', tr('Zahlungsbedingungen', 'Payment terms'), tr('z. B. 14 Tage netto', 'e.g. 14 Tage netto (printed in German)')],
+                ['terms', tr('Bedingungen / Hinweise', 'Terms / notes'), undefined],
+                ['internalNotes', tr('Interne Notiz', 'Internal note'), tr('Nur intern sichtbar, nicht im PDF', 'Internal only, not in the PDF')],
               ] as const
             ).map(([name, label, hint]) => (
               <Controller
@@ -494,20 +523,23 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
 
       <BottomBar>
         <View style={styles.totalsRow}>
-          <View style={styles.flex} accessible accessibilityLabel={`Summe netto ${formatEur(totals.netTotal)}, Umsatzsteuer ${formatEur(totals.taxTotal)}, Gesamt brutto ${formatEur(totals.grossTotal)}`}>
+          <View style={styles.flex} accessible accessibilityLabel={tr(
+              `Summe netto ${formatEur(totals.netTotal)}, Umsatzsteuer ${formatEur(totals.taxTotal)}, Gesamt brutto ${formatEur(totals.grossTotal)}`,
+              `Net total ${formatEur(totals.netTotal)}, VAT ${formatEur(totals.taxTotal)}, total gross ${formatEur(totals.grossTotal)}`,
+            )}>
             <Text variant="small" tone="secondary" testID="totals-net">
-              Netto {formatEur(totals.netTotal)}
-              {taxMode === 'Standard' ? ` · USt. ${formatEur(totals.taxTotal)}` : ''}
+              {tr('Netto', 'Net')} {formatEur(totals.netTotal)}
+              {taxMode === 'Standard' ? ` · ${tr('USt.', 'VAT')} ${formatEur(totals.taxTotal)}` : ''}
             </Text>
             <Text variant="heading" testID="totals-gross">
               {formatEur(totals.grossTotal)}
             </Text>
           </View>
-          {step > 0 ? <IconButton icon="chevron-back" accessibilityLabel="Vorheriger Schritt" onPress={() => setStep(step - 1)} testID="step-back" /> : null}
-          {step < STEPS.length - 1 ? (
-            <Button label="Weiter" icon="chevron-forward" fullWidth={false} onPress={() => setStep(step + 1)} testID="step-next" />
+          {step > 0 ? <IconButton icon="chevron-back" accessibilityLabel={tr('Vorheriger Schritt', 'Previous step')} onPress={() => setStep(step - 1)} testID="step-back" /> : null}
+          {step < STEP_COUNT - 1 ? (
+            <Button label={tr('Weiter', 'Next')} icon="chevron-forward" fullWidth={false} onPress={() => setStep(step + 1)} testID="step-next" />
           ) : (
-            <Button label="Speichern" icon="save-outline" fullWidth={false} onPress={() => void save()} loading={isSubmitting} testID="editor-save" />
+            <Button label={tr('Speichern', 'Save')} icon="save-outline" fullWidth={false} onPress={() => void save()} loading={isSubmitting} testID="editor-save" />
           )}
         </View>
       </BottomBar>
@@ -540,7 +572,7 @@ function QuotationEditor({ init, onReload }: { init: EditorInit; onReload?: () =
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   flex: { flex: 1, minWidth: 0 },
   gap: { gap: space[3] },
   row: { flexDirection: 'row', gap: space[3] },
@@ -548,4 +580,4 @@ const styles = StyleSheet.create({
   customerCard: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   emptyLines: { alignItems: 'center', gap: space[2], borderStyle: 'dashed', borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.xl },
   totalsRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
-});
+}));

@@ -9,16 +9,19 @@ import { Card } from '@/components/Card';
 import { Checkbox, TextField } from '@/components/Field';
 import { FormScroll, Screen } from '@/components/Layout';
 import { LegalLinks } from '@/components/LegalLinks';
+import { LanguageSwitcher } from '@/components/Preferences';
 import { InlineError } from '@/components/States';
 import { Text } from '@/components/Text';
 import { legalUrls } from '@/lib/config';
 import { applyServerErrors, openExternal } from '@/lib/forms';
+import { useLocale } from '@/lib/i18n';
 import { register } from '@/lib/session';
 import { space } from '@/theme';
 
 type FormValues = Omit<RegisterForm, 'acceptTerms'> & { acceptTerms: boolean };
 
 export default function RegisterScreen() {
+  const { tr } = useLocale();
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -40,7 +43,10 @@ export default function RegisterScreen() {
     <Screen>
       <FormScroll>
         <Text variant="body" tone="secondary">
-          Erstellen Sie Ihr Konto. Im nächsten Schritt legen Sie Ihr Unternehmen an.
+          {tr(
+            'Erstellen Sie Ihr Konto. Im nächsten Schritt legen Sie Ihr Unternehmen an.',
+            'Create your account. In the next step you will set up your company.',
+          )}
         </Text>
         <Card style={styles.card}>
           <Controller
@@ -48,7 +54,7 @@ export default function RegisterScreen() {
             name="displayName"
             render={({ field: { onChange, onBlur, value } }) => (
               <TextField
-                label="Ihr Name"
+                label={tr('Ihr Name', 'Your name')}
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
@@ -68,7 +74,7 @@ export default function RegisterScreen() {
             render={({ field: { onChange, onBlur, value } }) => (
               <TextField
                 ref={emailRef}
-                label="E-Mail-Adresse"
+                label={tr('E-Mail-Adresse', 'Email address')}
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
@@ -90,12 +96,12 @@ export default function RegisterScreen() {
             render={({ field: { onChange, onBlur, value } }) => (
               <TextField
                 ref={passwordRef}
-                label="Passwort"
+                label={tr('Passwort', 'Password')}
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
                 error={errors.password?.message}
-                hint="Mindestens 10 Zeichen, mit Buchstaben und Ziffern."
+                hint={tr('Mindestens 10 Zeichen, mit Buchstaben und Ziffern.', 'At least 10 characters, with letters and digits.')}
                 secureToggle
                 autoCapitalize="none"
                 autoComplete="new-password"
@@ -110,30 +116,34 @@ export default function RegisterScreen() {
             name="acceptTerms"
             render={({ field: { onChange, value } }) => (
               <Checkbox
-                label="Ich akzeptiere die AGB und habe die Datenschutzerklärung gelesen."
+                label={tr(
+                  'Ich akzeptiere die AGB und habe die Datenschutzerklärung gelesen.',
+                  'I accept the terms and conditions and have read the privacy policy.',
+                )}
                 checked={value}
                 onChange={onChange}
                 error={errors.acceptTerms?.message}
                 testID="register-terms"
               >
                 <Text variant="body">
-                  Ich akzeptiere die{' '}
+                  {tr('Ich akzeptiere die', 'I accept the')}{' '}
                   <Text variant="body" tone="brand" accessibilityRole="link" onPress={() => void openExternal(legalUrls.terms)}>
-                    AGB
+                    {tr('AGB', 'terms and conditions')}
                   </Text>{' '}
-                  und habe die{' '}
+                  {tr('und habe die', 'and have read the')}{' '}
                   <Text variant="body" tone="brand" accessibilityRole="link" onPress={() => void openExternal(legalUrls.privacy)}>
-                    Datenschutzerklärung
-                  </Text>{' '}
-                  gelesen.
+                    {tr('Datenschutzerklärung', 'privacy policy')}
+                  </Text>
+                  {tr(' gelesen.', '.')}
                 </Text>
               </Checkbox>
             )}
           />
           <InlineError message={formError} />
-          <Button label="Konto erstellen" onPress={() => void onSubmit()} loading={isSubmitting} testID="register-submit" />
+          <Button label={tr('Konto erstellen', 'Create account')} onPress={() => void onSubmit()} loading={isSubmitting} testID="register-submit" />
         </Card>
         <View style={styles.legal}>
+          <LanguageSwitcher />
           <LegalLinks />
         </View>
       </FormScroll>
@@ -143,5 +153,5 @@ export default function RegisterScreen() {
 
 const styles = StyleSheet.create({
   card: { gap: space[4] },
-  legal: { marginTop: space[2] },
+  legal: { marginTop: space[2], gap: space[3] },
 });

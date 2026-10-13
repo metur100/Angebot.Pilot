@@ -2,15 +2,17 @@ import { formatDate } from '@angebotpilot/api-contracts';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { forwardRef, useState, type ReactNode } from 'react';
-import { Platform, Pressable, StyleSheet, Switch, TextInput, View, type TextInputProps } from 'react-native';
+import { Platform, Pressable, Switch, TextInput, View, type TextInputProps } from 'react-native';
 
-import { colors, font, radius, space, touch } from '@/theme';
+import { useLocale } from '@/lib/i18n';
+import { font, makeStyles, radius, space, touch, useTheme } from '@/theme';
 
 import { Button } from './Button';
 import { OptionSheet, Sheet, type SheetOption } from './Sheet';
 import { Text } from './Text';
 
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
+  const styles = useStyles();
   return (
     <Text variant="label" tone="secondary" style={styles.label}>
       {label}
@@ -47,6 +49,9 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
   { label, error, hint, required, secureToggle, right, multiline, secureTextEntry, testID, ...input },
   ref,
 ) {
+  const { colors, scheme } = useTheme();
+  const { tr } = useLocale();
+  const styles = useStyles();
   const [hidden, setHidden] = useState(true);
   const [focused, setFocused] = useState(false);
   const isSecure = secureToggle ? hidden : secureTextEntry;
@@ -63,6 +68,8 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
           multiline={multiline}
           secureTextEntry={isSecure}
           placeholderTextColor={colors.placeholder}
+          keyboardAppearance={scheme}
+          selectionColor={colors.brandText}
           onFocus={(e) => {
             setFocused(true);
             input.onFocus?.(e);
@@ -77,7 +84,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
         {secureToggle ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={hidden ? 'Passwort anzeigen' : 'Passwort verbergen'}
+            accessibilityLabel={hidden ? tr('Passwort anzeigen', 'Show password') : tr('Passwort verbergen', 'Hide password')}
             onPress={() => setHidden((h) => !h)}
             style={styles.adornment}
             testID={testID ? `${testID}-toggle` : undefined}
@@ -93,7 +100,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
 });
 
 export function SelectField<T extends string>({
-  label, value, options, onChange, error, hint, placeholder = 'Bitte wählen', testID, disabled, sheetTitle,
+  label, value, options, onChange, error, hint, placeholder: placeholderProp, testID, disabled, sheetTitle,
 }: {
   label: string;
   value: T | null | undefined;
@@ -106,6 +113,10 @@ export function SelectField<T extends string>({
   disabled?: boolean;
   sheetTitle?: string;
 }) {
+  const { colors } = useTheme();
+  const { tr } = useLocale();
+  const styles = useStyles();
+  const placeholder = placeholderProp ?? tr('Bitte wählen', 'Please choose');
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
   return (
@@ -114,7 +125,7 @@ export function SelectField<T extends string>({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${selected?.label ?? placeholder}`}
-        accessibilityHint="Öffnet die Auswahl"
+        accessibilityHint={tr('Öffnet die Auswahl', 'Opens the options')}
         accessibilityState={{ disabled: !!disabled }}
         disabled={disabled}
         onPress={() => setOpen(true)}
@@ -135,6 +146,8 @@ export function SelectField<T extends string>({
 export function SwitchRow({
   label, description, value, onChange, testID, disabled,
 }: { label: string; description?: string; value: boolean; onChange: (v: boolean) => void; testID?: string; disabled?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="switch"
@@ -158,7 +171,7 @@ export function SwitchRow({
         onValueChange={onChange}
         disabled={disabled}
         trackColor={{ true: colors.brand, false: colors.borderStrong }}
-        thumbColor={colors.surface}
+        thumbColor={colors.onBrand}
         importantForAccessibility="no"
         accessibilityElementsHidden
       />
@@ -169,6 +182,8 @@ export function SwitchRow({
 export function Checkbox({
   label, checked, onChange, error, testID, children,
 }: { label: string; checked: boolean; onChange: (v: boolean) => void; error?: string; testID?: string; children?: ReactNode }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.field}>
       <Pressable
@@ -215,6 +230,9 @@ export function DateField({
   /** Optional dates: shows a clear button when set. */
   onClear?: () => void;
 }) {
+  const { colors, scheme } = useTheme();
+  const { tr, intlTag } = useLocale();
+  const styles = useStyles();
   const [iosOpen, setIosOpen] = useState(false);
   const [draft, setDraft] = useState<Date>(() => (value ? isoToDate(value) : new Date()));
   const open = () => {
@@ -238,18 +256,18 @@ export function DateField({
       <FieldLabel label={label} required={required} />
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${label}: ${value ? formatDate(value) : 'nicht gesetzt'}`}
-        accessibilityHint="Öffnet den Kalender"
+        accessibilityLabel={`${label}: ${value ? formatDate(value) : tr('nicht gesetzt', 'not set')}`}
+        accessibilityHint={tr('Öffnet den Kalender', 'Opens the calendar')}
         onPress={open}
         style={[styles.inputBox, styles.selectBox, error ? styles.inputError : null]}
         testID={testID}
       >
         <Ionicons name="calendar-outline" size={20} color={colors.textSecondary} />
         <Text variant="body" tone={value ? 'default' : 'muted'} style={styles.flex}>
-          {value ? formatDate(value) : 'Datum wählen'}
+          {value ? formatDate(value) : tr('Datum wählen', 'Choose date')}
         </Text>
         {onClear && value ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={`${label} entfernen`} onPress={onClear} style={styles.adornment} hitSlop={4}>
+          <Pressable accessibilityRole="button" accessibilityLabel={tr(`${label} entfernen`, `Clear ${label}`)} onPress={onClear} style={styles.adornment} hitSlop={4}>
             <Ionicons name="close-circle" size={20} color={colors.textMuted} />
           </Pressable>
         ) : null}
@@ -262,7 +280,7 @@ export function DateField({
           title={label}
           footer={
             <Button
-              label="Übernehmen"
+              label={tr('Übernehmen', 'Apply')}
               onPress={() => {
                 onChange(dateToIso(draft));
                 setIosOpen(false);
@@ -274,10 +292,12 @@ export function DateField({
             value={draft}
             mode="date"
             display="inline"
-            locale="de-DE"
+            locale={intlTag}
+            themeVariant={scheme}
+            textColor={colors.text}
             minimumDate={minimumDate ? isoToDate(minimumDate) : undefined}
             onChange={(_e, d) => d && setDraft(d)}
-            accentColor={colors.brand}
+            accentColor={colors.brandText}
           />
         </Sheet>
       ) : null}
@@ -288,6 +308,7 @@ export function DateField({
 export function SegmentedControl<T extends string>({
   options, value, onChange, accessibilityLabel,
 }: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void; accessibilityLabel: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.segmented} accessibilityRole="radiogroup" accessibilityLabel={accessibilityLabel}>
       {options.map((o) => {
@@ -312,7 +333,7 @@ export function SegmentedControl<T extends string>({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   field: { gap: space[1] },
   label: {},
   inputBox: {
@@ -320,7 +341,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg, backgroundColor: colors.surface, paddingHorizontal: space[3],
   },
   multilineBox: { alignItems: 'flex-start', paddingVertical: space[2] },
-  inputFocused: { borderColor: colors.brand, borderWidth: 2, paddingHorizontal: space[3] - 1 },
+  inputFocused: { borderColor: colors.brandText, borderWidth: 2, paddingHorizontal: space[3] - 1 },
   inputError: { borderColor: colors.danger },
   input: { flex: 1, ...font.md, color: colors.text, paddingVertical: space[2], minHeight: 46 },
   multiline: { minHeight: 96 },
@@ -338,4 +359,4 @@ const styles = StyleSheet.create({
   segmented: { flexDirection: 'row', backgroundColor: colors.surfaceMuted, borderRadius: radius.lg, padding: 3, gap: 3 },
   segment: { flex: 1, minHeight: touch, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, paddingHorizontal: space[2] },
   segmentActive: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.brandBorder },
-});
+}));

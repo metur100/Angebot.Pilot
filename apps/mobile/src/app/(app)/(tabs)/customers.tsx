@@ -1,21 +1,25 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, View } from 'react-native';
 
 import { CustomerCard } from '@/components/EntityCards';
 import { Fab } from '@/components/Fab';
-import { FilterChips, Screen, SearchBar } from '@/components/Layout';
+import { FilterChips, Screen, SearchBar, ThemedRefreshControl } from '@/components/Layout';
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/States';
 import { Text } from '@/components/Text';
 import { useDebouncedValue } from '@/lib/hooks';
+import { useLocale } from '@/lib/i18n';
 import { flattenPages, useCustomerList } from '@/lib/queries';
-import { colors, space } from '@/theme';
+import { makeStyles, space, useTheme } from '@/theme';
 
 type StatusFilter = 'active' | 'archived' | 'all';
 type TypeFilter = 'any' | 'Business' | 'Private';
 
 export default function CustomersScreen() {
   const router = useRouter();
+  const { tr } = useLocale();
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [status, setStatus] = useState<StatusFilter>('active');
   const [type, setType] = useState<TypeFilter>('any');
   const [search, setSearch] = useState('');
@@ -28,26 +32,26 @@ export default function CustomersScreen() {
   return (
     <Screen>
       <View style={styles.header}>
-        <SearchBar value={search} onChangeText={setSearch} placeholder="Name, Ort oder E-Mail suchen" testID="customer-search" />
+        <SearchBar value={search} onChangeText={setSearch} placeholder={tr('Name, Ort oder E-Mail suchen', 'Search name, city or email')} testID="customer-search" />
         <FilterChips
           options={[
-            { value: 'active', label: 'Aktiv' },
-            { value: 'archived', label: 'Archiviert' },
-            { value: 'all', label: 'Alle' },
+            { value: 'active', label: tr('Aktiv', 'Active') },
+            { value: 'archived', label: tr('Archiviert', 'Archived') },
+            { value: 'all', label: tr('Alle', 'All') },
           ]}
           value={status}
           onChange={setStatus}
-          accessibilityLabel="Nach Status filtern"
+          accessibilityLabel={tr('Nach Status filtern', 'Filter by status')}
         />
         <FilterChips
           options={[
-            { value: 'any', label: 'Alle Arten' },
-            { value: 'Business', label: 'Geschäftskunden' },
-            { value: 'Private', label: 'Privatkunden' },
+            { value: 'any', label: tr('Alle Arten', 'All types') },
+            { value: 'Business', label: tr('Geschäftskunden', 'Business customers') },
+            { value: 'Private', label: tr('Privatkunden', 'Private customers') },
           ]}
           value={type}
           onChange={setType}
-          accessibilityLabel="Nach Kundenart filtern"
+          accessibilityLabel={tr('Nach Kundenart filtern', 'Filter by customer type')}
         />
       </View>
       {query.isPending ? (
@@ -65,24 +69,29 @@ export default function CustomersScreen() {
           onEndReached={() => {
             if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
           }}
-          refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} colors={[colors.brand]} tintColor={colors.brand} />}
+          refreshControl={<ThemedRefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} />}
           ListHeaderComponent={
             items.length > 0 ? (
               <Text variant="caption" tone="muted" style={styles.count}>
-                {total} {total === 1 ? 'Kunde' : 'Kunden'}
+                {total} {total === 1 ? tr('Kunde', 'customer') : tr('Kunden', 'customers')}
               </Text>
             ) : null
           }
-          ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator style={styles.footer} color={colors.brand} /> : <View style={styles.fabSpace} />}
+          ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator style={styles.footer} color={colors.brandText} /> : <View style={styles.fabSpace} />}
           ListEmptyComponent={
             filtered ? (
-              <EmptyState icon="search-outline" title="Keine Kunden gefunden" message="Passen Sie Suche oder Filter an." testID="customers-empty" />
+              <EmptyState
+                icon="search-outline"
+                title={tr('Keine Kunden gefunden', 'No customers found')}
+                message={tr('Passen Sie Suche oder Filter an.', 'Adjust your search or filters.')}
+                testID="customers-empty"
+              />
             ) : (
               <EmptyState
                 icon="people-outline"
-                title="Noch keine Kunden"
-                message="Legen Sie Ihren ersten Kunden an, um ein Angebot zu erstellen."
-                actionLabel="Kunde anlegen"
+                title={tr('Noch keine Kunden', 'No customers yet')}
+                message={tr('Legen Sie Ihren ersten Kunden an, um ein Angebot zu erstellen.', 'Add your first customer to create a quotation.')}
+                actionLabel={tr('Kunde anlegen', 'Add customer')}
                 onAction={() => router.push('/customer-form')}
                 testID="customers-empty"
               />
@@ -91,15 +100,15 @@ export default function CustomersScreen() {
           testID="customer-list"
         />
       )}
-      <Fab label="Neuer Kunde" icon="person-add-outline" onPress={() => router.push('/customer-form')} testID="fab-new-customer" />
+      <Fab label={tr('Neuer Kunde', 'New customer')} icon="person-add-outline" onPress={() => router.push('/customer-form')} testID="fab-new-customer" />
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   header: { paddingHorizontal: space[4], paddingTop: space[3], gap: space[1], backgroundColor: colors.background },
   list: { padding: space[4], flexGrow: 1 },
   count: { marginBottom: space[2] },
   footer: { marginVertical: space[4] },
   fabSpace: { height: 88 },
-});
+}));

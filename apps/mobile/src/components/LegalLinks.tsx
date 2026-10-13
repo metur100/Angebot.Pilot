@@ -2,24 +2,26 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { legalUrls } from '@/lib/config';
 import { openExternal } from '@/lib/forms';
+import { useLocale } from '@/lib/i18n';
 import { space, touch } from '@/theme';
 
 import { Text } from './Text';
 
-const links = [
-  { label: 'Datenschutz', url: legalUrls.privacy },
-  { label: 'AGB', url: legalUrls.terms },
-  { label: 'Impressum', url: legalUrls.imprint },
-];
-
 export function LegalLinks() {
+  const { tr } = useLocale();
+  // The legal pages themselves are German (German company, German law).
+  const links = [
+    { key: 'privacy', label: tr('Datenschutz', 'Privacy'), url: legalUrls.privacy },
+    { key: 'terms', label: tr('AGB', 'Terms'), url: legalUrls.terms },
+    { key: 'imprint', label: tr('Impressum', 'Legal notice'), url: legalUrls.imprint },
+  ];
   return (
     <View style={styles.row}>
       {links.map((l) => (
         <Pressable
-          key={l.label}
+          key={l.key}
           accessibilityRole="link"
-          accessibilityLabel={`${l.label} (öffnet im Browser)`}
+          accessibilityLabel={tr(`${l.label} (öffnet im Browser)`, `${l.label} (opens in browser)`)}
           onPress={() => void openExternal(l.url)}
           style={styles.link}
         >

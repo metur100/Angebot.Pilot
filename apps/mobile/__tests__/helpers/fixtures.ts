@@ -9,7 +9,7 @@ export const QUOTATION_ID = '9a8b7c6d-5e4f-4a3b-9c2d-333333333333';
 export const TOKEN = 'AbCdEfGhIjKlMnOpQrStUvWxYz012345';
 
 export const me: MeDto = {
-  id: 'u-1', email: 'anna@elektro-muster.de', displayName: 'Anna Muster', emailVerified: true,
+  id: 'u-1', email: 'anna@elektro-muster.de', displayName: 'Anna Muster', emailVerified: true, language: 'de',
   companies: [{ companyId: COMPANY_ID, companyName: 'Muster Elektrotechnik', role: 'Owner', membershipId: 'm-1', isDemo: false }],
 };
 

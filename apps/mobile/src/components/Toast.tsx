@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, Animated, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Animated, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, radius, shadow, space } from '@/theme';
+import { makeStyles, radius, space, useTheme } from '@/theme';
 
 import { Text } from './Text';
 
@@ -37,6 +37,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 }
 
 function ToastView({ toast, onDone }: { toast: ToastState; onDone: () => void }) {
+  const { colors, scheme } = useTheme();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const [opacity] = useState(() => new Animated.Value(0));
   useEffect(() => {
@@ -47,7 +49,8 @@ function ToastView({ toast, onDone }: { toast: ToastState; onDone: () => void })
     return () => clearTimeout(timer);
   }, [opacity, onDone]);
   const icon = toast.tone === 'success' ? 'checkmark-circle' : toast.tone === 'error' ? 'alert-circle' : 'information-circle';
-  const iconColor = toast.tone === 'success' ? colors.palette.success.solid : toast.tone === 'error' ? colors.palette.danger.solid : colors.brandBorder;
+  const iconColor = toast.tone === 'success' ? colors.palette.success.solid : toast.tone === 'error' ? colors.palette.danger.solid
+    : scheme === 'dark' ? colors.brandDark : colors.brandBorder;
   return (
     <View pointerEvents="none" style={[styles.wrap, { bottom: insets.bottom + 72 }]}>
       <Animated.View style={[styles.toast, { opacity }]} accessibilityLiveRegion="polite" testID="toast">
@@ -60,11 +63,11 @@ function ToastView({ toast, onDone }: { toast: ToastState; onDone: () => void })
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, shadow }) => ({
   wrap: { position: 'absolute', left: space[4], right: space[4], alignItems: 'center' },
   toast: {
-    flexDirection: 'row', alignItems: 'center', gap: space[2], backgroundColor: colors.neutral[800],
+    flexDirection: 'row', alignItems: 'center', gap: space[2], backgroundColor: colors.inverseSurface,
     borderRadius: radius.lg, paddingHorizontal: space[4], paddingVertical: space[3], maxWidth: 480, ...shadow.raised,
   },
   text: { flexShrink: 1, fontWeight: '500' },
-});
+}));

@@ -18,12 +18,14 @@ import { Sheet } from '@/components/Sheet';
 import { QuotationStatusBadge } from '@/components/StatusBadge';
 import { EmptyState, ErrorState, InlineError, ListSkeleton } from '@/components/States';
 import { Text } from '@/components/Text';
+import { useLocale } from '@/lib/i18n';
 import { sharePublicPdf } from '@/lib/pdf';
 import { keys } from '@/lib/queries';
 import { api, useSession } from '@/lib/session';
-import { colors, space } from '@/theme';
+import { space, useTheme } from '@/theme';
 
 function AcceptSheet({ visible, onClose, token, q, onDone }: { visible: boolean; onClose: () => void; token: string; q: PublicQuotationDto; onDone: (r: PublicDecisionResponse) => void }) {
+  const { tr } = useLocale();
   const [fullName, setFullName] = useState('');
   const [binding, setBinding] = useState(false);
   const [note, setNote] = useState('');
@@ -32,8 +34,8 @@ function AcceptSheet({ visible, onClose, token, q, onDone }: { visible: boolean;
   const [busy, setBusy] = useState(false);
   const submit = async () => {
     const e: typeof errors = {};
-    if (fullName.trim().length < 2) e.fullName = 'Bitte vollständigen Namen angeben.';
-    if (!binding) e.binding = 'Bitte bestätigen Sie die verbindliche Annahme.';
+    if (fullName.trim().length < 2) e.fullName = tr('Bitte vollständigen Namen angeben.', 'Please enter your full name.');
+    if (!binding) e.binding = tr('Bitte bestätigen Sie die verbindliche Annahme.', 'Please confirm the binding acceptance.');
     setErrors(e);
     if (e.fullName || e.binding) return;
     setBusy(true);
@@ -50,17 +52,20 @@ function AcceptSheet({ visible, onClose, token, q, onDone }: { visible: boolean;
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="Angebot annehmen"
+      title={tr('Angebot annehmen', 'Accept quotation')}
       testID="public-accept-sheet"
-      footer={<Button label="Verbindlich annehmen" icon="checkmark-circle-outline" onPress={() => void submit()} loading={busy} testID="public-accept-submit" />}
+      footer={<Button label={tr('Verbindlich annehmen', 'Accept (binding)')} icon="checkmark-circle-outline" onPress={() => void submit()} loading={busy} testID="public-accept-submit" />}
     >
       <Text variant="body" tone="secondary">
-        Sie nehmen das Angebot {q.number} von {q.companyName} über {formatEur(q.totals.grossTotal)} an.
+        {tr(
+          `Sie nehmen das Angebot ${q.number} von ${q.companyName} über ${formatEur(q.totals.grossTotal)} an.`,
+          `You are accepting quotation ${q.number} from ${q.companyName} for ${formatEur(q.totals.grossTotal)}.`,
+        )}
       </Text>
-      <TextField label="Vor- und Nachname" value={fullName} onChangeText={setFullName} error={errors.fullName} autoComplete="name" required testID="public-fullname" />
-      <TextField label="Nachricht (optional)" value={note} onChangeText={setNote} multiline />
+      <TextField label={tr('Vor- und Nachname', 'First and last name')} value={fullName} onChangeText={setFullName} error={errors.fullName} autoComplete="name" required testID="public-fullname" />
+      <TextField label={tr('Nachricht (optional)', 'Message (optional)')} value={note} onChangeText={setNote} multiline />
       <Checkbox
-        label="Ich nehme dieses Angebot verbindlich an."
+        label={tr('Ich nehme dieses Angebot verbindlich an.', 'I accept this quotation as binding.')}
         checked={binding}
         onChange={setBinding}
         error={errors.binding}
@@ -72,6 +77,7 @@ function AcceptSheet({ visible, onClose, token, q, onDone }: { visible: boolean;
 }
 
 function RejectSheet({ visible, onClose, token, onDone }: { visible: boolean; onClose: () => void; token: string; onDone: (r: PublicDecisionResponse) => void }) {
+  const { tr } = useLocale();
   const [fullName, setFullName] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -91,11 +97,17 @@ function RejectSheet({ visible, onClose, token, onDone }: { visible: boolean; on
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="Angebot ablehnen"
-      footer={<Button label="Ablehnen" variant="danger" icon="close-circle-outline" onPress={() => void submit()} loading={busy} testID="public-reject-submit" />}
+      title={tr('Angebot ablehnen', 'Reject quotation')}
+      footer={<Button label={tr('Ablehnen', 'Reject')} variant="danger" icon="close-circle-outline" onPress={() => void submit()} loading={busy} testID="public-reject-submit" />}
     >
-      <TextField label="Ihr Name (optional)" value={fullName} onChangeText={setFullName} autoComplete="name" />
-      <TextField label="Grund (optional)" value={reason} onChangeText={setReason} multiline hint="Hilft dem Anbieter, sein Angebot zu verbessern." />
+      <TextField label={tr('Ihr Name (optional)', 'Your name (optional)')} value={fullName} onChangeText={setFullName} autoComplete="name" />
+      <TextField
+        label={tr('Grund (optional)', 'Reason (optional)')}
+        value={reason}
+        onChangeText={setReason}
+        multiline
+        hint={tr('Hilft dem Anbieter, sein Angebot zu verbessern.', 'Helps the supplier improve their offer.')}
+      />
       <InlineError message={error} />
     </Sheet>
   );
@@ -104,6 +116,8 @@ function RejectSheet({ visible, onClose, token, onDone }: { visible: boolean; on
 export default function PublicQuotationScreen() {
   const { token } = useLocalSearchParams<{ token: string }>();
   const router = useRouter();
+  const { tr } = useLocale();
+  const { colors } = useTheme();
   const session = useSession();
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: keys.publicQuotation(token), queryFn: () => api.publicQuotation.get(token), retry: false });
@@ -123,7 +137,7 @@ export default function PublicQuotationScreen() {
     void queryClient.invalidateQueries({ queryKey: keys.publicQuotation(token) });
   };
 
-  const header = <Stack.Screen options={{ title: query.data ? `Angebot ${query.data.number}` : 'Angebot', headerBackVisible: true }} />;
+  const header = <Stack.Screen options={{ title: query.data ? `${tr('Angebot', 'Quotation')} ${query.data.number}` : tr('Angebot', 'Quotation'), headerBackVisible: true }} />;
 
   if (query.isPending) return <Screen>{header}<ListSkeleton rows={3} /></Screen>;
   if (query.isError) {
@@ -134,9 +148,12 @@ export default function PublicQuotationScreen() {
         {notFound ? (
           <EmptyState
             icon="link-outline"
-            title="Link ungültig oder abgelaufen"
-            message="Dieser Angebotslink ist nicht mehr gültig. Bitte wenden Sie sich an den Anbieter für einen neuen Link."
-            actionLabel={session.status === 'signedIn' ? 'Zur App' : 'Schließen'}
+            title={tr('Link ungültig oder abgelaufen', 'Link invalid or expired')}
+            message={tr(
+              'Dieser Angebotslink ist nicht mehr gültig. Bitte wenden Sie sich an den Anbieter für einen neuen Link.',
+              'This quotation link is no longer valid. Please contact the supplier for a new link.',
+            )}
+            actionLabel={session.status === 'signedIn' ? tr('Zur App', 'Go to app') : tr('Schließen', 'Close')}
             onAction={close}
           />
         ) : (
@@ -157,14 +174,20 @@ export default function PublicQuotationScreen() {
           <Card style={styles.confirm} testID="public-confirmation">
             <Ionicons name={accepted ? 'checkmark-circle' : 'close-circle'} size={56} color={accepted ? colors.palette.success.solid : colors.palette.danger.solid} />
             <Text variant="title" align="center" accessibilityRole="header">
-              {accepted ? 'Vielen Dank!' : 'Ablehnung übermittelt'}
+              {accepted ? tr('Vielen Dank!', 'Thank you!') : tr('Ablehnung übermittelt', 'Rejection sent')}
             </Text>
             <Text variant="body" tone="secondary" align="center">
               {accepted
-                ? `Sie haben das Angebot ${decision.number} am ${formatDateTime(decision.decidedAt)} angenommen. ${decision.companyName} wurde informiert.`
-                : `Sie haben das Angebot ${decision.number} abgelehnt. ${decision.companyName} wurde informiert.`}
+                ? tr(
+                  `Sie haben das Angebot ${decision.number} am ${formatDateTime(decision.decidedAt)} angenommen. ${decision.companyName} wurde informiert.`,
+                  `You accepted quotation ${decision.number} on ${formatDateTime(decision.decidedAt)}. ${decision.companyName} has been notified.`,
+                )
+                : tr(
+                  `Sie haben das Angebot ${decision.number} abgelehnt. ${decision.companyName} wurde informiert.`,
+                  `You rejected quotation ${decision.number}. ${decision.companyName} has been notified.`,
+                )}
             </Text>
-            <Button label="Fertig" onPress={() => setDecision(null)} variant="outline" />
+            <Button label={tr('Fertig', 'Done')} onPress={() => setDecision(null)} variant="outline" />
           </Card>
         </FormScroll>
       </Screen>
@@ -188,32 +211,37 @@ export default function PublicQuotationScreen() {
           <Text variant="title" accessibilityRole="header">
             {q.title}
           </Text>
-          <Text variant="body">für {q.recipientName}</Text>
+          <Text variant="body">{tr(`für ${q.recipientName}`, `for ${q.recipientName}`)}</Text>
           <Text variant="heading">{formatEur(q.totals.grossTotal)}</Text>
           <Text variant="caption" tone="secondary">
-            vom {formatDate(q.issueDate)} · gültig bis {formatDate(q.validUntil)}
+            {tr(
+              `vom ${formatDate(q.issueDate)} · gültig bis ${formatDate(q.validUntil)}`,
+              `dated ${formatDate(q.issueDate)} · valid until ${formatDate(q.validUntil)}`,
+            )}
           </Text>
           {q.decidedAt ? (
             <Text variant="caption" tone={q.status === 'Accepted' ? 'success' : 'danger'}>
-              {q.status === 'Accepted' ? 'Angenommen' : 'Abgelehnt'} am {formatDateTime(q.decidedAt)}
-              {q.decisionName ? ` von ${q.decisionName}` : ''}
+              {q.status === 'Accepted'
+                ? tr(`Angenommen am ${formatDateTime(q.decidedAt)}`, `Accepted on ${formatDateTime(q.decidedAt)}`)
+                : tr(`Abgelehnt am ${formatDateTime(q.decidedAt)}`, `Rejected on ${formatDateTime(q.decidedAt)}`)}
+              {q.decisionName ? tr(` von ${q.decisionName}`, ` by ${q.decisionName}`) : ''}
             </Text>
           ) : null}
           {q.isPastValidity && q.status === 'Sent' ? (
             <Text variant="caption" tone="warning">
-              Die Gültigkeit ist abgelaufen. Bitte wenden Sie sich an {q.companyName}.
+              {tr(`Die Gültigkeit ist abgelaufen. Bitte wenden Sie sich an ${q.companyName}.`, `The quotation has expired. Please contact ${q.companyName}.`)}
             </Text>
           ) : null}
         </Card>
 
         {q.canDecide ? (
           <View style={styles.gap}>
-            <Button label="Angebot annehmen" icon="checkmark-circle-outline" onPress={() => setSheet('accept')} testID="public-accept" />
-            <Button label="Ablehnen" icon="close-circle-outline" variant="dangerOutline" onPress={() => setSheet('reject')} testID="public-reject" />
+            <Button label={tr('Angebot annehmen', 'Accept quotation')} icon="checkmark-circle-outline" onPress={() => setSheet('accept')} testID="public-accept" />
+            <Button label={tr('Ablehnen', 'Reject')} icon="close-circle-outline" variant="dangerOutline" onPress={() => setSheet('reject')} testID="public-reject" />
           </View>
         ) : null}
         <Button
-          label="PDF öffnen / teilen"
+          label={tr('PDF öffnen / teilen', 'Open / share PDF')}
           icon="document-attach-outline"
           variant="secondary"
           loading={pdfBusy}
@@ -222,7 +250,7 @@ export default function PublicQuotationScreen() {
             try {
               await sharePublicPdf(token, q.number);
             } catch (e) {
-              Alert.alert('PDF', e instanceof Error ? e.message : 'Fehler');
+              Alert.alert('PDF', e instanceof Error ? e.message : tr('Fehler', 'Error'));
             } finally {
               setPdfBusy(false);
             }
@@ -231,12 +259,12 @@ export default function PublicQuotationScreen() {
 
         {q.introText ? <Text variant="body">{q.introText}</Text> : null}
 
-        <SectionHeader title="Positionen" />
+        <SectionHeader title={tr('Positionen', 'Line items')} />
         {q.lineItems.map((li) => (
           <Card key={li.position} style={styles.gapSm}>
             <View style={styles.rowBetween}>
               <Text variant="small" tone="muted">
-                Pos. {li.position}
+                {tr('Pos.', 'Item')} {li.position}
               </Text>
               <Text variant="bodyStrong">{formatEur(li.lineNet)}</Text>
             </View>
@@ -249,25 +277,25 @@ export default function PublicQuotationScreen() {
           </Card>
         ))}
 
-        <SectionHeader title="Summe" />
+        <SectionHeader title={tr('Summe', 'Total')} />
         <Card>
-          <KeyValue label="Netto" value={formatEur(q.totals.netTotal)} />
+          <KeyValue label={tr('Netto', 'Net')} value={formatEur(q.totals.netTotal)} />
           {q.taxMode === 'Standard'
-            ? q.totals.taxGroups.map((g) => <KeyValue key={g.ratePercent} label={`USt. ${formatPercent(g.ratePercent)}`} value={formatEur(g.taxAmount)} />)
+            ? q.totals.taxGroups.map((g) => <KeyValue key={g.ratePercent} label={`${tr('USt.', 'VAT')} ${formatPercent(g.ratePercent)}`} value={formatEur(g.taxAmount)} />)
             : null}
           <Divider spaced />
-          <KeyValue label="Gesamt brutto" value={formatEur(q.totals.grossTotal)} strong />
+          <KeyValue label={tr('Gesamt brutto', 'Total gross')} value={formatEur(q.totals.grossTotal)} strong />
         </Card>
 
         {q.closingText ? <Text variant="body">{q.closingText}</Text> : null}
-        {q.paymentTerms ? <KeyValue label="Zahlungsbedingungen" value={q.paymentTerms} /> : null}
-        {q.terms ? <KeyValue label="Bedingungen" value={q.terms} /> : null}
+        {q.paymentTerms ? <KeyValue label={tr('Zahlungsbedingungen', 'Payment terms')} value={q.paymentTerms} /> : null}
+        {q.terms ? <KeyValue label={tr('Bedingungen', 'Terms')} value={q.terms} /> : null}
 
-        <SectionHeader title="Anbieter" />
+        <SectionHeader title={tr('Anbieter', 'Supplier')} />
         <Card>
-          <KeyValue label="Firma" value={[q.companyName, q.companyAddress].filter(Boolean).join('\n')} />
-          {q.companyEmail ? <KeyValue label="E-Mail" value={q.companyEmail} /> : null}
-          {q.companyPhone ? <KeyValue label="Telefon" value={q.companyPhone} /> : null}
+          <KeyValue label={tr('Firma', 'Company')} value={[q.companyName, q.companyAddress].filter(Boolean).join('\n')} />
+          {q.companyEmail ? <KeyValue label={tr('E-Mail', 'Email')} value={q.companyEmail} /> : null}
+          {q.companyPhone ? <KeyValue label={tr('Telefon', 'Phone')} value={q.companyPhone} /> : null}
         </Card>
       </FormScroll>
       <AcceptSheet visible={sheet === 'accept'} onClose={() => setSheet(null)} token={token} q={q} onDone={onDecided} />

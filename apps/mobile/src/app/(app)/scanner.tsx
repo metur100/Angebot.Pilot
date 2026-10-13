@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,11 +13,15 @@ import { TextField } from '@/components/Field';
 import { FormScroll } from '@/components/Layout';
 import { Text } from '@/components/Text';
 import { resolveScan } from '@/features/scanner/resolveScan';
+import { useLocale } from '@/lib/i18n';
 import { api, useCompanyId } from '@/lib/session';
-import { colors, radius, space } from '@/theme';
+import { makeStyles, radius, space, useTheme } from '@/theme';
 
 export default function ScannerScreen() {
   const router = useRouter();
+  const { tr } = useLocale();
+  const { colors } = useTheme();
+  const styles = useStyles();
   const companyId = useCompanyId();
   const [permission, requestPermission] = useCameraPermissions();
   const [message, setMessage] = useState<string | null>(null);
@@ -32,7 +37,7 @@ export default function ScannerScreen() {
     try {
       const result = await resolveScan(api, companyId, data);
       if (result.kind === 'invalid') {
-        setMessage('Dieser QR-Code gehört zu keinem AngebotPilot-Angebot.');
+        setMessage(tr('Dieser QR-Code gehört zu keinem AngebotPilot-Angebot.', 'This QR code does not belong to an AngebotPilot quotation.'));
         setTimeout(() => {
           handling.current = false;
         }, 1500);
@@ -51,9 +56,9 @@ export default function ScannerScreen() {
 
   const header = (
     <View style={styles.header}>
-      <IconButton icon="close" accessibilityLabel="Scanner schließen" color={permission?.granted ? colors.onBrand : colors.text} onPress={() => router.back()} testID="scanner-close" />
+      <IconButton icon="close" accessibilityLabel={tr('Scanner schließen', 'Close scanner')} color={permission?.granted ? colors.onBrand : colors.text} onPress={() => router.back()} testID="scanner-close" />
       <Text variant="heading" tone={permission?.granted ? 'inverse' : 'default'}>
-        QR-Code scannen
+        {tr('QR-Code scannen', 'Scan QR code')}
       </Text>
     </View>
   );
@@ -61,7 +66,7 @@ export default function ScannerScreen() {
   const manualEntry = (
     <View style={styles.manual}>
       <TextField
-        label="Oder Link manuell eingeben"
+        label={tr('Oder Link manuell eingeben', 'Or enter the link manually')}
         value={manual}
         onChangeText={setManual}
         autoCapitalize="none"
@@ -70,14 +75,14 @@ export default function ScannerScreen() {
         placeholder="https://…/q/…"
         testID="scanner-manual"
       />
-      <Button label="Öffnen" variant="outline" onPress={() => void handle(manual)} disabled={!manual.trim()} loading={busy} />
+      <Button label={tr('Öffnen', 'Open')} variant="outline" onPress={() => void handle(manual)} disabled={!manual.trim()} loading={busy} />
     </View>
   );
 
   if (!permission) {
     return (
       <SafeAreaView style={styles.light}>
-        <ActivityIndicator color={colors.brand} style={{ marginTop: space[10] }} />
+        <ActivityIndicator color={colors.brandText} style={{ marginTop: space[10] }} />
       </SafeAreaView>
     );
   }
@@ -88,17 +93,20 @@ export default function ScannerScreen() {
         {header}
         <FormScroll>
           <View style={styles.permission}>
-            <Ionicons name="camera-outline" size={40} color={colors.brand} />
+            <Ionicons name="camera-outline" size={40} color={colors.brandText} />
             <Text variant="heading" align="center">
-              Kamerazugriff für den QR-Scanner
+              {tr('Kamerazugriff für den QR-Scanner', 'Camera access for the QR scanner')}
             </Text>
             <Text variant="body" tone="secondary" align="center">
-              Die Kamera wird nur zum Scannen von Angebots-QR-Codes verwendet. Es werden keine Fotos gespeichert.
+              {tr(
+                'Die Kamera wird nur zum Scannen von Angebots-QR-Codes verwendet. Es werden keine Fotos gespeichert.',
+                'The camera is only used to scan quotation QR codes. No photos are stored.',
+              )}
             </Text>
             {permission.canAskAgain ? (
-              <Button label="Kamera erlauben" icon="camera-outline" onPress={() => void requestPermission()} testID="scanner-allow" />
+              <Button label={tr('Kamera erlauben', 'Allow camera')} icon="camera-outline" onPress={() => void requestPermission()} testID="scanner-allow" />
             ) : (
-              <Button label="Einstellungen öffnen" icon="settings-outline" onPress={() => void Linking.openSettings()} />
+              <Button label={tr('Einstellungen öffnen', 'Open settings')} icon="settings-outline" onPress={() => void Linking.openSettings()} />
             )}
           </View>
           {message ? <Text variant="caption" tone="danger" accessibilityRole="alert">{message}</Text> : null}
@@ -110,16 +118,17 @@ export default function ScannerScreen() {
 
   return (
     <View style={styles.dark}>
+      <StatusBar style="light" />
       <CameraView style={StyleSheet.absoluteFill} facing="back" barcodeScannerSettings={{ barcodeTypes: ['qr'] }} onBarcodeScanned={busy ? undefined : onScanned} />
       <SafeAreaView style={styles.overlay} edges={['top', 'bottom']}>
         {header}
         <View style={styles.frameWrap} pointerEvents="none">
-          <View style={styles.frame} accessibilityLabel="Scanbereich" />
+          <View style={styles.frame} accessibilityLabel={tr('Scanbereich', 'Scan area')} />
         </View>
         <View style={styles.bottom}>
           {busy ? <ActivityIndicator color={colors.onBrand} /> : null}
           <Text variant="body" tone="inverse" align="center" accessibilityLiveRegion="polite">
-            {message ?? 'Richten Sie die Kamera auf den QR-Code im Angebots-PDF.'}
+            {message ?? tr('Richten Sie die Kamera auf den QR-Code im Angebots-PDF.', 'Point the camera at the QR code in the quotation PDF.')}
           </Text>
         </View>
       </SafeAreaView>
@@ -127,14 +136,14 @@ export default function ScannerScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   light: { flex: 1, backgroundColor: colors.background },
-  dark: { flex: 1, backgroundColor: '#000' },
+  dark: { flex: 1, backgroundColor: colors.camera },
   overlay: { flex: 1, justifyContent: 'space-between' },
   header: { flexDirection: 'row', alignItems: 'center', gap: space[2], paddingHorizontal: space[2], minHeight: 56 },
   frameWrap: { alignItems: 'center', justifyContent: 'center' },
   frame: { width: 240, height: 240, borderRadius: radius.xl, borderWidth: 3, borderColor: colors.onBrand },
-  bottom: { padding: space[6], gap: space[2], backgroundColor: 'rgba(0,0,0,0.45)' },
+  bottom: { padding: space[6], gap: space[2], backgroundColor: colors.cameraScrim },
   permission: { alignItems: 'center', gap: space[3], paddingVertical: space[6] },
   manual: { gap: space[2], marginTop: space[4] },
-});
+}));

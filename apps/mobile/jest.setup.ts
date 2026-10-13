@@ -2,6 +2,9 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 
 
+// Deterministic device language: German (tests switch to English explicitly).
+jest.mock('@/lib/deviceLocale', () => ({ deviceLocaleTags: jest.fn(() => ['de-DE']) }));
+
 jest.mock('react-native-keyboard-controller', () => require('react-native-keyboard-controller/jest'));
 
 jest.mock('expo-constants', () => ({

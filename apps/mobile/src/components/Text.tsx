@@ -1,6 +1,6 @@
 import { StyleSheet, Text as RNText, type TextProps, type TextStyle } from 'react-native';
 
-import { colors, font } from '@/theme';
+import { font, useTheme, type ThemeColors } from '@/theme';
 
 type Variant = 'display' | 'title' | 'heading' | 'subheading' | 'body' | 'bodyStrong' | 'caption' | 'label' | 'small';
 type Tone = 'default' | 'secondary' | 'muted' | 'brand' | 'danger' | 'success' | 'warning' | 'inverse';
@@ -11,19 +11,20 @@ export interface AppTextProps extends TextProps {
   align?: TextStyle['textAlign'];
 }
 
-const toneColor: Record<Tone, string> = {
+const toneColor = (colors: ThemeColors): Record<Tone, string> => ({
   default: colors.text,
   secondary: colors.textSecondary,
   muted: colors.textMuted,
-  brand: colors.brand,
+  brand: colors.brandText,
   danger: colors.danger,
   success: colors.success,
   warning: colors.warning,
   inverse: colors.onBrand,
-};
+});
 
 export function Text({ variant = 'body', tone = 'default', align, style, ...rest }: AppTextProps) {
-  return <RNText {...rest} style={[styles[variant], { color: toneColor[tone] }, align ? { textAlign: align } : null, style]} />;
+  const { colors } = useTheme();
+  return <RNText {...rest} style={[styles[variant], { color: toneColor(colors)[tone] }, align ? { textAlign: align } : null, style]} />;
 }
 
 const styles = StyleSheet.create({

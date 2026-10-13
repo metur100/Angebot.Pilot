@@ -5,7 +5,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, View } from 'react-native';
 
-import { radius, space, toneColors } from '@/theme';
+import { radius, space, useTheme } from '@/theme';
 
 import type { IconName } from './Button';
 import { Text } from './Text';
@@ -37,6 +37,7 @@ const emailIcon: Record<EmailStatus, IconName> = {
 
 /** Status badge: always icon + text + colour (never colour alone). */
 export function Badge({ label, tone, icon, testID }: { label: string; tone: Tone; icon?: IconName; testID?: string }) {
+  const { toneColors } = useTheme();
   const c = toneColors[tone];
   return (
     <View

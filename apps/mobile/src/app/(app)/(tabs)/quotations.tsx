@@ -1,35 +1,38 @@
-import type { QuotationStatus } from '@angebotpilot/api-contracts';
+import { quotationStatusLabel, tr, type QuotationStatus } from '@angebotpilot/api-contracts';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, View } from 'react-native';
 
 import { QuotationCard } from '@/components/EntityCards';
 import { Fab } from '@/components/Fab';
-import { FilterChips, Screen, SearchBar } from '@/components/Layout';
+import { FilterChips, Screen, SearchBar, ThemedRefreshControl } from '@/components/Layout';
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/States';
 import { Text } from '@/components/Text';
 import { useDebouncedValue } from '@/lib/hooks';
+import { useLocale } from '@/lib/i18n';
 import { flattenPages, useQuotationList } from '@/lib/queries';
-import { colors, space } from '@/theme';
+import { makeStyles, space, useTheme } from '@/theme';
 
 type Filter = 'all' | QuotationStatus;
 
-const FILTERS: { value: Filter; label: string }[] = [
-  { value: 'all', label: 'Alle' },
-  { value: 'Draft', label: 'Entwürfe' },
-  { value: 'Sent', label: 'Versendet' },
-  { value: 'Accepted', label: 'Angenommen' },
-  { value: 'Rejected', label: 'Abgelehnt' },
-  { value: 'Expired', label: 'Abgelaufen' },
-  { value: 'Cancelled', label: 'Storniert' },
-];
+const FILTER_VALUES: Filter[] = ['all', 'Draft', 'Sent', 'Accepted', 'Rejected', 'Expired', 'Cancelled'];
+
+function filterOptions(): { value: Filter; label: string }[] {
+  return FILTER_VALUES.map((value) => ({
+    value,
+    label: value === 'all' ? tr('Alle', 'All') : value === 'Draft' ? tr('Entwürfe', 'Drafts') : quotationStatusLabel[value],
+  }));
+}
 
 function toFilter(value: string | undefined): Filter | null {
-  return value && FILTERS.some((f) => f.value === value) ? (value as Filter) : null;
+  return value && FILTER_VALUES.includes(value as Filter) ? (value as Filter) : null;
 }
 
 export default function QuotationsScreen() {
   const router = useRouter();
+  const { tr } = useLocale();
+  const { colors } = useTheme();
+  const styles = useStyles();
   const params = useLocalSearchParams<{ status?: string }>();
   const [filter, setFilter] = useState<Filter>(() => toFilter(params.status) ?? 'all');
   const [search, setSearch] = useState('');
@@ -51,8 +54,8 @@ export default function QuotationsScreen() {
   return (
     <Screen>
       <View style={styles.header}>
-        <SearchBar value={search} onChangeText={setSearch} placeholder="Nummer, Betreff oder Kunde suchen" testID="quotation-search" />
-        <FilterChips options={FILTERS} value={filter} onChange={setFilter} accessibilityLabel="Nach Status filtern" />
+        <SearchBar value={search} onChangeText={setSearch} placeholder={tr('Nummer, Betreff oder Kunde suchen', 'Search number, subject or customer')} testID="quotation-search" />
+        <FilterChips options={filterOptions()} value={filter} onChange={setFilter} accessibilityLabel={tr('Nach Status filtern', 'Filter by status')} />
       </View>
       {query.isPending ? (
         <ListSkeleton />
@@ -69,24 +72,32 @@ export default function QuotationsScreen() {
           onEndReached={() => {
             if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
           }}
-          refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} colors={[colors.brand]} tintColor={colors.brand} />}
+          refreshControl={<ThemedRefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} />}
           ListHeaderComponent={
             items.length > 0 ? (
               <Text variant="caption" tone="muted" style={styles.count}>
-                {total} {total === 1 ? 'Angebot' : 'Angebote'}
+                {total} {total === 1 ? tr('Angebot', 'quotation') : tr('Angebote', 'quotations')}
               </Text>
             ) : null
           }
-          ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator style={styles.footer} color={colors.brand} /> : <View style={styles.fabSpace} />}
+          ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator style={styles.footer} color={colors.brandText} /> : <View style={styles.fabSpace} />}
           ListEmptyComponent={
             filtered ? (
-              <EmptyState icon="search-outline" title="Keine Treffer" message="Passen Sie Suche oder Filter an." testID="quotations-empty" />
+              <EmptyState
+                icon="search-outline"
+                title={tr('Keine Treffer', 'No results')}
+                message={tr('Passen Sie Suche oder Filter an.', 'Adjust your search or filters.')}
+                testID="quotations-empty"
+              />
             ) : (
               <EmptyState
                 icon="document-text-outline"
-                title="Noch keine Angebote"
-                message="Erstellen Sie Ihr erstes Angebot – Positionen erfassen, Summen werden automatisch berechnet."
-                actionLabel="Angebot erstellen"
+                title={tr('Noch keine Angebote', 'No quotations yet')}
+                message={tr(
+                  'Erstellen Sie Ihr erstes Angebot – Positionen erfassen, Summen werden automatisch berechnet.',
+                  'Create your first quotation – enter line items, totals are calculated automatically.',
+                )}
+                actionLabel={tr('Angebot erstellen', 'Create quotation')}
                 onAction={() => router.push('/quotation-editor')}
                 testID="quotations-empty"
               />
@@ -95,15 +106,15 @@ export default function QuotationsScreen() {
           testID="quotation-list"
         />
       )}
-      <Fab label="Neues Angebot" icon="add" onPress={() => router.push('/quotation-editor')} testID="fab-new-quotation" />
+      <Fab label={tr('Neues Angebot', 'New quotation')} icon="add" onPress={() => router.push('/quotation-editor')} testID="fab-new-quotation" />
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   header: { paddingHorizontal: space[4], paddingTop: space[3], gap: space[2], backgroundColor: colors.background },
   list: { padding: space[4], flexGrow: 1 },
   count: { marginBottom: space[2] },
   footer: { marginVertical: space[4] },
   fabSpace: { height: 88 },
-});
+}));

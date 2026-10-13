@@ -3,15 +3,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/Button';
-import { Screen } from '@/components/Layout';
+import { Screen, ThemedRefreshControl } from '@/components/Layout';
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/States';
 import { Text } from '@/components/Text';
+import { useLocale } from '@/lib/i18n';
 import { flattenPages, keys, useNotifications } from '@/lib/queries';
 import { api, useCompanyId } from '@/lib/session';
-import { colors, radius, space } from '@/theme';
+import { makeStyles, radius, space, useTheme } from '@/theme';
 
 function targetFor(n: NotificationDto): string | null {
   if (!n.entityId) return null;
@@ -25,6 +26,9 @@ function targetFor(n: NotificationDto): string | null {
 export default function NotificationsScreen() {
   const companyId = useCompanyId();
   const router = useRouter();
+  const { tr } = useLocale();
+  const { colors } = useTheme();
+  const styles = useStyles();
   const queryClient = useQueryClient();
   const query = useNotifications();
   const [markingAll, setMarkingAll] = useState(false);
@@ -39,7 +43,7 @@ export default function NotificationsScreen() {
         await api.notifications.markRead(companyId, n.id);
         invalidate();
       } catch (e) {
-        Alert.alert('Fehler', errorMessage(e));
+        Alert.alert(tr('Fehler', 'Error'), errorMessage(e));
       }
     }
     const target = targetFor(n);
@@ -52,7 +56,7 @@ export default function NotificationsScreen() {
       await api.notifications.markAllRead(companyId);
       invalidate();
     } catch (e) {
-      Alert.alert('Fehler', errorMessage(e));
+      Alert.alert(tr('Fehler', 'Error'), errorMessage(e));
     } finally {
       setMarkingAll(false);
     }
@@ -64,7 +68,7 @@ export default function NotificationsScreen() {
         options={{
           headerRight: () =>
             unread > 0 ? (
-              <Button label="Alle gelesen" variant="ghost" size="sm" fullWidth={false} onPress={() => void markAll()} loading={markingAll} testID="mark-all-read" />
+              <Button label={tr('Alle gelesen', 'Mark all read')} variant="ghost" size="sm" fullWidth={false} onPress={() => void markAll()} loading={markingAll} testID="mark-all-read" />
             ) : null,
         }}
       />
@@ -81,36 +85,42 @@ export default function NotificationsScreen() {
           onEndReached={() => {
             if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
           }}
-          refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => void query.refetch()} colors={[colors.brand]} tintColor={colors.brand} />}
-          ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator color={colors.brand} style={{ margin: space[4] }} /> : null}
+          refreshControl={<ThemedRefreshControl refreshing={query.isRefetching} onRefresh={() => void query.refetch()} />}
+          ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator color={colors.brandText} style={{ margin: space[4] }} /> : null}
           renderItem={({ item }) => (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`${item.isRead ? '' : 'Ungelesen: '}${item.title}${item.body ? `. ${item.body}` : ''}`}
-              accessibilityHint={item.isRead ? undefined : 'Markiert als gelesen'}
+              accessibilityLabel={`${item.isRead ? '' : tr('Ungelesen: ', 'Unread: ')}${item.title}${item.body ? `. ${item.body}` : ''}`}
+              accessibilityHint={item.isRead ? undefined : tr('Markiert als gelesen', 'Marks as read')}
               onPress={() => void open(item)}
               style={({ pressed }) => [styles.item, !item.isRead ? styles.unread : null, pressed ? styles.pressed : null]}
               testID={`notification-${item.id}`}
             >
-              <Ionicons name={item.isRead ? 'notifications-outline' : 'notifications'} size={22} color={item.isRead ? colors.textMuted : colors.brand} />
+              <Ionicons name={item.isRead ? 'notifications-outline' : 'notifications'} size={22} color={item.isRead ? colors.textMuted : colors.brandText} />
               <View style={styles.flex}>
                 <Text variant={item.isRead ? 'body' : 'bodyStrong'}>{item.title}</Text>
                 {item.body ? <Text variant="caption" tone="secondary">{item.body}</Text> : null}
                 <Text variant="small" tone="muted">
                   {formatDateTime(item.createdAt)}
-                  {item.isRead ? '' : ' · ungelesen'}
+                  {item.isRead ? '' : tr(' · ungelesen', ' · unread')}
                 </Text>
               </View>
             </Pressable>
           )}
-          ListEmptyComponent={<EmptyState icon="notifications-off-outline" title="Keine Benachrichtigungen" message="Hier erscheinen z. B. Annahmen und Ablehnungen Ihrer Kunden." />}
+          ListEmptyComponent={
+            <EmptyState
+              icon="notifications-off-outline"
+              title={tr('Keine Benachrichtigungen', 'No notifications')}
+              message={tr('Hier erscheinen z. B. Annahmen und Ablehnungen Ihrer Kunden.', 'Your customers’ acceptances and rejections, for example, appear here.')}
+            />
+          }
         />
       )}
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   list: { padding: space[4], flexGrow: 1 },
   flex: { flex: 1 },
   item: {
@@ -119,4 +129,4 @@ const styles = StyleSheet.create({
   },
   unread: { borderColor: colors.brandBorder, backgroundColor: colors.brandSoft },
   pressed: { opacity: 0.85 },
-});
+}));

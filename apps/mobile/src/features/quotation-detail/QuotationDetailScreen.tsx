@@ -1,12 +1,12 @@
 import {
   errorMessage, followUpKindLabel, followUpStatusLabel, formatDate, formatDateTime, formatEur, formatPercent,
-  formatQuantity, emailKindLabel, quotationEventLabel, taxModeLabel,
+  formatQuantity, emailKindLabel, quotationEventLabel, taxModeLabel, tr,
   type QuotationDto,
 } from '@angebotpilot/api-contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, Share, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, Share, View } from 'react-native';
 
 import { Button, IconButton } from '@/components/Button';
 import { Card, Divider, KeyValue, SectionHeader } from '@/components/Card';
@@ -17,10 +17,11 @@ import { EmailStatusBadge, QuotationStatusBadge } from '@/components/StatusBadge
 import { ErrorState, ListSkeleton } from '@/components/States';
 import { Text } from '@/components/Text';
 import { useToast } from '@/components/Toast';
+import { useLocale } from '@/lib/i18n';
 import { shareQuotationPdf } from '@/lib/pdf';
 import { invalidateInvoiceData, keys, useQuotation, useQuotationDeliveries, useQuotationEvents, useQuotationFollowUps } from '@/lib/queries';
 import { api, useCompanyId } from '@/lib/session';
-import { colors, space, touch } from '@/theme';
+import { makeStyles, space, touch } from '@/theme';
 
 import { CancelSheet, ConvertSheet, DecisionSheet, SendSheet } from './ActionSheets';
 import { availableActions, type QuotationAction } from './actions';
@@ -28,30 +29,34 @@ import { availableActions, type QuotationAction } from './actions';
 type OpenSheet = null | 'send' | 'accept' | 'reject' | 'cancel' | 'convert' | 'more';
 
 function Totals({ q }: { q: QuotationDto }) {
+  const styles = useStyles();
   const t = q.totals;
   return (
     <Card testID="quotation-totals">
       {t.discountTotal > 0 ? (
         <>
-          <Row label="Zwischensumme" value={formatEur(t.subtotalBeforeDiscount)} />
-          <Row label="Rabatte" value={`−${formatEur(t.discountTotal)}`} />
+          <Row label={tr('Zwischensumme', 'Subtotal')} value={formatEur(t.subtotalBeforeDiscount)} />
+          <Row label={tr('Rabatte', 'Discounts')} value={`−${formatEur(t.discountTotal)}`} />
         </>
       ) : null}
-      <Row label="Summe netto" value={formatEur(t.netTotal)} />
+      <Row label={tr('Summe netto', 'Net total')} value={formatEur(t.netTotal)} />
       {q.taxMode === 'Standard'
-        ? t.taxGroups.map((g) => <Row key={g.ratePercent} label={`USt. ${formatPercent(g.ratePercent)} auf ${formatEur(g.netAmount)}`} value={formatEur(g.taxAmount)} />)
+        ? t.taxGroups.map((g) => <Row key={g.ratePercent} label={tr(`USt. ${formatPercent(g.ratePercent)} auf ${formatEur(g.netAmount)}`, `VAT ${formatPercent(g.ratePercent)} on ${formatEur(g.netAmount)}`)} value={formatEur(g.taxAmount)} />)
         : (
           <Text variant="caption" tone="muted" style={styles.taxNote}>
-            {q.taxMode === 'SmallBusiness' ? 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.' : 'Steuerschuldnerschaft des Leistungsempfängers (§ 13b UStG).'}
+            {q.taxMode === 'SmallBusiness'
+              ? tr('Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.', 'No VAT is charged under § 19 UStG (small business).')
+              : tr('Steuerschuldnerschaft des Leistungsempfängers (§ 13b UStG).', 'Reverse charge: the recipient owes the tax (§ 13b UStG).')}
           </Text>
         )}
       <Divider spaced />
-      <Row label="Gesamt brutto" value={formatEur(t.grossTotal)} strong testID="quotation-gross" />
+      <Row label={tr('Gesamt brutto', 'Total gross')} value={formatEur(t.grossTotal)} strong testID="quotation-gross" />
     </Card>
   );
 }
 
 function Row({ label, value, strong, testID }: { label: string; value: string; strong?: boolean; testID?: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.totalRow}>
       <Text variant={strong ? 'bodyStrong' : 'caption'} tone={strong ? 'default' : 'secondary'} style={styles.flex}>
@@ -70,34 +75,36 @@ function TextBlock({ label, value }: { label: string; value: string | null }) {
 }
 
 function History({ id }: { id: string }) {
+  const { tr } = useLocale();
+  const styles = useStyles();
   const followUps = useQuotationFollowUps(id);
   const deliveries = useQuotationDeliveries(id);
   const events = useQuotationEvents(id);
   return (
     <>
-      <SectionHeader title="Erinnerungen" />
+      <SectionHeader title={tr('Erinnerungen', 'Reminders')} />
       <Card>
-        {followUps.isPending ? <Text variant="caption" tone="muted">Wird geladen …</Text> : null}
+        {followUps.isPending ? <Text variant="caption" tone="muted">{tr('Wird geladen …', 'Loading …')}</Text> : null}
         {followUps.isError ? <ErrorState error={followUps.error} onRetry={() => void followUps.refetch()} compact /> : null}
-        {followUps.data?.length === 0 ? <Text variant="caption" tone="muted">Keine Erinnerungen geplant.</Text> : null}
+        {followUps.data?.length === 0 ? <Text variant="caption" tone="muted">{tr('Keine Erinnerungen geplant.', 'No reminders scheduled.')}</Text> : null}
         {followUps.data?.map((f, i) => (
           <View key={f.id}>
             {i > 0 ? <Divider spaced /> : null}
             <Text variant="bodyStrong">{followUpKindLabel[f.kind]}</Text>
             <Text variant="caption" tone="secondary">
-              {followUpStatusLabel[f.status]} · fällig {formatDateTime(f.dueAt)}
-              {f.processedAt ? ` · ausgeführt ${formatDateTime(f.processedAt)}` : ''}
+              {followUpStatusLabel[f.status]} · {tr('fällig', 'due')} {formatDateTime(f.dueAt)}
+              {f.processedAt ? tr(` · ausgeführt ${formatDateTime(f.processedAt)}`, ` · processed ${formatDateTime(f.processedAt)}`) : ''}
             </Text>
             {f.statusReason ? <Text variant="small" tone="muted">{f.statusReason}</Text> : null}
           </View>
         ))}
       </Card>
 
-      <SectionHeader title="E-Mail-Versand" />
+      <SectionHeader title={tr('E-Mail-Versand', 'Email delivery')} />
       <Card testID="delivery-history">
-        {deliveries.isPending ? <Text variant="caption" tone="muted">Wird geladen …</Text> : null}
+        {deliveries.isPending ? <Text variant="caption" tone="muted">{tr('Wird geladen …', 'Loading …')}</Text> : null}
         {deliveries.isError ? <ErrorState error={deliveries.error} onRetry={() => void deliveries.refetch()} compact /> : null}
-        {deliveries.data?.length === 0 ? <Text variant="caption" tone="muted">Noch keine E-Mails zu diesem Angebot.</Text> : null}
+        {deliveries.data?.length === 0 ? <Text variant="caption" tone="muted">{tr('Noch keine E-Mails zu diesem Angebot.', 'No emails for this quotation yet.')}</Text> : null}
         {deliveries.data?.map((d, i) => (
           <View key={d.id} style={styles.gapSm}>
             {i > 0 ? <Divider spaced /> : null}
@@ -108,22 +115,25 @@ function History({ id }: { id: string }) {
               <EmailStatusBadge status={d.status} />
             </View>
             <Text variant="caption" tone="secondary">
-              an {d.toAddress} · {formatDateTime(d.handedOffAt ?? d.createdAt)}
+              {tr('an', 'to')} {d.toAddress} · {formatDateTime(d.handedOffAt ?? d.createdAt)}
             </Text>
             {d.status === 'HandedOff' ? (
               <Text variant="small" tone="muted">
-                Vom Mailserver angenommen – die Zustellung ins Postfach kann nicht garantiert werden.
+                {tr(
+                  'Vom Mailserver angenommen – die Zustellung ins Postfach kann nicht garantiert werden.',
+                  'Accepted by the mail server – delivery to the inbox cannot be guaranteed.',
+                )}
               </Text>
             ) : null}
             {d.lastError ? <Text variant="small" tone="danger">{d.lastError}</Text> : null}
-            {d.nextAttemptAt ? <Text variant="small" tone="muted">Nächster Versuch: {formatDateTime(d.nextAttemptAt)}</Text> : null}
+            {d.nextAttemptAt ? <Text variant="small" tone="muted">{tr('Nächster Versuch', 'Next attempt')}: {formatDateTime(d.nextAttemptAt)}</Text> : null}
           </View>
         ))}
       </Card>
 
-      <SectionHeader title="Verlauf" />
+      <SectionHeader title={tr('Verlauf', 'History')} />
       <Card testID="event-timeline">
-        {events.isPending ? <Text variant="caption" tone="muted">Wird geladen …</Text> : null}
+        {events.isPending ? <Text variant="caption" tone="muted">{tr('Wird geladen …', 'Loading …')}</Text> : null}
         {events.isError ? <ErrorState error={events.error} onRetry={() => void events.refetch()} compact /> : null}
         {events.data?.map((e) => (
           <View key={e.id} style={styles.event}>
@@ -132,7 +142,7 @@ function History({ id }: { id: string }) {
               <Text variant="body">{quotationEventLabel[e.type] ?? e.type}</Text>
               <Text variant="small" tone="muted">
                 {formatDateTime(e.occurredAt)}
-                {e.actorName ? ` · ${e.actorName}` : e.actorType === 'Customer' ? ' · Kunde' : e.actorType === 'System' ? ' · System' : ''}
+                {e.actorName ? ` · ${e.actorName}` : e.actorType === 'Customer' ? tr(' · Kunde', ' · Customer') : e.actorType === 'System' ? ' · System' : ''}
               </Text>
               {e.details ? <Text variant="small" tone="secondary">{e.details}</Text> : null}
             </View>
@@ -146,6 +156,8 @@ function History({ id }: { id: string }) {
 export default function QuotationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const companyId = useCompanyId();
+  const { tr } = useLocale();
+  const styles = useStyles();
   const router = useRouter();
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -168,7 +180,7 @@ export default function QuotationDetailScreen() {
     try {
       await fn();
     } catch (error) {
-      Alert.alert('Aktion fehlgeschlagen', errorMessage(error));
+      Alert.alert(tr('Aktion fehlgeschlagen', 'Action failed'), errorMessage(error));
     } finally {
       setBusy(null);
     }
@@ -177,6 +189,7 @@ export default function QuotationDetailScreen() {
   const sharePublicLink = async () => {
     const link = await api.quotations.createPublicLink(companyId, id);
     refreshAll();
+    // Shared with the (German) customer: the message stays German.
     await Share.share({ message: `Ihr Angebot ${q?.number ?? ''}: ${link.url}`, url: link.url });
   };
 
@@ -204,11 +217,13 @@ export default function QuotationDetailScreen() {
         return;
       case 'publicLink':
         Alert.alert(
-          'Neuen Kundenlink erzeugen?',
-          q.hasActivePublicLink ? 'Der bisherige Link wird dabei ungültig. Der neue Link wird nur einmal angezeigt.' : 'Der Link wird nur einmal angezeigt – teilen Sie ihn direkt.',
+          tr('Neuen Kundenlink erzeugen?', 'Create a new customer link?'),
+          q.hasActivePublicLink
+            ? tr('Der bisherige Link wird dabei ungültig. Der neue Link wird nur einmal angezeigt.', 'The previous link becomes invalid. The new link is shown only once.')
+            : tr('Der Link wird nur einmal angezeigt – teilen Sie ihn direkt.', 'The link is shown only once – share it right away.'),
           [
-            { text: 'Abbrechen', style: 'cancel' },
-            { text: 'Erzeugen & teilen', onPress: () => void run('publicLink', sharePublicLink) },
+            { text: tr('Abbrechen', 'Cancel'), style: 'cancel' },
+            { text: tr('Erzeugen & teilen', 'Create & share'), onPress: () => void run('publicLink', sharePublicLink) },
           ],
         );
         return;
@@ -216,31 +231,38 @@ export default function QuotationDetailScreen() {
         void run('duplicate', async () => {
           const copy = await api.quotations.duplicate(companyId, q.id);
           refreshAll();
-          toast(`Kopie ${copy.number} angelegt`);
+          toast(tr(`Kopie ${copy.number} angelegt`, `Copy ${copy.number} created`));
           router.push(`/quotation/${copy.id}`);
         });
         return;
       case 'revise':
-        Alert.alert('Revision erstellen?', `Es wird ein neuer Entwurf auf Basis von ${q.number} angelegt. Das bisherige Angebot wird nach dem Versand der Revision ersetzt.`, [
-          { text: 'Abbrechen', style: 'cancel' },
+        Alert.alert(
+          tr('Revision erstellen?', 'Create revision?'),
+          tr(
+            `Es wird ein neuer Entwurf auf Basis von ${q.number} angelegt. Das bisherige Angebot wird nach dem Versand der Revision ersetzt.`,
+            `A new draft based on ${q.number} will be created. The current quotation is replaced once the revision has been sent.`,
+          ),
+          [
+          { text: tr('Abbrechen', 'Cancel'), style: 'cancel' },
           {
-            text: 'Revision erstellen',
+            text: tr('Revision erstellen', 'Create revision'),
             onPress: () =>
               void run('revise', async () => {
                 const rev = await api.quotations.revise(companyId, q.id);
                 refreshAll();
-                toast(`Revision ${rev.number} angelegt`);
+                toast(tr(`Revision ${rev.number} angelegt`, `Revision ${rev.number} created`));
                 router.push(`/quotation/${rev.id}`);
               }),
           },
-        ]);
+          ],
+        );
         return;
       case 'createInvoice':
         void run('createInvoice', async () => {
           const draft = await api.quotations.createInvoice(companyId, q.id);
           invalidateInvoiceData(queryClient, companyId, draft);
           refreshAll();
-          toast('Rechnungsentwurf angelegt');
+          toast(tr('Rechnungsentwurf angelegt', 'Draft invoice created'));
           router.push({ pathname: '/invoice-editor', params: { id: draft.id, created: '1' } });
         });
         return;
@@ -249,14 +271,14 @@ export default function QuotationDetailScreen() {
           await api.quotations.cancelFollowUps(companyId, q.id);
           void followUps.refetch();
           refreshAll();
-          toast('Erinnerungen abgebrochen');
+          toast(tr('Erinnerungen abgebrochen', 'Reminders cancelled'));
         });
         return;
       case 'delete':
-        Alert.alert('Entwurf löschen?', `${q.number} wird endgültig gelöscht. Die Nummer wird nicht erneut vergeben.`, [
-          { text: 'Abbrechen', style: 'cancel' },
+        Alert.alert(tr('Entwurf löschen?', 'Delete draft?'), tr(`${q.number} wird endgültig gelöscht. Die Nummer wird nicht erneut vergeben.`, `${q.number} will be deleted permanently. The number will not be reused.`), [
+          { text: tr('Abbrechen', 'Cancel'), style: 'cancel' },
           {
-            text: 'Löschen',
+            text: tr('Löschen', 'Delete'),
             style: 'destructive',
             onPress: () =>
               void run('delete', async () => {
@@ -264,7 +286,7 @@ export default function QuotationDetailScreen() {
                 queryClient.removeQueries({ queryKey: keys.quotation(companyId, q.id) });
                 void queryClient.invalidateQueries({ queryKey: keys.quotations(companyId) });
                 void queryClient.invalidateQueries({ queryKey: keys.dashboard(companyId) });
-                toast('Entwurf gelöscht');
+                toast(tr('Entwurf gelöscht', 'Draft deleted'));
                 router.back();
               }),
           },
@@ -291,7 +313,7 @@ export default function QuotationDetailScreen() {
         options={{
           title: q.number,
           headerRight: () => (
-            <IconButton icon="ellipsis-horizontal-circle-outline" accessibilityLabel="Weitere Aktionen" onPress={() => setSheet('more')} testID="quotation-more" />
+            <IconButton icon="ellipsis-horizontal-circle-outline" accessibilityLabel={tr('Weitere Aktionen', 'More actions')} onPress={() => setSheet('more')} testID="quotation-more" />
           ),
         }}
       />
@@ -300,14 +322,14 @@ export default function QuotationDetailScreen() {
           <View style={styles.rowBetween}>
             <Text variant="caption" tone="secondary">
               {q.number}
-              {q.revisionNumber > 0 ? ` · Revision ${q.revisionNumber}` : ''}
+              {q.revisionNumber > 0 ? ` · ${tr('Revision', 'Revision')} ${q.revisionNumber}` : ''}
             </Text>
             <QuotationStatusBadge status={q.status} />
           </View>
           <Text variant="title" accessibilityRole="header">
-            {q.title || 'Ohne Betreff'}
+            {q.title || tr('Ohne Betreff', 'No subject')}
           </Text>
-          <Pressable accessibilityRole="link" accessibilityLabel={`Kunde ${q.customerName} öffnen`} onPress={() => router.push(`/customer/${q.customerId}`)} style={styles.customerLink}>
+          <Pressable accessibilityRole="link" accessibilityLabel={tr(`Kunde ${q.customerName} öffnen`, `Open customer ${q.customerName}`)} onPress={() => router.push(`/customer/${q.customerId}`)} style={styles.customerLink}>
             <Text variant="bodyStrong" tone="brand">
               {q.customerName}
             </Text>
@@ -316,26 +338,33 @@ export default function QuotationDetailScreen() {
             {formatEur(q.totals.grossTotal)}
           </Text>
           <View style={styles.rowWrap}>
-            <KeyValue label="Datum" value={formatDate(q.issueDate)} />
-            <KeyValue label="Gültig bis" value={formatDate(q.validUntil)} />
-            {q.sentAt ? <KeyValue label="Versendet" value={formatDateTime(q.sentAt)} /> : null}
+            <KeyValue label={tr('Datum', 'Date')} value={formatDate(q.issueDate)} />
+            <KeyValue label={tr('Gültig bis', 'Valid until')} value={formatDate(q.validUntil)} />
+            {q.sentAt ? <KeyValue label={tr('Versendet', 'Sent')} value={formatDateTime(q.sentAt)} /> : null}
           </View>
           {q.decidedAt ? (
             <Text variant="caption" tone={q.status === 'Accepted' ? 'success' : 'danger'}>
-              {q.status === 'Accepted' ? 'Angenommen' : 'Abgelehnt'} am {formatDateTime(q.decidedAt)}
-              {q.decisionName ? ` von ${q.decisionName}` : q.decidedByActor === 'User' ? ' (intern erfasst)' : ''}
+              {q.status === 'Accepted'
+                ? tr(`Angenommen am ${formatDateTime(q.decidedAt)}`, `Accepted on ${formatDateTime(q.decidedAt)}`)
+                : tr(`Abgelehnt am ${formatDateTime(q.decidedAt)}`, `Rejected on ${formatDateTime(q.decidedAt)}`)}
+              {q.decisionName
+                ? tr(` von ${q.decisionName}`, ` by ${q.decisionName}`)
+                : q.decidedByActor === 'User' ? tr(' (intern erfasst)', ' (recorded internally)') : ''}
               {q.decisionNote ? ` – „${q.decisionNote}“` : ''}
             </Text>
           ) : null}
           {q.cancelledAt ? (
             <Text variant="caption" tone="muted">
-              Storniert am {formatDateTime(q.cancelledAt)}
+              {tr(`Storniert am ${formatDateTime(q.cancelledAt)}`, `Cancelled on ${formatDateTime(q.cancelledAt)}`)}
               {q.cancellationReason ? ` – ${q.cancellationReason}` : ''}
             </Text>
           ) : null}
           {q.hasActivePublicLink ? (
             <Text variant="small" tone="muted">
-              Kundenlink aktiv{q.publicLinkLastOpenedAt ? ` · zuletzt geöffnet ${formatDateTime(q.publicLinkLastOpenedAt)}` : ' · noch nicht geöffnet'}
+              {tr('Kundenlink aktiv', 'Customer link active')}
+              {q.publicLinkLastOpenedAt
+                ? tr(` · zuletzt geöffnet ${formatDateTime(q.publicLinkLastOpenedAt)}`, ` · last opened ${formatDateTime(q.publicLinkLastOpenedAt)}`)
+                : tr(' · noch nicht geöffnet', ' · not opened yet')}
             </Text>
           ) : null}
         </Card>
@@ -358,29 +387,29 @@ export default function QuotationDetailScreen() {
         <View style={styles.quickRow}>
           <Button label="PDF" icon="document-attach-outline" variant="secondary" onPress={() => handle('pdf')} loading={busy === 'pdf'} style={styles.flex} testID="action-pdf" />
           {more.some((m) => m.action === 'publicLink') ? (
-            <Button label="Link teilen" icon="share-social-outline" variant="secondary" onPress={() => handle('publicLink')} loading={busy === 'publicLink'} style={styles.flex} testID="action-publicLink" />
+            <Button label={tr('Link teilen', 'Share link')} icon="share-social-outline" variant="secondary" onPress={() => handle('publicLink')} loading={busy === 'publicLink'} style={styles.flex} testID="action-publicLink" />
           ) : null}
         </View>
 
         {q.jobId ? (
-          <Button label="Zugehörigen Auftrag öffnen" icon="briefcase-outline" variant="ghost" onPress={() => router.push(`/job/${q.jobId}`)} />
+          <Button label={tr('Zugehörigen Auftrag öffnen', 'Open related job')} icon="briefcase-outline" variant="ghost" onPress={() => router.push(`/job/${q.jobId}`)} />
         ) : null}
 
         {q.status === 'Accepted' || q.invoices.length > 0 ? (
           <>
-            <SectionHeader title={`Rechnungen (${q.invoices.length})`} />
+            <SectionHeader title={`${tr('Rechnungen', 'Invoices')} (${q.invoices.length})`} />
             <View style={styles.actions} testID="quotation-invoices">
               {q.invoices.map((inv) => (
                 <InvoiceLinkCard key={inv.id} item={inv} />
               ))}
               {q.status === 'Accepted' ? (
                 <Button
-                  label="Rechnung erstellen"
+                  label={tr('Rechnung erstellen', 'Create invoice')}
                   icon="receipt-outline"
                   variant="outline"
                   onPress={() => handle('createInvoice')}
                   loading={busy === 'createInvoice'}
-                  accessibilityHint="Legt einen Rechnungsentwurf mit den Positionen dieses Angebots an"
+                  accessibilityHint={tr('Legt einen Rechnungsentwurf mit den Positionen dieses Angebots an', 'Creates a draft invoice with the line items of this quotation')}
                   testID="action-createInvoice"
                 />
               ) : null}
@@ -388,7 +417,7 @@ export default function QuotationDetailScreen() {
           </>
         ) : null}
 
-        <SectionHeader title={`Positionen (${q.lineItems.length})`} />
+        <SectionHeader title={`${tr('Positionen', 'Line items')} (${q.lineItems.length})`} />
         {q.lineItems
           .slice()
           .sort((a, b) => a.position - b.position)
@@ -396,7 +425,7 @@ export default function QuotationDetailScreen() {
             <Card key={li.id} style={styles.gapSm} testID={`detail-line-${li.position}`}>
               <View style={styles.rowBetween}>
                 <Text variant="small" tone="muted">
-                  Pos. {li.position}
+                  {tr('Pos.', 'Item')} {li.position}
                 </Text>
                 <Text variant="bodyStrong">{formatEur(li.lineNet)}</Text>
               </View>
@@ -405,42 +434,42 @@ export default function QuotationDetailScreen() {
               <Text variant="caption" tone="secondary">
                 {formatQuantity(li.quantity)} {li.unit} × {formatEur(li.unitPriceNet)}
                 {li.discountPercent ? ` · −${formatPercent(li.discountPercent)}` : ''}
-                {q.taxMode === 'Standard' ? ` · ${formatPercent(li.taxRatePercent)} USt.` : ''}
+                {q.taxMode === 'Standard' ? ` · ${formatPercent(li.taxRatePercent)} ${tr('USt.', 'VAT')}` : ''}
               </Text>
             </Card>
           ))}
 
-        <SectionHeader title="Summen" />
+        <SectionHeader title={tr('Summen', 'Totals')} />
         <Totals q={q} />
 
-        <SectionHeader title="Details" />
+        <SectionHeader title={tr('Details', 'Details')} />
         <Card>
-          <KeyValue label="Empfänger" value={[q.recipientName, q.recipientContact, q.recipientAddress].filter(Boolean).join('\n')} />
-          {q.recipientEmail ? <KeyValue label="E-Mail" value={q.recipientEmail} /> : null}
-          <KeyValue label="Besteuerung" value={taxModeLabel[q.taxMode]} />
-          <TextBlock label="Einleitung" value={q.introText} />
-          <TextBlock label="Schlusstext" value={q.closingText} />
-          <TextBlock label="Zahlungsbedingungen" value={q.paymentTerms} />
-          <TextBlock label="Bedingungen" value={q.terms} />
-          <TextBlock label="Interne Notiz" value={q.internalNotes} />
+          <KeyValue label={tr('Empfänger', 'Recipient')} value={[q.recipientName, q.recipientContact, q.recipientAddress].filter(Boolean).join('\n')} />
+          {q.recipientEmail ? <KeyValue label={tr('E-Mail', 'Email')} value={q.recipientEmail} /> : null}
+          <KeyValue label={tr('Besteuerung', 'Tax treatment')} value={taxModeLabel[q.taxMode]} />
+          <TextBlock label={tr('Einleitung', 'Introduction')} value={q.introText} />
+          <TextBlock label={tr('Schlusstext', 'Closing text')} value={q.closingText} />
+          <TextBlock label={tr('Zahlungsbedingungen', 'Payment terms')} value={q.paymentTerms} />
+          <TextBlock label={tr('Bedingungen', 'Terms')} value={q.terms} />
+          <TextBlock label={tr('Interne Notiz', 'Internal note')} value={q.internalNotes} />
         </Card>
 
         {q.revisions.length > 1 ? (
           <>
-            <SectionHeader title="Revisionen" />
+            <SectionHeader title={tr('Revisionen', 'Revisions')} />
             <Card>
               {q.revisions.map((r) => (
                 <Pressable
                   key={r.id}
                   accessibilityRole="link"
-                  accessibilityLabel={`${r.number}, Revision ${r.revisionNumber}`}
+                  accessibilityLabel={`${r.number}, ${tr('Revision', 'revision')} ${r.revisionNumber}`}
                   disabled={r.id === q.id}
                   onPress={() => router.push(`/quotation/${r.id}`)}
                   style={styles.revision}
                 >
                   <Text variant="body" tone={r.id === q.id ? 'default' : 'brand'} style={styles.flex}>
                     {r.number} · Rev. {r.revisionNumber}
-                    {r.id === q.id ? ' (aktuell angezeigt)' : ''}
+                    {r.id === q.id ? tr(' (aktuell angezeigt)', ' (currently shown)') : ''}
                   </Text>
                   <QuotationStatusBadge status={r.status} />
                 </Pressable>
@@ -455,7 +484,7 @@ export default function QuotationDetailScreen() {
       <OptionSheet
         visible={sheet === 'more'}
         onClose={() => setSheet(null)}
-        title="Weitere Aktionen"
+        title={tr('Weitere Aktionen', 'More actions')}
         options={[...primary, ...more].map((a) => ({ value: a.action, label: a.label, icon: a.icon, destructive: a.destructive }))}
         onSelect={(a) => setTimeout(() => handle(a), 250)}
       />
@@ -467,13 +496,17 @@ export default function QuotationDetailScreen() {
           const res = await api.quotations.send(companyId, q.id, body);
           refreshAll(res.quotation);
           setSheet(null);
-          toast(body.mode === 'Email' ? 'E-Mail wird versendet – Status im Versandverlauf' : 'Als versendet markiert');
+          toast(
+            body.mode === 'Email'
+              ? tr('E-Mail wird versendet – Status im Versandverlauf', 'Email is being sent – see status in the delivery history')
+              : tr('Als versendet markiert', 'Marked as sent'),
+          );
           if (res.publicUrl && body.mode === 'Manual') {
             const url = res.publicUrl;
             setTimeout(() => {
-              Alert.alert('Kundenlink', 'Möchten Sie den Kundenlink jetzt teilen? Er wird nur einmal angezeigt.', [
-                { text: 'Später', style: 'cancel' },
-                { text: 'Teilen', onPress: () => void Share.share({ message: url, url }) },
+              Alert.alert(tr('Kundenlink', 'Customer link'), tr('Möchten Sie den Kundenlink jetzt teilen? Er wird nur einmal angezeigt.', 'Do you want to share the customer link now? It is shown only once.'), [
+                { text: tr('Später', 'Later'), style: 'cancel' },
+                { text: tr('Teilen', 'Share'), onPress: () => void Share.share({ message: url, url }) },
               ]);
             }, 400);
           }
@@ -488,7 +521,7 @@ export default function QuotationDetailScreen() {
           const updated = sheet === 'reject' ? await api.quotations.reject(companyId, q.id, { note }) : await api.quotations.accept(companyId, q.id, { note });
           refreshAll(updated);
           setSheet(null);
-          toast(updated.status === 'Accepted' ? 'Annahme erfasst' : 'Ablehnung erfasst');
+          toast(updated.status === 'Accepted' ? tr('Annahme erfasst', 'Acceptance recorded') : tr('Ablehnung erfasst', 'Rejection recorded'));
         }}
       />
       <CancelSheet
@@ -499,7 +532,7 @@ export default function QuotationDetailScreen() {
           const updated = await api.quotations.cancel(companyId, q.id, { reason });
           refreshAll(updated);
           setSheet(null);
-          toast('Angebot storniert');
+          toast(tr('Angebot storniert', 'Quotation cancelled'));
         }}
       />
       <ConvertSheet
@@ -511,7 +544,7 @@ export default function QuotationDetailScreen() {
           refreshAll();
           void queryClient.invalidateQueries({ queryKey: keys.jobs(companyId) });
           setSheet(null);
-          toast(`Auftrag ${job.number} angelegt`);
+          toast(tr(`Auftrag ${job.number} angelegt`, `Job ${job.number} created`));
           router.push(`/job/${job.id}`);
         }}
       />
@@ -519,7 +552,7 @@ export default function QuotationDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   flex: { flex: 1, minWidth: 0 },
   gap: { gap: space[2] },
   gapSm: { gap: 2 },
@@ -533,4 +566,4 @@ const styles = StyleSheet.create({
   revision: { flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: touch },
   event: { flexDirection: 'row', gap: space[3], paddingVertical: space[2] },
   eventDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brandBorder, marginTop: 8 },
-});
+}));

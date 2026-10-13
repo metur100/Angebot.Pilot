@@ -1,8 +1,8 @@
-// Create/edit an invoice draft. Same layout as the quotation editor: four steps (Kunde, Daten, Positionen, Texte), line
+// Create/edit an invoice draft. Same layout as the quotation editor: four steps (customer, dates, items, texts), line
 // items as stacked cards edited in a bottom sheet, and a sticky live-totals bar. Only drafts are editable – issued
 // invoices are frozen and can only be corrected via a cancellation invoice.
 import {
-  addDaysIso, ApiError, calculateTotals, errorMessage, formatEur, todayIso,
+  addDaysIso, ApiError, calculateTotals, errorMessage, formatEur, todayIso, tr,
   type InvoiceDto, type UpdateInvoiceRequest,
 } from '@angebotpilot/api-contracts';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,27 +11,32 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Controller, useFieldArray, useForm, useWatch, type FieldErrors } from 'react-hook-form';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, View } from 'react-native';
 
 import { Button, IconButton } from '@/components/Button';
 import { Card, SectionHeader } from '@/components/Card';
 import { DateField, SegmentedControl, SelectField, TextField } from '@/components/Field';
 import { BottomBar, FormScroll, Screen } from '@/components/Layout';
 import { ErrorState, InlineError, LoadingView } from '@/components/States';
-import { TAX_DISCLAIMER, taxModeOptions } from '@/components/TaxModeInfo';
+import { taxDisclaimer, taxModeOptions } from '@/components/TaxModeInfo';
 import { Text } from '@/components/Text';
 import { useToast } from '@/components/Toast';
 import { CustomerPicker } from '@/features/quotation-editor/CustomerPicker';
 import { LineCard, StepIndicator } from '@/features/quotation-editor/EditorParts';
 import { LineItemEditor } from '@/features/quotation-editor/LineItemEditor';
 import { emptyToNull, isConflict } from '@/lib/forms';
+import { useLocale } from '@/lib/i18n';
 import { invalidateInvoiceData, useCompanySettings, useCustomer, useInvoice, useTaxRates } from '@/lib/queries';
 import { api, useCompanyId } from '@/lib/session';
-import { colors, radius, space } from '@/theme';
+import { makeStyles, radius, space, useTheme } from '@/theme';
 
 import { daysBetween, invoiceFormSchema, type InvoiceForm } from './schema';
 
-const STEPS = ['Kunde', 'Daten', 'Positionen', 'Texte'] as const;
+const STEP_COUNT = 4;
+
+function stepLabels(): string[] {
+  return [tr('Kunde', 'Customer'), tr('Daten', 'Dates'), tr('Positionen', 'Items'), tr('Texte', 'Texts')];
+}
 
 const STEP_FIELDS: (keyof InvoiceForm)[][] = [
   ['customerId'],
@@ -87,6 +92,7 @@ export default function InvoiceEditorScreen() {
   const existing = useInvoice(editId);
   const settings = useCompanySettings();
   const presetCustomer = useCustomer(editId ? undefined : params.customerId);
+  const { tr } = useLocale();
   const [reloadCount, setReloadCount] = useState(0);
 
   if (editId) {
@@ -104,7 +110,10 @@ export default function InvoiceEditorScreen() {
           <ErrorState
             error={new ApiError({
               status: 409,
-              detail: 'Nur Rechnungsentwürfe können bearbeitet werden. Gestellte Rechnungen sind unveränderbar – korrigieren Sie sie über eine Stornorechnung.',
+              detail: tr(
+                'Nur Rechnungsentwürfe können bearbeitet werden. Gestellte Rechnungen sind unveränderbar – korrigieren Sie sie über eine Stornorechnung.',
+                'Only draft invoices can be edited. Issued invoices cannot be changed – correct them with a cancellation invoice.',
+              ),
             })}
           />
         </Screen>
@@ -132,7 +141,7 @@ export default function InvoiceEditorScreen() {
   const init: EditorInit = {
     values: {
       customerId: presetCustomer.data?.id ?? '',
-      title: 'Rechnung',
+      title: 'Rechnung', // document content: German
       issueDate: today,
       servicePeriod: false,
       serviceDateFrom: today,
@@ -154,6 +163,9 @@ export default function InvoiceEditorScreen() {
 
 function InvoiceEditor({ init, onReload }: { init: EditorInit; onReload?: () => Promise<void> }) {
   const editId = init.editId;
+  const { tr } = useLocale();
+  const { colors } = useTheme();
+  const styles = useStyles();
   const companyId = useCompanyId();
   const router = useRouter();
   const navigation = useNavigation();
@@ -191,13 +203,13 @@ function InvoiceEditor({ init, onReload }: { init: EditorInit; onReload?: () => 
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
       if (allowLeave.current || !isDirty) return;
       e.preventDefault();
-      Alert.alert('Änderungen verwerfen?', 'Ihre Änderungen an dieser Rechnung sind noch nicht gespeichert.', [
-        { text: 'Weiter bearbeiten', style: 'cancel' },
-        { text: 'Verwerfen', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+      Alert.alert(tr('Änderungen verwerfen?', 'Discard changes?'), tr('Ihre Änderungen an dieser Rechnung sind noch nicht gespeichert.', 'Your changes to this invoice have not been saved yet.'), [
+        { text: tr('Weiter bearbeiten', 'Keep editing'), style: 'cancel' },
+        { text: tr('Verwerfen', 'Discard'), style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
       ]);
     });
     return unsubscribe;
-  }, [navigation, isDirty]);
+  }, [navigation, isDirty, tr]);
 
   /** Moving the invoice date keeps the payment term (days until due) and a single service date in step. */
   const changeIssueDate = (next: string) => {
@@ -232,25 +244,28 @@ function InvoiceEditor({ init, onReload }: { init: EditorInit; onReload?: () => 
         : await api.invoices.create(companyId, body);
       invalidateInvoiceData(queryClient, companyId, saved);
       allowLeave.current = true;
-      toast(editId ? 'Rechnungsentwurf gespeichert' : 'Rechnungsentwurf angelegt');
+      toast(editId ? tr('Rechnungsentwurf gespeichert', 'Draft invoice saved') : tr('Rechnungsentwurf angelegt', 'Draft invoice created'));
       if (editId && !init.openDetailAfterSave) router.back();
       else router.replace(`/invoice/${saved.id}`);
     } catch (error) {
       if (isConflict(error)) {
-        setFormError('Speichern nicht möglich: Die Rechnung wurde zwischenzeitlich geändert.');
+        setFormError(tr('Speichern nicht möglich: Die Rechnung wurde zwischenzeitlich geändert.', 'Cannot save: the invoice was changed in the meantime.'));
         Alert.alert(
-          'Rechnung wurde zwischenzeitlich geändert',
-          'Eine andere Person hat diesen Entwurf gespeichert oder gestellt. Laden Sie die aktuelle Fassung neu – Ihre Eingaben in diesem Formular gehen dabei verloren.',
+          tr('Rechnung wurde zwischenzeitlich geändert', 'Invoice was changed in the meantime'),
+          tr(
+            'Eine andere Person hat diesen Entwurf gespeichert oder gestellt. Laden Sie die aktuelle Fassung neu – Ihre Eingaben in diesem Formular gehen dabei verloren.',
+            'Someone else has saved or issued this draft. Reload the current version – your entries in this form will be lost.',
+          ),
           [
-            { text: 'Abbrechen', style: 'cancel' },
-            { text: 'Neu laden', onPress: () => void onReload?.() },
+            { text: tr('Abbrechen', 'Cancel'), style: 'cancel' },
+            { text: tr('Neu laden', 'Reload'), onPress: () => void onReload?.() },
           ],
         );
         return;
       }
       if (error instanceof ApiError && Object.keys(error.fieldErrors).length) {
         const messages: string[] = [];
-        let firstStep: number = STEPS.length;
+        let firstStep: number = STEP_COUNT;
         for (const [key, msgs] of Object.entries(error.fieldErrors)) {
           const path = key.replace(/\[(\d+)\]/g, '.$1');
           const top = path.split('.')[0] as keyof InvoiceForm;
@@ -260,10 +275,10 @@ function InvoiceEditor({ init, onReload }: { init: EditorInit; onReload?: () => 
             firstStep = Math.min(firstStep, stepIndex);
           }
           const lineMatch = /^lineItems\.(\d+)/.exec(path);
-          messages.push(lineMatch ? `Position ${Number(lineMatch[1]) + 1}: ${msgs[0]}` : (msgs[0] ?? ''));
+          messages.push(lineMatch ? `${tr('Position', 'Item')} ${Number(lineMatch[1]) + 1}: ${msgs[0]}` : (msgs[0] ?? ''));
         }
         setFormError(messages.join('\n'));
-        if (firstStep < STEPS.length) setStep(firstStep);
+        if (firstStep < STEP_COUNT) setStep(firstStep);
         return;
       }
       setFormError(errorMessage(error));
@@ -272,7 +287,7 @@ function InvoiceEditor({ init, onReload }: { init: EditorInit; onReload?: () => 
 
   const onInvalid = (invalid: FieldErrors<InvoiceForm>) => {
     setStep(firstStepWithError(invalid));
-    setFormError('Bitte prüfen Sie die markierten Angaben.');
+    setFormError(tr('Bitte prüfen Sie die markierten Angaben.', 'Please check the highlighted fields.'));
   };
 
   const save = () => handleSubmit(onValid, onInvalid)();
@@ -286,47 +301,54 @@ function InvoiceEditor({ init, onReload }: { init: EditorInit; onReload?: () => 
   const editingItem = editingIndex !== null && editingIndex >= 0 ? (lineItems?.[editingIndex] ?? null) : null;
 
   const confirmDelete = (index: number) =>
-    Alert.alert('Position löschen?', `„${lineItems?.[index]?.title ?? ''}“ wird aus der Rechnung entfernt.`, [
-      { text: 'Abbrechen', style: 'cancel' },
-      { text: 'Löschen', style: 'destructive', onPress: () => lines.remove(index) },
+    Alert.alert(tr('Position löschen?', 'Delete item?'), tr(`„${lineItems?.[index]?.title ?? ''}“ wird aus der Rechnung entfernt.`, `“${lineItems?.[index]?.title ?? ''}” will be removed from the invoice.`), [
+      { text: tr('Abbrechen', 'Cancel'), style: 'cancel' },
+      { text: tr('Löschen', 'Delete'), style: 'destructive', onPress: () => lines.remove(index) },
     ]);
 
   return (
     <Screen>
       <Stack.Screen
         options={{
-          title: editId ? 'Entwurf bearbeiten' : 'Neue Rechnung',
+          title: editId ? tr('Entwurf bearbeiten', 'Edit draft') : tr('Neue Rechnung', 'New invoice'),
           gestureEnabled: !isDirty,
           headerRight: () => (
-            <Button label="Speichern" variant="ghost" size="sm" fullWidth={false} onPress={() => void save()} loading={isSubmitting} testID="invoice-editor-save-header" />
+            <Button label={tr('Speichern', 'Save')} variant="ghost" size="sm" fullWidth={false} onPress={() => void save()} loading={isSubmitting} testID="invoice-editor-save-header" />
           ),
         }}
       />
-      <StepIndicator steps={STEPS} step={step} onSelect={setStep} errorSteps={errorSteps} />
+      <StepIndicator steps={stepLabels()} step={step} onSelect={setStep} errorSteps={errorSteps} />
       <FormScroll bottomInset={false} contentStyle={styles.content}>
         <InlineError message={formError} testID="invoice-editor-error" />
 
         {step === 0 ? (
           <>
-            <SectionHeader title="Kunde" />
+            <SectionHeader title={tr('Kunde', 'Customer')} />
             <Controller
               control={control}
               name="customerId"
               render={({ field: { value } }) =>
                 value ? (
                   <Card style={styles.customerCard} testID="selected-customer">
-                    <Ionicons name="person-circle-outline" size={32} color={colors.brand} />
+                    <Ionicons name="person-circle-outline" size={32} color={colors.brandText} />
                     <View style={styles.flex}>
                       <Text variant="bodyStrong">{customerName}</Text>
                       <Text variant="caption" tone="secondary">
-                        Rechnungsempfänger
+                        {tr('Rechnungsempfänger', 'Invoice recipient')}
                       </Text>
                     </View>
-                    <Button label="Ändern" variant="ghost" size="sm" fullWidth={false} onPress={() => setCustomerPickerOpen(true)} accessibilityLabel="Kunden ändern" />
+                    <Button
+                      label={tr('Ändern', 'Change')}
+                      variant="ghost"
+                      size="sm"
+                      fullWidth={false}
+                      onPress={() => setCustomerPickerOpen(true)}
+                      accessibilityLabel={tr('Kunden ändern', 'Change customer')}
+                    />
                   </Card>
                 ) : (
                   <View style={styles.gap}>
-                    <Button label="Kunde wählen" icon="people-outline" variant="outline" onPress={() => setCustomerPickerOpen(true)} testID="pick-customer" />
+                    <Button label={tr('Kunde wählen', 'Choose customer')} icon="people-outline" variant="outline" onPress={() => setCustomerPickerOpen(true)} testID="pick-customer" />
                     {errors.customerId ? (
                       <Text variant="caption" tone="danger" accessibilityRole="alert">
                         {errors.customerId.message}
@@ -337,7 +359,10 @@ function InvoiceEditor({ init, onReload }: { init: EditorInit; onReload?: () => 
               }
             />
             <Text variant="caption" tone="muted">
-              Name, Anschrift und USt-IdNr. werden beim Stellen der Rechnung aus den Kundendaten übernommen und danach festgeschrieben.
+              {tr(
+                'Name, Anschrift und USt-IdNr. werden beim Stellen der Rechnung aus den Kundendaten übernommen und danach festgeschrieben.',
+                'Name, address and VAT ID are taken from the customer data when the invoice is issued and then frozen.',
+              )}
             </Text>
           </>
         ) : null}
@@ -348,14 +373,23 @@ function InvoiceEditor({ init, onReload }: { init: EditorInit; onReload?: () => 
               control={control}
               name="title"
               render={({ field: { onChange, onBlur, value } }) => (
-                <TextField label="Betreff" value={value} onChangeText={onChange} onBlur={onBlur} error={errors.title?.message} required placeholder="z. B. Badsanierung EG" testID="invoice-editor-title" />
+                <TextField
+                  label={tr('Betreff', 'Subject')}
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  error={errors.title?.message}
+                  required
+                  placeholder={tr('z. B. Badsanierung EG', 'e.g. Badsanierung EG (printed in German)')}
+                  testID="invoice-editor-title"
+                />
               )}
             />
             <Controller
               control={control}
               name="issueDate"
               render={({ field: { value } }) => (
-                <DateField label="Rechnungsdatum" value={value} onChange={changeIssueDate} error={errors.issueDate?.message} required testID="invoice-editor-issueDate" />
+                <DateField label={tr('Rechnungsdatum', 'Invoice date')} value={value} onChange={changeIssueDate} error={errors.issueDate?.message} required testID="invoice-editor-issueDate" />
               )}
             />
             <Controller
@@ -363,10 +397,10 @@ function InvoiceEditor({ init, onReload }: { init: EditorInit; onReload?: () => 
               name="servicePeriod"
               render={({ field: { onChange, value } }) => (
                 <SegmentedControl
-                  accessibilityLabel="Leistungsdatum oder Leistungszeitraum"
+                  accessibilityLabel={tr('Leistungsdatum oder Leistungszeitraum', 'Service date or service period')}
                   options={[
-                    { value: 'date', label: 'Leistungsdatum' },
-                    { value: 'period', label: 'Leistungszeitraum' },
+                    { value: 'date', label: tr('Leistungsdatum', 'Service date') },
+                    { value: 'period', label: tr('Leistungszeitraum', 'Service period') },
                   ]}
                   value={value ? 'period' : 'date'}
                   onChange={(v) => {
@@ -383,7 +417,7 @@ function InvoiceEditor({ init, onReload }: { init: EditorInit; onReload?: () => 
                   name="serviceDateFrom"
                   render={({ field: { onChange, value } }) => (
                     <DateField
-                      label={servicePeriod ? 'Leistung von' : 'Leistungsdatum'}
+                      label={servicePeriod ? tr('Leistung von', 'Service from') : tr('Leistungsdatum', 'Service date')}
                       value={value ?? ''}
                       onChange={onChange}
                       onClear={() => onChange('')}
@@ -401,7 +435,7 @@ function InvoiceEditor({ init, onReload }: { init: EditorInit; onReload?: () => 
                     name="serviceDateTo"
                     render={({ field: { onChange, value } }) => (
                       <DateField
-                        label="Leistung bis"
+                        label={tr('Leistung bis', 'Service to')}
                         value={value ?? ''}
                         onChange={onChange}
                         onClear={() => onChange('')}
@@ -416,35 +450,38 @@ function InvoiceEditor({ init, onReload }: { init: EditorInit; onReload?: () => 
               ) : null}
             </View>
             <Text variant="small" tone="muted">
-              Pflichtangabe nach § 14 UStG: wann die Leistung erbracht wurde.
+              {tr('Pflichtangabe nach § 14 UStG: wann die Leistung erbracht wurde.', 'Mandatory under § 14 UStG: when the service was provided.')}
             </Text>
             <Controller
               control={control}
               name="dueDate"
               render={({ field: { onChange, value } }) => (
-                <DateField label="Fällig am" value={value} onChange={onChange} error={errors.dueDate?.message} minimumDate={issueDate} required testID="invoice-editor-dueDate" />
+                <DateField label={tr('Fällig am', 'Due on')} value={value} onChange={onChange} error={errors.dueDate?.message} minimumDate={issueDate} required testID="invoice-editor-dueDate" />
               )}
             />
             {paymentDays !== null && paymentDays >= 0 && !errors.dueDate ? (
               <Text variant="small" tone="muted" testID="invoice-editor-payment-days">
-                Zahlungsziel: {paymentDays === 0 ? 'sofort' : `${paymentDays} ${paymentDays === 1 ? 'Tag' : 'Tage'}`}
+                {tr('Zahlungsziel', 'Payment term')}:{' '}
+                {paymentDays === 0
+                  ? tr('sofort', 'immediately')
+                  : tr(`${paymentDays} ${paymentDays === 1 ? 'Tag' : 'Tage'}`, `${paymentDays} ${paymentDays === 1 ? 'day' : 'days'}`)}
               </Text>
             ) : null}
             <Controller
               control={control}
               name="taxMode"
-              render={({ field: { onChange, value } }) => <SelectField label="Besteuerung" value={value} options={taxModeOptions} onChange={onChange} testID="invoice-editor-taxMode" />}
+              render={({ field: { onChange, value } }) => <SelectField label={tr('Besteuerung', 'Tax treatment')} value={value} options={taxModeOptions()} onChange={onChange} testID="invoice-editor-taxMode" />}
             />
             <Text variant="small" tone="muted">
-              {TAX_DISCLAIMER}
+              {taxDisclaimer()}
             </Text>
             <Controller
               control={control}
               name="buyerReference"
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextField
-                  label="Referenz (optional)"
-                  hint="z. B. Bestellnummer oder Leitweg-ID des Kunden"
+                  label={tr('Referenz (optional)', 'Reference (optional)')}
+                  hint={tr('z. B. Bestellnummer oder Leitweg-ID des Kunden', 'e.g. the customer’s order number or Leitweg-ID')}
                   value={value ?? ''}
                   onChangeText={onChange}
                   onBlur={onBlur}
@@ -477,9 +514,9 @@ function InvoiceEditor({ init, onReload }: { init: EditorInit; onReload?: () => 
             })}
             {lineCount === 0 ? (
               <Card style={styles.emptyLines}>
-                <Ionicons name="list-outline" size={28} color={colors.brand} />
+                <Ionicons name="list-outline" size={28} color={colors.brandText} />
                 <Text variant="body" tone="secondary" align="center">
-                  Noch keine Positionen. Fügen Sie die erbrachten Leistungen und das Material hinzu.
+                  {tr('Noch keine Positionen. Fügen Sie die erbrachten Leistungen und das Material hinzu.', 'No line items yet. Add the services provided and the materials.')}
                 </Text>
               </Card>
             ) : null}
@@ -488,7 +525,7 @@ function InvoiceEditor({ init, onReload }: { init: EditorInit; onReload?: () => 
                 {errors.lineItems?.message ?? errors.lineItems?.root?.message}
               </Text>
             ) : null}
-            <Button label="Position hinzufügen" icon="add-circle-outline" variant="secondary" onPress={() => setEditingIndex(-1)} testID="add-line" />
+            <Button label={tr('Position hinzufügen', 'Add item')} icon="add-circle-outline" variant="secondary" onPress={() => setEditingIndex(-1)} testID="add-line" />
           </>
         ) : null}
 
@@ -496,10 +533,10 @@ function InvoiceEditor({ init, onReload }: { init: EditorInit; onReload?: () => 
           <Card style={styles.gap}>
             {(
               [
-                ['introText', 'Einleitung', 'Text vor den Positionen'],
-                ['closingText', 'Schlusstext', 'Text nach den Positionen'],
-                ['paymentTerms', 'Zahlungshinweis (optional)', 'z. B. Skonto-Vereinbarung'],
-                ['internalNotes', 'Interne Notizen', 'Nur intern sichtbar, nicht auf der Rechnung'],
+                ['introText', tr('Einleitung', 'Introduction'), tr('Text vor den Positionen', 'Text before the line items')],
+                ['closingText', tr('Schlusstext', 'Closing text'), tr('Text nach den Positionen', 'Text after the line items')],
+                ['paymentTerms', tr('Zahlungshinweis (optional)', 'Payment note (optional)'), tr('z. B. Skonto-Vereinbarung', 'e.g. early payment discount')],
+                ['internalNotes', tr('Interne Notizen', 'Internal notes'), tr('Nur intern sichtbar, nicht auf der Rechnung', 'Internal only, not on the invoice')],
               ] as const
             ).map(([name, label, hint]) => (
               <Controller
@@ -517,20 +554,23 @@ function InvoiceEditor({ init, onReload }: { init: EditorInit; onReload?: () => 
 
       <BottomBar>
         <View style={styles.totalsRow}>
-          <View style={styles.flex} accessible accessibilityLabel={`Summe netto ${formatEur(totals.netTotal)}, Umsatzsteuer ${formatEur(totals.taxTotal)}, Gesamt brutto ${formatEur(totals.grossTotal)}`}>
+          <View style={styles.flex} accessible accessibilityLabel={tr(
+              `Summe netto ${formatEur(totals.netTotal)}, Umsatzsteuer ${formatEur(totals.taxTotal)}, Gesamt brutto ${formatEur(totals.grossTotal)}`,
+              `Net total ${formatEur(totals.netTotal)}, VAT ${formatEur(totals.taxTotal)}, total gross ${formatEur(totals.grossTotal)}`,
+            )}>
             <Text variant="small" tone="secondary" testID="totals-net">
-              Netto {formatEur(totals.netTotal)}
-              {taxMode === 'Standard' ? ` · USt. ${formatEur(totals.taxTotal)}` : ''}
+              {tr('Netto', 'Net')} {formatEur(totals.netTotal)}
+              {taxMode === 'Standard' ? ` · ${tr('USt.', 'VAT')} ${formatEur(totals.taxTotal)}` : ''}
             </Text>
             <Text variant="heading" testID="totals-gross">
               {formatEur(totals.grossTotal)}
             </Text>
           </View>
-          {step > 0 ? <IconButton icon="chevron-back" accessibilityLabel="Vorheriger Schritt" onPress={() => setStep(step - 1)} testID="step-back" /> : null}
-          {step < STEPS.length - 1 ? (
-            <Button label="Weiter" icon="chevron-forward" fullWidth={false} onPress={() => setStep(step + 1)} testID="step-next" />
+          {step > 0 ? <IconButton icon="chevron-back" accessibilityLabel={tr('Vorheriger Schritt', 'Previous step')} onPress={() => setStep(step - 1)} testID="step-back" /> : null}
+          {step < STEP_COUNT - 1 ? (
+            <Button label={tr('Weiter', 'Next')} icon="chevron-forward" fullWidth={false} onPress={() => setStep(step + 1)} testID="step-next" />
           ) : (
-            <Button label="Speichern" icon="save-outline" fullWidth={false} onPress={() => void save()} loading={isSubmitting} testID="invoice-editor-save" />
+            <Button label={tr('Speichern', 'Save')} icon="save-outline" fullWidth={false} onPress={() => void save()} loading={isSubmitting} testID="invoice-editor-save" />
           )}
         </View>
       </BottomBar>
@@ -562,7 +602,7 @@ function InvoiceEditor({ init, onReload }: { init: EditorInit; onReload?: () => 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   flex: { flex: 1, minWidth: 0 },
   gap: { gap: space[3] },
   row: { flexDirection: 'row', gap: space[3] },
@@ -570,4 +610,4 @@ const styles = StyleSheet.create({
   customerCard: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   emptyLines: { alignItems: 'center', gap: space[2], borderStyle: 'dashed', borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.xl },
   totalsRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
-});
+}));

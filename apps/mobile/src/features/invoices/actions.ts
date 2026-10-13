@@ -1,6 +1,6 @@
 // Pure mapping from an invoice (status, kind and the server-computed allowedActions) to the buttons shown on the detail
 // screen. The server decides what is allowed (status + role); this file only decides placement, order and wording.
-import type { InvoiceDto } from '@angebotpilot/api-contracts';
+import { tr, type InvoiceDto } from '@angebotpilot/api-contracts';
 
 import type { IconName } from '@/components/Button';
 
@@ -19,25 +19,25 @@ type InvoiceForActions = Pick<InvoiceDto, 'status' | 'kind' | 'allowedActions' |
 function def(action: InvoiceUiAction, i: InvoiceForActions): InvoiceActionDef {
   switch (action) {
     case 'issue':
-      return { action, label: 'Rechnung stellen', icon: 'checkmark-done-outline' };
+      return { action, label: tr('Rechnung stellen', 'Issue invoice'), icon: 'checkmark-done-outline' };
     case 'edit':
-      return { action, label: 'Bearbeiten', icon: 'create-outline' };
+      return { action, label: tr('Bearbeiten', 'Edit'), icon: 'create-outline' };
     case 'send':
-      return { action, label: i.sentAt ? 'Erneut senden' : 'Senden', icon: 'paper-plane-outline' };
+      return { action, label: i.sentAt ? tr('Erneut senden', 'Send again') : tr('Senden', 'Send'), icon: 'paper-plane-outline' };
     case 'recordPayment':
-      return { action, label: 'Zahlung erfassen', icon: 'cash-outline' };
+      return { action, label: tr('Zahlung erfassen', 'Record payment'), icon: 'cash-outline' };
     case 'remind':
-      return { action, label: 'Zahlungserinnerung senden', icon: 'alarm-outline' };
+      return { action, label: tr('Zahlungserinnerung senden', 'Send payment reminder'), icon: 'alarm-outline' };
     case 'pdf':
-      return { action, label: i.status === 'Draft' ? 'PDF-Vorschau teilen' : 'PDF teilen', icon: 'document-attach-outline' };
+      return { action, label: i.status === 'Draft' ? tr('PDF-Vorschau teilen', 'Share PDF preview') : tr('PDF teilen', 'Share PDF'), icon: 'document-attach-outline' };
     case 'xml':
-      return { action, label: 'E-Rechnung (XML) teilen', icon: 'code-download-outline' };
+      return { action, label: tr('E-Rechnung (XML) teilen', 'Share e-invoice (XML)'), icon: 'code-download-outline' };
     case 'duplicate':
-      return { action, label: 'Kopieren', icon: 'copy-outline' };
+      return { action, label: tr('Kopieren', 'Copy'), icon: 'copy-outline' };
     case 'cancel':
-      return { action, label: 'Stornieren', icon: 'ban-outline', destructive: true };
+      return { action, label: tr('Stornieren', 'Cancel invoice'), icon: 'ban-outline', destructive: true };
     case 'delete':
-      return { action, label: 'Entwurf löschen', icon: 'trash-outline', destructive: true };
+      return { action, label: tr('Entwurf löschen', 'Delete draft'), icon: 'trash-outline', destructive: true };
   }
 }
 

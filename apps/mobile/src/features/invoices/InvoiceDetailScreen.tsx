@@ -1,12 +1,12 @@
 import {
-  errorMessage, formatDate, formatDateTime, formatEur, formatPercent, formatQuantity, invoiceEventLabel, taxModeLabel,
+  errorMessage, formatDate, formatDateTime, formatEur, formatPercent, formatQuantity, invoiceEventLabel, taxModeLabel, tr,
   type InvoiceDto, type InvoicePaymentDto,
 } from '@angebotpilot/api-contracts';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 
 import { Button, IconButton, type IconName } from '@/components/Button';
 import { Card, Divider, KeyValue, SectionHeader } from '@/components/Card';
@@ -16,11 +16,12 @@ import { InvoiceStatusBadge } from '@/components/StatusBadge';
 import { ErrorState, ListSkeleton } from '@/components/States';
 import { Text } from '@/components/Text';
 import { useToast } from '@/components/Toast';
+import { useLocale } from '@/lib/i18n';
 import { formatInvoiceAmount, invoiceFileName, invoiceHeaderTitle, invoiceLabel } from '@/lib/invoices';
 import { shareInvoicePdf, shareInvoiceXml } from '@/lib/pdf';
 import { invalidateInvoiceData, keys, useInvoice, useInvoiceEvents } from '@/lib/queries';
 import { api, useCompanyId } from '@/lib/session';
-import { colors, radius, space, touch } from '@/theme';
+import { makeStyles, radius, space, touch, useTheme } from '@/theme';
 
 import { InvoiceCancelSheet, InvoiceSendSheet, IssueSheet, PaymentSheet, RemindSheet } from './ActionSheets';
 import { availableInvoiceActions, type InvoiceUiAction } from './actions';
@@ -37,6 +38,8 @@ const alertIcon: Record<AlertTone, IconName> = {
 };
 
 function InfoAlert({ tone, title, children, testID }: { tone: AlertTone; title: string; children?: ReactNode; testID?: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const c = colors.palette[tone];
   return (
     <View style={[styles.alert, { backgroundColor: c.bg, borderColor: c.border }]} accessibilityRole="alert" testID={testID}>
@@ -52,6 +55,7 @@ function InfoAlert({ tone, title, children, testID }: { tone: AlertTone; title: 
 }
 
 function LinkText({ label, onPress, testID }: { label: string; onPress: () => void; testID?: string }) {
+  const styles = useStyles();
   return (
     <Pressable accessibilityRole="link" accessibilityLabel={label} onPress={onPress} style={styles.link} testID={testID}>
       <Text variant="bodyStrong" tone="brand">
@@ -63,36 +67,39 @@ function LinkText({ label, onPress, testID }: { label: string; onPress: () => vo
 
 function serviceLabel(i: InvoiceDto): { label: string; value: string } {
   if (i.serviceDateFrom && i.serviceDateTo && i.serviceDateTo !== i.serviceDateFrom) {
-    return { label: 'Leistungszeitraum', value: `${formatDate(i.serviceDateFrom)} – ${formatDate(i.serviceDateTo)}` };
+    return { label: tr('Leistungszeitraum', 'Service period'), value: `${formatDate(i.serviceDateFrom)} – ${formatDate(i.serviceDateTo)}` };
   }
-  return { label: 'Leistungsdatum', value: i.serviceDateFrom ? formatDate(i.serviceDateFrom) : '–' };
+  return { label: tr('Leistungsdatum', 'Service date'), value: i.serviceDateFrom ? formatDate(i.serviceDateFrom) : '–' };
 }
 
 function Totals({ i }: { i: InvoiceDto }) {
+  const styles = useStyles();
   const t = i.totals;
   const m = (v: number) => formatInvoiceAmount(v, i.kind);
   return (
     <Card testID="invoice-totals">
       {t.discountTotal > 0 ? (
         <>
-          <Row label="Zwischensumme" value={m(t.subtotalBeforeDiscount)} />
-          <Row label="Rabatte" value={i.kind === 'Cancellation' ? formatEur(t.discountTotal) : `−${formatEur(t.discountTotal)}`} />
+          <Row label={tr('Zwischensumme', 'Subtotal')} value={m(t.subtotalBeforeDiscount)} />
+          <Row label={tr('Rabatte', 'Discounts')} value={i.kind === 'Cancellation' ? formatEur(t.discountTotal) : `−${formatEur(t.discountTotal)}`} />
         </>
       ) : null}
-      <Row label="Summe netto" value={m(t.netTotal)} />
+      <Row label={tr('Summe netto', 'Net total')} value={m(t.netTotal)} />
       {i.taxMode === 'Standard'
-        ? t.taxGroups.map((g) => <Row key={g.ratePercent} label={`USt. ${formatPercent(g.ratePercent)} auf ${m(g.netAmount)}`} value={m(g.taxAmount)} />)
+        ? t.taxGroups.map((g) => <Row key={g.ratePercent} label={tr(`USt. ${formatPercent(g.ratePercent)} auf ${m(g.netAmount)}`, `VAT ${formatPercent(g.ratePercent)} on ${m(g.netAmount)}`)} value={m(g.taxAmount)} />)
         : (
           <Text variant="caption" tone="muted" style={styles.taxNote}>
-            {i.taxMode === 'SmallBusiness' ? 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.' : 'Steuerschuldnerschaft des Leistungsempfängers (§ 13b UStG).'}
+            {i.taxMode === 'SmallBusiness'
+              ? tr('Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.', 'No VAT is charged under § 19 UStG (small business).')
+              : tr('Steuerschuldnerschaft des Leistungsempfängers (§ 13b UStG).', 'Reverse charge: the recipient owes the tax (§ 13b UStG).')}
           </Text>
         )}
       <Divider spaced />
-      <Row label="Gesamt brutto" value={m(t.grossTotal)} strong testID="invoice-totals-gross" />
+      <Row label={tr('Gesamt brutto', 'Total gross')} value={m(t.grossTotal)} strong testID="invoice-totals-gross" />
       {i.kind === 'Invoice' && i.status !== 'Draft' && i.status !== 'Cancelled' ? (
         <>
-          {i.paidAmount > 0 ? <Row label="Bereits bezahlt" value={`−${formatEur(i.paidAmount)}`} /> : null}
-          <Row label="Offener Betrag" value={formatEur(i.openAmount)} strong testID="invoice-open-amount" />
+          {i.paidAmount > 0 ? <Row label={tr('Bereits bezahlt', 'Already paid')} value={`−${formatEur(i.paidAmount)}`} /> : null}
+          <Row label={tr('Offener Betrag', 'Amount due')} value={formatEur(i.openAmount)} strong testID="invoice-open-amount" />
         </>
       ) : null}
     </Card>
@@ -100,6 +107,7 @@ function Totals({ i }: { i: InvoiceDto }) {
 }
 
 function Row({ label, value, strong, testID }: { label: string; value: string; strong?: boolean; testID?: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.totalRow}>
       <Text variant={strong ? 'bodyStrong' : 'caption'} tone={strong ? 'default' : 'secondary'} style={styles.flex}>
@@ -113,6 +121,8 @@ function Row({ label, value, strong, testID }: { label: string; value: string; s
 }
 
 function PaymentRow({ p, canRemove, onRemove, busy }: { p: InvoicePaymentDto; canRemove: boolean; onRemove: () => void; busy: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.payment} testID={`payment-${p.id}`}>
       <View style={styles.flex}>
@@ -123,15 +133,15 @@ function PaymentRow({ p, canRemove, onRemove, busy }: { p: InvoicePaymentDto; ca
         </Text>
         {p.note ? <Text variant="small" tone="secondary">{p.note}</Text> : null}
         <Text variant="small" tone="muted">
-          erfasst {formatDateTime(p.createdAt)}
-          {p.createdByName ? ` von ${p.createdByName}` : ''}
+          {tr(`erfasst ${formatDateTime(p.createdAt)}`, `recorded ${formatDateTime(p.createdAt)}`)}
+          {p.createdByName ? tr(` von ${p.createdByName}`, ` by ${p.createdByName}`) : ''}
         </Text>
       </View>
       {canRemove ? (
         <IconButton
           icon="trash-outline"
           color={colors.danger}
-          accessibilityLabel={`Zahlung über ${formatEur(p.amount)} vom ${formatDate(p.paidOn)} entfernen`}
+          accessibilityLabel={tr(`Zahlung über ${formatEur(p.amount)} vom ${formatDate(p.paidOn)} entfernen`, `Remove payment of ${formatEur(p.amount)} from ${formatDate(p.paidOn)}`)}
           onPress={onRemove}
           disabled={busy}
           testID={`remove-payment-${p.id}`}
@@ -142,14 +152,15 @@ function PaymentRow({ p, canRemove, onRemove, busy }: { p: InvoicePaymentDto; ca
 }
 
 function History({ id }: { id: string }) {
+  const styles = useStyles();
   const events = useInvoiceEvents(id);
   return (
     <>
-      <SectionHeader title="Verlauf" />
+      <SectionHeader title={tr('Verlauf', 'History')} />
       <Card testID="invoice-events">
-        {events.isPending ? <Text variant="caption" tone="muted">Wird geladen …</Text> : null}
+        {events.isPending ? <Text variant="caption" tone="muted">{tr('Wird geladen …', 'Loading …')}</Text> : null}
         {events.isError ? <ErrorState error={events.error} onRetry={() => void events.refetch()} compact /> : null}
-        {events.data?.length === 0 ? <Text variant="caption" tone="muted">Noch keine Einträge.</Text> : null}
+        {events.data?.length === 0 ? <Text variant="caption" tone="muted">{tr('Noch keine Einträge.', 'No entries yet.')}</Text> : null}
         {events.data?.map((e) => (
           <View key={e.id} style={styles.event}>
             <View style={styles.eventDot} />
@@ -157,7 +168,7 @@ function History({ id }: { id: string }) {
               <Text variant="body">{invoiceEventLabel[e.type] ?? e.type}</Text>
               <Text variant="small" tone="muted">
                 {formatDateTime(e.occurredAt)}
-                {e.actorName ? ` · ${e.actorName}` : e.actorType === 'Customer' ? ' · Kunde' : e.actorType === 'System' ? ' · System' : ''}
+                {e.actorName ? ` · ${e.actorName}` : e.actorType === 'Customer' ? tr(' · Kunde', ' · Customer') : e.actorType === 'System' ? ' · System' : ''}
               </Text>
               {e.details ? <Text variant="small" tone="secondary">{e.details}</Text> : null}
             </View>
@@ -171,6 +182,9 @@ function History({ id }: { id: string }) {
 export default function InvoiceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const companyId = useCompanyId();
+  const { tr } = useLocale();
+  const { colors } = useTheme();
+  const styles = useStyles();
   const router = useRouter();
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -190,7 +204,7 @@ export default function InvoiceDetailScreen() {
     try {
       await fn();
     } catch (error) {
-      Alert.alert('Aktion fehlgeschlagen', errorMessage(error));
+      Alert.alert(tr('Aktion fehlgeschlagen', 'Action failed'), errorMessage(error));
     } finally {
       setBusy(null);
     }
@@ -219,22 +233,22 @@ export default function InvoiceDetailScreen() {
         void run('duplicate', async () => {
           const copy = await api.invoices.duplicate(companyId, i.id);
           invalidateInvoiceData(queryClient, companyId, copy);
-          toast('Kopie als Entwurf angelegt');
+          toast(tr('Kopie als Entwurf angelegt', 'Copy created as draft'));
           router.push(`/invoice/${copy.id}`);
         });
         return;
       case 'delete':
-        Alert.alert('Entwurf löschen?', 'Der Rechnungsentwurf wird endgültig gelöscht.', [
-          { text: 'Abbrechen', style: 'cancel' },
+        Alert.alert(tr('Entwurf löschen?', 'Delete draft?'), tr('Der Rechnungsentwurf wird endgültig gelöscht.', 'The draft invoice will be deleted permanently.'), [
+          { text: tr('Abbrechen', 'Cancel'), style: 'cancel' },
           {
-            text: 'Löschen',
+            text: tr('Löschen', 'Delete'),
             style: 'destructive',
             onPress: () =>
               void run('delete', async () => {
                 await api.invoices.delete(companyId, i.id);
                 queryClient.removeQueries({ queryKey: keys.invoice(companyId, i.id) });
                 invalidateInvoiceData(queryClient, companyId, { id: i.id, customerId: i.customerId, jobId: i.jobId, quotationId: i.quotationId });
-                toast('Entwurf gelöscht');
+                toast(tr('Entwurf gelöscht', 'Draft deleted'));
                 router.back();
               }),
           },
@@ -245,18 +259,25 @@ export default function InvoiceDetailScreen() {
 
   const removePayment = (paymentId: string, amount: number) => {
     if (!i) return;
-    Alert.alert('Zahlung entfernen?', `Die Zahlung über ${formatEur(amount)} wird entfernt und der offene Betrag neu berechnet.`, [
-      { text: 'Abbrechen', style: 'cancel' },
+    Alert.alert(
+      tr('Zahlung entfernen?', 'Remove payment?'),
+      tr(
+        `Die Zahlung über ${formatEur(amount)} wird entfernt und der offene Betrag neu berechnet.`,
+        `The payment of ${formatEur(amount)} will be removed and the amount due recalculated.`,
+      ),
+      [
+      { text: tr('Abbrechen', 'Cancel'), style: 'cancel' },
       {
-        text: 'Entfernen',
+        text: tr('Entfernen', 'Remove'),
         style: 'destructive',
         onPress: () =>
           void run(`payment-${paymentId}`, async () => {
             refresh(await api.invoices.removePayment(companyId, i.id, paymentId));
-            toast('Zahlung entfernt');
+            toast(tr('Zahlung entfernt', 'Payment removed'));
           }),
       },
-    ]);
+      ],
+    );
   };
 
   if (query.isPending) return <Screen><ListSkeleton rows={3} /></Screen>;
@@ -281,7 +302,7 @@ export default function InvoiceDetailScreen() {
         options={{
           title: invoiceHeaderTitle(i),
           headerRight: () => (
-            <IconButton icon="ellipsis-horizontal-circle-outline" accessibilityLabel="Weitere Aktionen" onPress={() => setSheet('more')} testID="invoice-more" />
+            <IconButton icon="ellipsis-horizontal-circle-outline" accessibilityLabel={tr('Weitere Aktionen', 'More actions')} onPress={() => setSheet('more')} testID="invoice-more" />
           ),
         }}
       />
@@ -289,12 +310,12 @@ export default function InvoiceDetailScreen() {
         <Card style={styles.gap}>
           <View style={styles.rowBetween}>
             <Text variant="caption" tone="secondary" style={styles.flex}>
-              {isDraft ? 'Rechnungsentwurf' : invoiceLabel(i)}
+              {isDraft ? tr('Rechnungsentwurf', 'Draft invoice') : invoiceLabel(i)}
             </Text>
             <InvoiceStatusBadge invoice={i} />
           </View>
           <Text variant="title" accessibilityRole="header">
-            {i.title || 'Ohne Betreff'}
+            {i.title || tr('Ohne Betreff', 'No subject')}
           </Text>
           <LinkText label={i.customerName} onPress={() => router.push(`/customer/${i.customerId}`)} />
           <Text variant="heading" testID="invoice-gross">
@@ -302,20 +323,20 @@ export default function InvoiceDetailScreen() {
           </Text>
           {i.status === 'PartiallyPaid' ? (
             <Text variant="caption" tone="secondary">
-              offen {formatEur(i.openAmount)} · bezahlt {formatEur(i.paidAmount)}
+              {tr(`offen ${formatEur(i.openAmount)} · bezahlt ${formatEur(i.paidAmount)}`, `${formatEur(i.openAmount)} due · ${formatEur(i.paidAmount)} paid`)}
             </Text>
           ) : null}
           <View style={styles.rowWrap}>
-            <KeyValue label="Rechnungsdatum" value={formatDate(i.issueDate)} />
+            <KeyValue label={tr('Rechnungsdatum', 'Invoice date')} value={formatDate(i.issueDate)} />
             <KeyValue label={service.label} value={service.value} />
-            {!isCancellation ? <KeyValue label="Fällig am" value={formatDate(i.dueDate)} testID="invoice-due" /> : null}
-            {i.buyerReference ? <KeyValue label="Referenz" value={i.buyerReference} /> : null}
-            {i.sentAt ? <KeyValue label="Versendet" value={formatDateTime(i.sentAt)} /> : null}
+            {!isCancellation ? <KeyValue label={tr('Fällig am', 'Due on')} value={formatDate(i.dueDate)} testID="invoice-due" /> : null}
+            {i.buyerReference ? <KeyValue label={tr('Referenz', 'Reference')} value={i.buyerReference} /> : null}
+            {i.sentAt ? <KeyValue label={tr('Versendet', 'Sent')} value={formatDateTime(i.sentAt)} /> : null}
           </View>
         </Card>
 
         {isDraft && i.issueProblems.length > 0 ? (
-          <InfoAlert tone="warning" title="Vor dem Stellen noch erforderlich" testID="issue-problems">
+          <InfoAlert tone="warning" title={tr('Vor dem Stellen noch erforderlich', 'Still required before issuing')} testID="issue-problems">
             {i.issueProblems.map((p) => (
               <Text key={p} variant="caption" style={{ color: colors.palette.warning.text }}>
                 • {p}
@@ -324,31 +345,40 @@ export default function InvoiceDetailScreen() {
           </InfoAlert>
         ) : null}
         {isDraft && i.issueProblems.length === 0 ? (
-          <InfoAlert tone="info" title="Entwurf">
+          <InfoAlert tone="info" title={tr('Entwurf', 'Draft')}>
             <Text variant="caption" tone="secondary">
-              Die Rechnungsnummer wird erst beim Stellen vergeben. Die PDF-Vorschau trägt den Vermerk „Entwurf“.
+              {tr(
+                'Die Rechnungsnummer wird erst beim Stellen vergeben. Die PDF-Vorschau trägt den Vermerk „Entwurf“.',
+                'The invoice number is assigned only when issued. The PDF preview is marked “Entwurf” (draft).',
+              )}
             </Text>
           </InfoAlert>
         ) : null}
         {i.isOverdue ? (
-          <InfoAlert tone="danger" title={`Seit ${i.daysOverdue} ${i.daysOverdue === 1 ? 'Tag' : 'Tagen'} überfällig`} testID="overdue-alert">
+          <InfoAlert tone="danger" title={tr(`Seit ${i.daysOverdue} ${i.daysOverdue === 1 ? 'Tag' : 'Tagen'} überfällig`, `${i.daysOverdue} ${i.daysOverdue === 1 ? 'day' : 'days'} overdue`)} testID="overdue-alert">
             <Text variant="caption" style={{ color: colors.palette.danger.text }}>
-              Fällig war die Zahlung am {formatDate(i.dueDate)}. Offen: {formatEur(i.openAmount)}.
+              {tr(
+                `Fällig war die Zahlung am ${formatDate(i.dueDate)}. Offen: ${formatEur(i.openAmount)}.`,
+                `Payment was due on ${formatDate(i.dueDate)}. Amount due: ${formatEur(i.openAmount)}.`,
+              )}
               {i.reminderCount > 0
-                ? ` ${i.reminderCount} ${i.reminderCount === 1 ? 'Erinnerung' : 'Erinnerungen'} gesendet${i.lastReminderAt ? `, zuletzt ${formatDateTime(i.lastReminderAt)}` : ''}.`
+                ? tr(
+                  ` ${i.reminderCount} ${i.reminderCount === 1 ? 'Erinnerung' : 'Erinnerungen'} gesendet${i.lastReminderAt ? `, zuletzt ${formatDateTime(i.lastReminderAt)}` : ''}.`,
+                  ` ${i.reminderCount} ${i.reminderCount === 1 ? 'reminder' : 'reminders'} sent${i.lastReminderAt ? `, last ${formatDateTime(i.lastReminderAt)}` : ''}.`,
+                )
                 : ''}
             </Text>
           </InfoAlert>
         ) : null}
         {i.status === 'Paid' ? (
-          <InfoAlert tone="success" title={`Vollständig bezahlt${i.paidOn ? ` am ${formatDate(i.paidOn)}` : ''}`} testID="paid-alert" />
+          <InfoAlert tone="success" title={tr(`Vollständig bezahlt${i.paidOn ? ` am ${formatDate(i.paidOn)}` : ''}`, `Paid in full${i.paidOn ? ` on ${formatDate(i.paidOn)}` : ''}`)} testID="paid-alert" />
         ) : null}
         {i.status === 'Cancelled' ? (
-          <InfoAlert tone="muted" title={`Storniert${i.cancelledAt ? ` am ${formatDateTime(i.cancelledAt)}` : ''}`} testID="cancelled-alert">
-            {i.cancellationReason ? <Text variant="caption" tone="secondary">Grund: {i.cancellationReason}</Text> : null}
+          <InfoAlert tone="muted" title={tr(`Storniert${i.cancelledAt ? ` am ${formatDateTime(i.cancelledAt)}` : ''}`, `Cancelled${i.cancelledAt ? ` on ${formatDateTime(i.cancelledAt)}` : ''}`)} testID="cancelled-alert">
+            {i.cancellationReason ? <Text variant="caption" tone="secondary">{tr('Grund', 'Reason')}: {i.cancellationReason}</Text> : null}
             {i.cancellationInvoiceId ? (
               <LinkText
-                label={`Stornorechnung ${i.cancellationInvoiceNumber ?? ''} öffnen`.replace('  ', ' ')}
+                label={tr(`Stornorechnung ${i.cancellationInvoiceNumber ?? ''} öffnen`, `Open cancellation invoice ${i.cancellationInvoiceNumber ?? ''}`).replace(/\s+/g, ' ').trim()}
                 onPress={() => router.push(`/invoice/${i.cancellationInvoiceId}`)}
                 testID="open-cancellation-invoice"
               />
@@ -356,12 +386,15 @@ export default function InvoiceDetailScreen() {
           </InfoAlert>
         ) : null}
         {isCancellation ? (
-          <InfoAlert tone="info" title="Stornorechnung" testID="cancellation-alert">
+          <InfoAlert tone="info" title={tr('Stornorechnung', 'Cancellation invoice')} testID="cancellation-alert">
             <Text variant="caption" tone="secondary">
-              Diese Rechnung storniert {i.cancelledInvoiceNumber ? `Rechnung ${i.cancelledInvoiceNumber}` : 'die ursprüngliche Rechnung'} in voller Höhe.
+              {tr(
+                `Diese Rechnung storniert ${i.cancelledInvoiceNumber ? `Rechnung ${i.cancelledInvoiceNumber}` : 'die ursprüngliche Rechnung'} in voller Höhe.`,
+                `This invoice cancels ${i.cancelledInvoiceNumber ? `invoice ${i.cancelledInvoiceNumber}` : 'the original invoice'} in full.`,
+              )}
             </Text>
             {i.cancelledInvoiceId ? (
-              <LinkText label="Ursprüngliche Rechnung öffnen" onPress={() => router.push(`/invoice/${i.cancelledInvoiceId}`)} testID="open-original-invoice" />
+              <LinkText label={tr('Ursprüngliche Rechnung öffnen', 'Open original invoice')} onPress={() => router.push(`/invoice/${i.cancelledInvoiceId}`)} testID="open-original-invoice" />
             ) : null}
           </InfoAlert>
         ) : null}
@@ -383,24 +416,24 @@ export default function InvoiceDetailScreen() {
         ) : null}
         <View style={styles.quickRow}>
           <Button
-            label={isDraft ? 'PDF-Vorschau' : 'PDF'}
+            label={isDraft ? tr('PDF-Vorschau', 'PDF preview') : 'PDF'}
             icon="document-attach-outline"
             variant="secondary"
             onPress={() => handle('pdf')}
             loading={busy === 'pdf'}
             style={styles.flex}
-            accessibilityLabel={isDraft ? 'PDF-Vorschau teilen' : 'PDF teilen'}
+            accessibilityLabel={isDraft ? tr('PDF-Vorschau teilen', 'Share PDF preview') : tr('PDF teilen', 'Share PDF')}
             testID="invoice-action-pdf"
           />
           {i.hasEInvoice ? (
             <Button
-              label="E-Rechnung (XML)"
+              label={tr('E-Rechnung (XML)', 'E-invoice (XML)')}
               icon="code-download-outline"
               variant="secondary"
               onPress={() => handle('xml')}
               loading={busy === 'xml'}
               style={styles.flex}
-              accessibilityLabel="E-Rechnung (XML) teilen"
+              accessibilityLabel={tr('E-Rechnung (XML) teilen', 'Share e-invoice (XML)')}
               testID="invoice-action-xml"
             />
           ) : null}
@@ -408,20 +441,20 @@ export default function InvoiceDetailScreen() {
 
         {i.quotationId || i.jobId ? (
           <>
-            <SectionHeader title="Herkunft" />
+            <SectionHeader title={tr('Herkunft', 'Source')} />
             <Card>
               {i.quotationId ? (
-                <LinkText label={`Angebot ${i.quotationNumber ?? ''}`.trim()} onPress={() => router.push(`/quotation/${i.quotationId}`)} testID="invoice-source-quotation" />
+                <LinkText label={`${tr('Angebot', 'Quotation')} ${i.quotationNumber ?? ''}`.trim()} onPress={() => router.push(`/quotation/${i.quotationId}`)} testID="invoice-source-quotation" />
               ) : null}
-              {i.jobId ? <LinkText label={`Auftrag ${i.jobNumber ?? ''}`.trim()} onPress={() => router.push(`/job/${i.jobId}`)} testID="invoice-source-job" /> : null}
+              {i.jobId ? <LinkText label={`${tr('Auftrag', 'Job')} ${i.jobNumber ?? ''}`.trim()} onPress={() => router.push(`/job/${i.jobId}`)} testID="invoice-source-job" /> : null}
             </Card>
           </>
         ) : null}
 
-        <SectionHeader title={`Positionen (${i.lineItems.length})`} />
+        <SectionHeader title={`${tr('Positionen', 'Line items')} (${i.lineItems.length})`} />
         {i.lineItems.length === 0 ? (
           <Text variant="caption" tone="muted">
-            Noch keine Positionen.
+            {tr('Noch keine Positionen.', 'No line items yet.')}
           </Text>
         ) : null}
         {i.lineItems
@@ -431,7 +464,7 @@ export default function InvoiceDetailScreen() {
             <Card key={li.id} style={styles.gapSm} testID={`invoice-line-${li.position}`}>
               <View style={styles.rowBetween}>
                 <Text variant="small" tone="muted">
-                  Pos. {li.position}
+                  {tr('Pos.', 'Item')} {li.position}
                 </Text>
                 <Text variant="bodyStrong">{sign(li.lineNet)}</Text>
               </View>
@@ -440,21 +473,21 @@ export default function InvoiceDetailScreen() {
               <Text variant="caption" tone="secondary">
                 {formatQuantity(li.quantity)} {li.unit} × {formatEur(li.unitPriceNet)}
                 {li.discountPercent ? ` · −${formatPercent(li.discountPercent)}` : ''}
-                {i.taxMode === 'Standard' ? ` · ${formatPercent(li.taxRatePercent)} USt.` : ''}
+                {i.taxMode === 'Standard' ? ` · ${formatPercent(li.taxRatePercent)} ${tr('USt.', 'VAT')}` : ''}
               </Text>
             </Card>
           ))}
 
-        <SectionHeader title="Summen" />
+        <SectionHeader title={tr('Summen', 'Totals')} />
         <Totals i={i} />
 
         {!isDraft && !isCancellation ? (
           <>
-            <SectionHeader title={`Zahlungen (${i.payments.length})`} />
+            <SectionHeader title={`${tr('Zahlungen', 'Payments')} (${i.payments.length})`} />
             <Card testID="invoice-payments">
               {i.payments.length === 0 ? (
                 <Text variant="caption" tone="muted">
-                  Noch keine Zahlungen erfasst.
+                  {tr('Noch keine Zahlungen erfasst.', 'No payments recorded yet.')}
                 </Text>
               ) : null}
               {i.payments.map((p, index) => (
@@ -467,18 +500,18 @@ export default function InvoiceDetailScreen() {
           </>
         ) : null}
 
-        <SectionHeader title="Details" />
+        <SectionHeader title={tr('Details', 'Details')} />
         <Card>
-          <KeyValue label="Empfänger" value={[i.recipientName, i.recipientContact, i.recipientAddress].filter(Boolean).join('\n')} />
-          {i.recipientEmail ? <KeyValue label="E-Mail" value={i.recipientEmail} /> : null}
-          {i.recipientVatId ? <KeyValue label="USt-IdNr. des Kunden" value={i.recipientVatId} /> : null}
-          <KeyValue label="Besteuerung" value={taxModeLabel[i.taxMode]} />
-          {i.introText ? <KeyValue label="Einleitung" value={i.introText} /> : null}
-          {i.closingText ? <KeyValue label="Schlusstext" value={i.closingText} /> : null}
-          {i.paymentTerms ? <KeyValue label="Zahlungshinweis" value={i.paymentTerms} /> : null}
-          {i.internalNotes ? <KeyValue label="Interne Notiz" value={i.internalNotes} /> : null}
-          {i.issuedAt ? <KeyValue label="Gestellt" value={formatDateTime(i.issuedAt)} /> : null}
-          <KeyValue label="Angelegt" value={formatDateTime(i.createdAt)} />
+          <KeyValue label={tr('Empfänger', 'Recipient')} value={[i.recipientName, i.recipientContact, i.recipientAddress].filter(Boolean).join('\n')} />
+          {i.recipientEmail ? <KeyValue label={tr('E-Mail', 'Email')} value={i.recipientEmail} /> : null}
+          {i.recipientVatId ? <KeyValue label={tr('USt-IdNr. des Kunden', 'Customer VAT ID')} value={i.recipientVatId} /> : null}
+          <KeyValue label={tr('Besteuerung', 'Tax treatment')} value={taxModeLabel[i.taxMode]} />
+          {i.introText ? <KeyValue label={tr('Einleitung', 'Introduction')} value={i.introText} /> : null}
+          {i.closingText ? <KeyValue label={tr('Schlusstext', 'Closing text')} value={i.closingText} /> : null}
+          {i.paymentTerms ? <KeyValue label={tr('Zahlungshinweis', 'Payment note')} value={i.paymentTerms} /> : null}
+          {i.internalNotes ? <KeyValue label={tr('Interne Notiz', 'Internal note')} value={i.internalNotes} /> : null}
+          {i.issuedAt ? <KeyValue label={tr('Gestellt', 'Issued')} value={formatDateTime(i.issuedAt)} /> : null}
+          <KeyValue label={tr('Angelegt', 'Created')} value={formatDateTime(i.createdAt)} />
         </Card>
 
         <History id={i.id} />
@@ -487,7 +520,7 @@ export default function InvoiceDetailScreen() {
       <OptionSheet
         visible={sheet === 'more'}
         onClose={() => setSheet(null)}
-        title="Weitere Aktionen"
+        title={tr('Weitere Aktionen', 'More actions')}
         options={[...primary, ...more].map((a) => ({ value: a.action, label: a.label, icon: a.icon, destructive: a.destructive }))}
         onSelect={(a) => setTimeout(() => handle(a), 250)}
       />
@@ -504,7 +537,7 @@ export default function InvoiceDetailScreen() {
             const issued = await api.invoices.issue(companyId, i.id);
             refresh(issued);
             setSheet(null);
-            toast(`Rechnung ${issued.number ?? ''} gestellt`);
+            toast(tr(`Rechnung ${issued.number ?? ''} gestellt`, `Invoice ${issued.number ?? ''} issued`));
           } catch (error) {
             // The server lists what is missing (409 invoice_incomplete); reload so the problem list is current.
             void query.refetch();
@@ -520,7 +553,7 @@ export default function InvoiceDetailScreen() {
           const res = await api.invoices.send(companyId, i.id, body);
           refresh(res.invoice);
           setSheet(null);
-          toast(body.mode === 'Email' ? 'E-Mail wird versendet – Status im Verlauf' : 'Als versendet markiert');
+          toast(body.mode === 'Email' ? tr('E-Mail wird versendet – Status im Verlauf', 'Email is being sent – see status in the history') : tr('Als versendet markiert', 'Marked as sent'));
         }}
       />
       <PaymentSheet
@@ -531,7 +564,7 @@ export default function InvoiceDetailScreen() {
           const updated = await api.invoices.recordPayment(companyId, i.id, body);
           refresh(updated);
           setSheet(null);
-          toast(updated.status === 'Paid' ? 'Zahlung erfasst – Rechnung bezahlt' : 'Zahlung erfasst');
+          toast(updated.status === 'Paid' ? tr('Zahlung erfasst – Rechnung bezahlt', 'Payment recorded – invoice paid') : tr('Zahlung erfasst', 'Payment recorded'));
         }}
       />
       <RemindSheet
@@ -542,7 +575,7 @@ export default function InvoiceDetailScreen() {
           const res = await api.invoices.remind(companyId, i.id, body);
           refresh(res.invoice);
           setSheet(null);
-          toast('Zahlungserinnerung wird versendet');
+          toast(tr('Zahlungserinnerung wird versendet', 'Payment reminder is being sent'));
         }}
       />
       <InvoiceCancelSheet
@@ -553,14 +586,18 @@ export default function InvoiceDetailScreen() {
           const updated = await api.invoices.cancel(companyId, i.id, { reason });
           refresh(updated);
           setSheet(null);
-          toast(updated.cancellationInvoiceNumber ? `Stornorechnung ${updated.cancellationInvoiceNumber} erstellt` : 'Rechnung storniert');
+          toast(
+            updated.cancellationInvoiceNumber
+              ? tr(`Stornorechnung ${updated.cancellationInvoiceNumber} erstellt`, `Cancellation invoice ${updated.cancellationInvoiceNumber} created`)
+              : tr('Rechnung storniert', 'Invoice cancelled'),
+          );
         }}
       />
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   flex: { flex: 1, minWidth: 0 },
   gap: { gap: space[2] },
   gapSm: { gap: 2 },
@@ -576,4 +613,4 @@ const styles = StyleSheet.create({
   payment: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
   event: { flexDirection: 'row', gap: space[3], paddingVertical: space[2] },
   eventDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brandBorder, marginTop: 8 },
-});
+}));

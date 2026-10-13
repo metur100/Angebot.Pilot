@@ -12,10 +12,11 @@ import { Sheet } from '@/components/Sheet';
 import { EmptyState, ErrorState, InlineError } from '@/components/States';
 import { emptyToNull } from '@/lib/forms';
 import { useDebouncedValue } from '@/lib/hooks';
+import { useLocale } from '@/lib/i18n';
 import { flattenPages, keys, useCustomerList } from '@/lib/queries';
 import { api, useCompanyId } from '@/lib/session';
 import { errorMessage } from '@angebotpilot/api-contracts';
-import { colors, space } from '@/theme';
+import { space, useTheme } from '@/theme';
 
 export interface PickedCustomer {
   id: string;
@@ -24,6 +25,7 @@ export interface PickedCustomer {
 
 function QuickCreate({ onCreated, onCancel, initialName }: { onCreated: (c: CustomerDto) => void; onCancel: () => void; initialName: string }) {
   const companyId = useCompanyId();
+  const { tr } = useLocale();
   const queryClient = useQueryClient();
   const [type, setType] = useState<CustomerType>('Business');
   const [companyName, setCompanyName] = useState(initialName);
@@ -70,31 +72,31 @@ function QuickCreate({ onCreated, onCancel, initialName }: { onCreated: (c: Cust
   return (
     <View style={styles.quick} testID="quick-create-customer">
       <SegmentedControl
-        accessibilityLabel="Kundenart"
+        accessibilityLabel={tr('Kundenart', 'Customer type')}
         options={[
-          { value: 'Business', label: 'Geschäftskunde' },
-          { value: 'Private', label: 'Privatkunde' },
+          { value: 'Business', label: tr('Geschäftskunde', 'Business customer') },
+          { value: 'Private', label: tr('Privatkunde', 'Private customer') },
         ]}
         value={type}
         onChange={setType}
       />
       {type === 'Business' ? (
-        <TextField label="Firmenname" value={companyName} onChangeText={setCompanyName} error={errors.companyName} required testID="quick-companyName" />
+        <TextField label={tr('Firmenname', 'Company name')} value={companyName} onChangeText={setCompanyName} error={errors.companyName} required testID="quick-companyName" />
       ) : null}
       <View style={styles.row}>
         <View style={styles.flex}>
-          <TextField label="Vorname" value={firstName} onChangeText={setFirstName} error={errors.firstName} />
+          <TextField label={tr('Vorname', 'First name')} value={firstName} onChangeText={setFirstName} error={errors.firstName} />
         </View>
         <View style={styles.flex}>
-          <TextField label="Nachname" value={lastName} onChangeText={setLastName} error={errors.lastName} required={type === 'Private'} testID="quick-lastName" />
+          <TextField label={tr('Nachname', 'Last name')} value={lastName} onChangeText={setLastName} error={errors.lastName} required={type === 'Private'} testID="quick-lastName" />
         </View>
       </View>
-      <TextField label="E-Mail" value={email} onChangeText={setEmail} error={errors.email} keyboardType="email-address" autoCapitalize="none" />
-      <TextField label="Telefon" value={phone} onChangeText={setPhone} error={errors.phone} keyboardType="phone-pad" />
+      <TextField label={tr('E-Mail', 'Email')} value={email} onChangeText={setEmail} error={errors.email} keyboardType="email-address" autoCapitalize="none" />
+      <TextField label={tr('Telefon', 'Phone')} value={phone} onChangeText={setPhone} error={errors.phone} keyboardType="phone-pad" />
       <InlineError message={formError} />
       <View style={styles.row}>
-        <Button label="Zurück" variant="outline" onPress={onCancel} style={styles.flex} />
-        <Button label="Anlegen & wählen" onPress={() => void save()} loading={saving} style={styles.flex} testID="quick-save" />
+        <Button label={tr('Zurück', 'Back')} variant="outline" onPress={onCancel} style={styles.flex} />
+        <Button label={tr('Anlegen & wählen', 'Create & select')} onPress={() => void save()} loading={saving} style={styles.flex} testID="quick-save" />
       </View>
     </View>
   );
@@ -103,6 +105,8 @@ function QuickCreate({ onCreated, onCancel, initialName }: { onCreated: (c: Cust
 export function CustomerPicker({
   visible, onClose, onPick,
 }: { visible: boolean; onClose: () => void; onPick: (customer: PickedCustomer) => void }) {
+  const { tr } = useLocale();
+  const { colors } = useTheme();
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
   const debounced = useDebouncedValue(search.trim());
@@ -117,15 +121,15 @@ export function CustomerPicker({
   };
 
   return (
-    <Sheet visible={visible} onClose={onClose} title={creating ? 'Neuen Kunden anlegen' : 'Kunde wählen'} tall scroll={creating} testID="customer-picker">
+    <Sheet visible={visible} onClose={onClose} title={creating ? tr('Neuen Kunden anlegen', 'Create new customer') : tr('Kunde wählen', 'Choose customer')} tall scroll={creating} testID="customer-picker">
       {creating ? (
         <QuickCreate onCreated={pick} onCancel={() => setCreating(false)} initialName={search} />
       ) : (
         <View style={styles.flex}>
-          <SearchBar value={search} onChangeText={setSearch} placeholder="Kunden suchen" testID="picker-search" />
-          <Button label="Neuen Kunden anlegen" icon="person-add-outline" variant="secondary" onPress={() => setCreating(true)} style={styles.newButton} testID="picker-new" />
+          <SearchBar value={search} onChangeText={setSearch} placeholder={tr('Kunden suchen', 'Search customers')} testID="picker-search" />
+          <Button label={tr('Neuen Kunden anlegen', 'Create new customer')} icon="person-add-outline" variant="secondary" onPress={() => setCreating(true)} style={styles.newButton} testID="picker-new" />
           {query.isPending ? (
-            <ActivityIndicator color={colors.brand} style={styles.loading} />
+            <ActivityIndicator color={colors.brandText} style={styles.loading} />
           ) : query.isError && items.length === 0 ? (
             <ErrorState error={query.error} onRetry={() => void query.refetch()} compact />
           ) : (
@@ -138,7 +142,9 @@ export function CustomerPicker({
               onEndReached={() => {
                 if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
               }}
-              ListEmptyComponent={<EmptyState icon="people-outline" title="Keine Kunden gefunden" message="Legen Sie einen neuen Kunden an." />}
+              ListEmptyComponent={
+                <EmptyState icon="people-outline" title={tr('Keine Kunden gefunden', 'No customers found')} message={tr('Legen Sie einen neuen Kunden an.', 'Create a new customer.')} />
+              }
               contentContainerStyle={styles.list}
             />
           )}

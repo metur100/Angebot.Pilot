@@ -6,6 +6,7 @@
 import {
   ApiError,
   createApiClient,
+  getLocale,
   NetworkError,
   type AuthResponse,
   type MeDto,
@@ -16,6 +17,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useSyncExternalStore } from 'react';
 
 import { API_BASE_URL } from './config';
+import { applyAccountLanguage } from './preferences';
 import { queryClient } from './queryClient';
 
 export const SECURE_KEYS = {
@@ -114,6 +116,8 @@ async function applyAuth(response: AuthResponse) {
     await SecureStore.setItemAsync(SECURE_KEYS.refreshToken, response.refreshToken);
   }
   const preferred = state.activeCompanyId ?? (await SecureStore.getItemAsync(SECURE_KEYS.activeCompanyId));
+  // After sign-in the language saved on the account wins over the device choice.
+  applyAccountLanguage(response.user);
   setState({ user: response.user, activeCompanyId: pickCompany(response.user, preferred) });
 }
 
@@ -155,7 +159,8 @@ export async function login(email: string, password: string): Promise<void> {
 }
 
 export async function register(body: Omit<RegisterRequest, 'client'>): Promise<void> {
-  const response = await api.auth.register({ ...body, email: body.email.trim(), client: 'Mobile' });
+  // The account starts in the language the user registered in (verification email, later sign-ins).
+  const response = await api.auth.register({ language: getLocale(), ...body, email: body.email.trim(), client: 'Mobile' });
   await applyAuth(response);
   setState({ status: 'signedIn', expired: false });
 }
@@ -190,11 +195,13 @@ export async function reloadUser(preferCompanyId?: string): Promise<MeDto> {
   const user = await api.me.get();
   const activeCompanyId = pickCompany(user, preferCompanyId ?? state.activeCompanyId);
   if (activeCompanyId) await SecureStore.setItemAsync(SECURE_KEYS.activeCompanyId, activeCompanyId);
+  applyAccountLanguage(user);
   setState({ user, activeCompanyId });
   return user;
 }
 
 export function updateUser(user: MeDto) {
+  applyAccountLanguage(user);
   setState({ user, activeCompanyId: pickCompany(user, state.activeCompanyId) });
 }
 

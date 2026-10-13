@@ -1,15 +1,20 @@
 import { ActivityIndicator, Image, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors, space } from '@/theme';
+import { useLocale } from '@/lib/i18n';
+import { space, themes } from '@/theme';
 
 import { Button } from './Button';
 import { Text } from './Text';
 
 const icon = require('../../assets/images/splash-icon.png');
 
+// The splash keeps the brand blue of the native splash screen in both colour schemes (seamless hand-over).
+const splash = themes.light.colors;
+
 /** Branded loading screen while the session is restored (stored refresh token → new access token). */
 export function SplashView({ offline, onRetry }: { offline?: boolean; onRetry?: () => void }) {
+  const { tr } = useLocale();
   return (
     <SafeAreaView style={styles.root} testID="splash">
       <View style={styles.center}>
@@ -20,15 +25,18 @@ export function SplashView({ offline, onRetry }: { offline?: boolean; onRetry?: 
         {offline ? (
           <View style={styles.offline} accessibilityRole="alert">
             <Text variant="body" tone="inverse" align="center">
-              Keine Verbindung zum Server. Bitte prüfen Sie Ihre Internetverbindung.
+              {tr(
+                'Keine Verbindung zum Server. Bitte prüfen Sie Ihre Internetverbindung.',
+                'No connection to the server. Please check your internet connection.',
+              )}
             </Text>
-            <Button label="Erneut versuchen" icon="refresh" variant="secondary" onPress={onRetry} fullWidth={false} testID="splash-retry" />
+            <Button label={tr('Erneut versuchen', 'Try again')} icon="refresh" variant="secondary" onPress={onRetry} fullWidth={false} testID="splash-retry" />
           </View>
         ) : (
-          <View style={styles.progress} accessibilityRole="progressbar" accessibilityLabel="Anmeldung wird geprüft">
-            <ActivityIndicator color={colors.onBrand} />
+          <View style={styles.progress} accessibilityRole="progressbar" accessibilityLabel={tr('Anmeldung wird geprüft', 'Checking sign-in')}>
+            <ActivityIndicator color={splash.onBrand} />
             <Text variant="caption" tone="inverse">
-              Anmeldung wird geprüft …
+              {tr('Anmeldung wird geprüft …', 'Checking sign-in …')}
             </Text>
           </View>
         )}
@@ -38,7 +46,7 @@ export function SplashView({ offline, onRetry }: { offline?: boolean; onRetry?: 
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.brand },
+  root: { flex: 1, backgroundColor: splash.brand },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space[6], gap: space[3] },
   icon: { width: 180, height: 180, marginBottom: -space[6] },
   progress: { marginTop: space[6], alignItems: 'center', gap: space[2] },

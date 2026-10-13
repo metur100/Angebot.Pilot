@@ -14,6 +14,7 @@ const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL?.trim() || 'https://a
 const usesLocalHttpApi = API_BASE_URL.startsWith('http://');
 
 const BRAND = '#2F45D8';
+// Default (German) permission text; localized variants live in locales/*.json (iOS InfoPlist.strings).
 const CAMERA_USAGE = 'Die Kamera wird nur zum Scannen von Angebots-QR-Codes verwendet.';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
@@ -25,7 +26,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   version: '1.0.0',
   orientation: 'portrait',
   icon: './assets/images/icon.png',
-  userInterfaceStyle: 'light',
+  // Light/dark follow the system unless the user picks a theme in the app (Appearance.setColorScheme).
+  userInterfaceStyle: 'automatic',
   backgroundColor: '#F6F7F9',
   primaryColor: BRAND,
   description: 'Angebote erstellen, nachfassen, Aufträge gewinnen – AngebotPilot für kleine Betriebe.',
@@ -40,6 +42,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       ITSAppUsesNonExemptEncryption: false,
       NSCameraUsageDescription: CAMERA_USAGE,
       CFBundleDevelopmentRegion: 'de',
+      CFBundleLocalizations: ['de', 'en'],
       CFBundleAllowMixedLocalizations: true,
     },
     privacyManifests: {
@@ -93,11 +96,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     predictiveBackGestureEnabled: false,
   },
+  // UI languages: German (default) and English. Native strings (permission prompts) per language.
+  locales: { de: './locales/de.json', en: './locales/en.json' },
   plugins: [
     'expo-router',
     [
       'expo-splash-screen',
-      { image: './assets/images/splash-icon.png', imageWidth: 180, resizeMode: 'contain', backgroundColor: BRAND },
+      { image: './assets/images/splash-icon.png', imageWidth: 180, resizeMode: 'contain', backgroundColor: BRAND, dark: { backgroundColor: BRAND } },
     ],
     [
       'expo-camera',

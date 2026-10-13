@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { colors, radius, space, touch } from '@/theme';
+import { makeStyles, radius, space, touch, useTheme, type ThemeColors } from '@/theme';
 
 import { Text } from './Text';
 
@@ -24,20 +24,22 @@ export interface ButtonProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const variantStyle: Record<Variant, { bg: string; fg: string; border: string; pressed: string }> = {
-  primary: { bg: colors.brand, fg: colors.onBrand, border: colors.brand, pressed: colors.brandDark },
+const variantStyle = (colors: ThemeColors): Record<Variant, { bg: string; fg: string; border: string; pressed: string }> => ({
+  primary: { bg: colors.brand, fg: colors.onBrand, border: colors.brand, pressed: colors.brandPressed },
   secondary: { bg: colors.brandSoft, fg: colors.brandDark, border: colors.brandSoft, pressed: colors.brandBorder },
   outline: { bg: colors.surface, fg: colors.text, border: colors.borderStrong, pressed: colors.surfaceMuted },
-  ghost: { bg: 'transparent', fg: colors.brand, border: 'transparent', pressed: colors.brandSoft },
-  danger: { bg: colors.danger, fg: colors.onBrand, border: colors.danger, pressed: '#912018' },
+  ghost: { bg: 'transparent', fg: colors.brandText, border: 'transparent', pressed: colors.brandSoft },
+  danger: { bg: colors.dangerFill, fg: colors.onBrand, border: colors.dangerFill, pressed: colors.dangerPressed },
   dangerOutline: { bg: colors.surface, fg: colors.danger, border: colors.palette.danger.border, pressed: colors.dangerSoft },
-};
+});
 
 export function Button({
   label, onPress, variant = 'primary', icon, loading, disabled, size = 'md', fullWidth = true,
   accessibilityLabel, accessibilityHint, testID, style,
 }: ButtonProps) {
-  const v = variantStyle[variant];
+  const { colors } = useTheme();
+  const styles = useStyles();
+  const v = variantStyle(colors)[variant];
   const inactive = disabled || loading;
   return (
     <Pressable
@@ -83,7 +85,9 @@ export interface IconButtonProps {
   badge?: number;
 }
 
-export function IconButton({ icon, accessibilityLabel, onPress, color = colors.text, disabled, testID, size = 22, badge }: IconButtonProps) {
+export function IconButton({ icon, accessibilityLabel, onPress, color, disabled, testID, size = 22, badge }: IconButtonProps) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -94,7 +98,7 @@ export function IconButton({ icon, accessibilityLabel, onPress, color = colors.t
       testID={testID}
       style={({ pressed }) => [styles.icon, pressed ? { backgroundColor: colors.surfaceMuted } : null, disabled ? styles.disabled : null]}
     >
-      <Ionicons name={icon} size={size} color={color} />
+      <Ionicons name={icon} size={size} color={color ?? colors.text} />
       {badge ? (
         <View style={styles.badge} accessibilityElementsHidden importantForAccessibility="no">
           <Text variant="small" tone="inverse" style={styles.badgeText}>
@@ -106,7 +110,7 @@ export function IconButton({ icon, accessibilityLabel, onPress, color = colors.t
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   base: { borderRadius: radius.lg, borderWidth: 1, justifyContent: 'center', paddingHorizontal: space[4] },
   md: { minHeight: 48, paddingVertical: space[2] },
   sm: { minHeight: 40, paddingVertical: space[1], paddingHorizontal: space[3] },
@@ -115,8 +119,8 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.5 },
   icon: { minWidth: touch, minHeight: touch, alignItems: 'center', justifyContent: 'center', borderRadius: radius.full },
   badge: {
-    position: 'absolute', top: 4, right: 2, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.danger,
+    position: 'absolute', top: 4, right: 2, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.dangerFill,
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
   },
   badgeText: { fontSize: 11, lineHeight: 14, fontWeight: '700' },
-});
+}));

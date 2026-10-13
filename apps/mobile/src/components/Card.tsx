@@ -2,12 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { colors, radius, shadow, space, touch } from '@/theme';
+import { makeStyles, radius, space, touch, useTheme } from '@/theme';
 
 import type { IconName } from './Button';
 import { Text } from './Text';
 
 export function Card({ children, style, testID }: { children: ReactNode; style?: StyleProp<ViewStyle>; testID?: string }) {
+  const styles = useStyles();
   return (
     <View style={[styles.card, style]} testID={testID}>
       {children}
@@ -26,6 +27,8 @@ export interface PressableCardProps {
 }
 
 export function PressableCard({ children, onPress, accessibilityLabel, accessibilityHint, style, testID, showChevron = true }: PressableCardProps) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -42,6 +45,7 @@ export function PressableCard({ children, onPress, accessibilityLabel, accessibi
 }
 
 export function SectionHeader({ title, action }: { title: string; action?: ReactNode }) {
+  const styles = useStyles();
   return (
     <View style={styles.sectionHeader}>
       <Text variant="label" tone="secondary" accessibilityRole="header" style={styles.sectionTitle}>
@@ -53,6 +57,7 @@ export function SectionHeader({ title, action }: { title: string; action?: React
 }
 
 export function KeyValue({ label, value, strong, testID }: { label: string; value: ReactNode; strong?: boolean; testID?: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.kv} testID={testID}>
       <Text variant="caption" tone="secondary" style={styles.kvLabel}>
@@ -70,6 +75,7 @@ export function KeyValue({ label, value, strong, testID }: { label: string; valu
 }
 
 export function Divider({ spaced }: { spaced?: boolean }) {
+  const styles = useStyles();
   return <View style={[styles.divider, spaced ? styles.dividerSpaced : null]} />;
 }
 
@@ -87,6 +93,8 @@ export interface ListRowProps {
 
 /** A settings-style row (≥ 48 pt) with icon, label, optional value and chevron. */
 export function ListRow({ icon, label, value, onPress, destructive, accessibilityHint, testID, disabled, external }: ListRowProps) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const color = destructive ? colors.danger : colors.text;
   const content = (
     <>
@@ -121,7 +129,7 @@ export function ListRow({ icon, label, value, onPress, destructive, accessibilit
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, shadow }) => ({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
@@ -148,4 +156,4 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: Math.max(touch, 52),
     paddingVertical: space[2], paddingHorizontal: space[4], backgroundColor: colors.surface,
   },
-});
+}));

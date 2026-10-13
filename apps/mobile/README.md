@@ -1,6 +1,7 @@
 # AngebotPilot – Android & iOS app
 
-Native React Native app (Expo SDK 57, React Native 0.86, Expo Router, TypeScript). UI language German.
+Native React Native app (Expo SDK 57, React Native 0.86, Expo Router, TypeScript). UI in German (default) or English,
+light or dark theme.
 `apps/mobile` is a **standalone npm project** (own `package-lock.json`, not part of the root workspaces); the shared
 packages are linked via `file:../../packages/*` and compiled from source by Metro (see `metro.config.js`).
 
@@ -27,6 +28,27 @@ npm run assets                 # re-render icons/splash + store artwork from pac
 
 `android/` and `ios/` are generated (Continuous Native Generation) and git-ignored; all native settings live in
 `app.config.ts` and `plugins/`.
+
+## UI language (German / English)
+- The locale is module state in `@angebotpilot/api-contracts` (`getLocale/setLocale`, `tr(de, en)`); labels, number/date
+  formatting, zod messages and API errors follow it, and the API client sends `Accept-Language`.
+- `src/lib/i18n.tsx`: `LocaleProvider` + `useLocale()` → `{ locale, intlTag, setLanguage, tr }`. Convention: inline pairs,
+  `tr('Speichern', 'Save')`, evaluated at render time; components that show text call `useLocale()` so they re-render on a
+  switch (module-level string tables must be functions). Typed numbers use `src/lib/numbers.ts` (locale-aware).
+- Rule: signed out → stored device choice (SecureStore `angebotpilot.language`), else the device language; after sign-in
+  `MeDto.language` wins. Switching while signed in also PATCHes `/me`; registration sends `language`. Switchers: login,
+  register, "More" and "My account".
+- Documents (PDFs, e-invoices, customer emails, send-dialog prefills, shared file names) stay German.
+- Native strings (iOS camera permission) per language: `locales/de.json`, `locales/en.json`.
+
+## Theme (system / light / dark)
+- `src/theme`: static tokens (`space`, `radius`, `font`, `touch`) plus per-scheme colours built from
+  `@angebotpilot/brand` (`colors` / `darkColors`). There are no static colour exports: use `useTheme()` →
+  `{ scheme, colors, toneColors, shadow }` or `const useStyles = makeStyles(({ colors }) => ({ … }))` (memoised per scheme).
+  Fills use `colors.brand`, brand-coloured text/icons `colors.brandText`, destructive fills `colors.dangerFill`.
+- Preference `system | light | dark` (SecureStore `angebotpilot.theme`, default system) via `useThemePreference()`;
+  it also sets `Appearance.setColorScheme` so native pickers/alerts/keyboard match. Root layout wires the navigation
+  theme, status bar style and `expo-system-ui` background. `userInterfaceStyle: automatic` in `app.config.ts`.
 
 ## Android
 
@@ -78,7 +100,7 @@ for every upload. EAS alternative: `eas build -p android --profile production` (
 
 ## iOS (requires macOS – not buildable on the Windows dev machine)
 Configured in `app.config.ts`: bundle id, `buildNumber`, iPhone only, `ITSAppUsesNonExemptEncryption=false`, German
-camera usage text, privacy manifest (UserDefaults CA92.1, FileTimestamp C617.1, SystemBootTime 35F9.1, DiskSpace E174.1;
+(+ English, see `locales/`) camera usage text, privacy manifest (UserDefaults CA92.1, FileTimestamp C617.1, SystemBootTime 35F9.1, DiskSpace E174.1;
 no tracking). Build on a Mac (`npx expo prebuild -p ios && open ios/*.xcworkspace`) or in the cloud:
 `eas build -p ios --profile production` (remote credentials).
 

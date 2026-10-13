@@ -14,14 +14,17 @@ import { FormScroll, Screen } from '@/components/Layout';
 import { InlineError } from '@/components/States';
 import { Text } from '@/components/Text';
 import { applyServerErrors } from '@/lib/forms';
+import { useLocale } from '@/lib/i18n';
 import { api } from '@/lib/session';
-import { colors, space } from '@/theme';
+import { space, useTheme } from '@/theme';
 
 const schema = z.object({ email: emailSchema });
 type FormValues = z.infer<typeof schema>;
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
+  const { tr } = useLocale();
+  const { colors } = useTheme();
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const { control, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<FormValues>({
@@ -44,16 +47,17 @@ export default function ForgotPasswordScreen() {
       <Screen>
         <FormScroll>
           <Card style={styles.card}>
-            <Ionicons name="mail-open-outline" size={36} color={colors.brand} />
+            <Ionicons name="mail-open-outline" size={36} color={colors.brandText} />
             <Text variant="heading" accessibilityRole="header">
-              Bitte prüfen Sie Ihr Postfach
+              {tr('Bitte prüfen Sie Ihr Postfach', 'Please check your inbox')}
             </Text>
             <Text variant="body" tone="secondary">
-              Falls ein Konto für {sentTo} existiert, haben wir eine E-Mail mit einem Link zum Zurücksetzen des Passworts
-              gesendet. Der Link ist nur begrenzt gültig. Öffnen Sie ihn im Browser und melden Sie sich danach hier mit dem
-              neuen Passwort an.
+              {tr(
+                `Falls ein Konto für ${sentTo} existiert, haben wir eine E-Mail mit einem Link zum Zurücksetzen des Passworts gesendet. Der Link ist nur begrenzt gültig. Öffnen Sie ihn im Browser und melden Sie sich danach hier mit dem neuen Passwort an.`,
+                `If an account exists for ${sentTo}, we have sent an email with a link to reset the password. The link is only valid for a limited time. Open it in the browser, then sign in here with the new password.`,
+              )}
             </Text>
-            <Button label="Zurück zur Anmeldung" onPress={() => router.back()} />
+            <Button label={tr('Zurück zur Anmeldung', 'Back to sign in')} onPress={() => router.back()} />
           </Card>
         </FormScroll>
       </Screen>
@@ -65,14 +69,17 @@ export default function ForgotPasswordScreen() {
       <FormScroll>
         <Card style={styles.card}>
           <Text variant="body" tone="secondary">
-            Geben Sie die E-Mail-Adresse Ihres Kontos ein. Sie erhalten einen Link, mit dem Sie ein neues Passwort festlegen.
+            {tr(
+              'Geben Sie die E-Mail-Adresse Ihres Kontos ein. Sie erhalten einen Link, mit dem Sie ein neues Passwort festlegen.',
+              'Enter the email address of your account. You will receive a link to set a new password.',
+            )}
           </Text>
           <Controller
             control={control}
             name="email"
             render={({ field: { onChange, onBlur, value } }) => (
               <TextField
-                label="E-Mail-Adresse"
+                label={tr('E-Mail-Adresse', 'Email address')}
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
@@ -88,7 +95,7 @@ export default function ForgotPasswordScreen() {
           />
           <InlineError message={formError} />
           <View>
-            <Button label="Link anfordern" onPress={() => void onSubmit()} loading={isSubmitting} testID="forgot-submit" />
+            <Button label={tr('Link anfordern', 'Request link')} onPress={() => void onSubmit()} loading={isSubmitting} testID="forgot-submit" />
           </View>
         </Card>
       </FormScroll>

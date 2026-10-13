@@ -9,7 +9,7 @@ import InvoiceListScreen from '@/features/invoices/InvoiceListScreen';
 import JobDetailScreen from '@/features/jobs/JobDetailScreen';
 import QuotationDetailScreen from '@/features/quotation-detail/QuotationDetailScreen';
 import { restoreSession } from '@/lib/session';
-import { colors } from '@/theme';
+import { themes } from '@/theme';
 
 import { mockApi } from './helpers/api';
 import {
@@ -53,7 +53,7 @@ describe('invoice list', () => {
     expect(within(draftCard).getByText('Nummer wird beim Stellen vergeben')).toBeTruthy();
     expect(screen.getByLabelText('Status: Überfällig')).toBeTruthy();
     expect(screen.getByTestId('invoice-due-inv-2')).toHaveTextContent('5 Tage überfällig (fällig 15.10.2026)');
-    expect(StyleSheet.flatten(screen.getByTestId('invoice-due-inv-2').props.style).color).toBe(colors.danger);
+    expect(StyleSheet.flatten(screen.getByTestId('invoice-due-inv-2').props.style).color).toBe(themes.light.colors.danger);
     expect(screen.getByText('Stornorechnung RE-2026-0003')).toBeTruthy();
     expect(screen.getByText(`−${formatEur(3570)}`)).toBeTruthy();
     expect(screen.getByLabelText('Status: Bezahlt')).toBeTruthy();

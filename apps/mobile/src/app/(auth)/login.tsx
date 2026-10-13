@@ -1,9 +1,9 @@
-import { ApiError, errorMessage, loginSchema, type LoginForm } from '@angebotpilot/api-contracts';
+import { ApiError, errorMessage, loginSchema, tr, type LoginForm } from '@angebotpilot/api-contracts';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Image, StyleSheet, View, type TextInput } from 'react-native';
+import { Image, View, type TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/Button';
@@ -11,16 +11,18 @@ import { Card } from '@/components/Card';
 import { TextField } from '@/components/Field';
 import { FormScroll } from '@/components/Layout';
 import { LegalLinks } from '@/components/LegalLinks';
+import { LanguageSwitcher } from '@/components/Preferences';
 import { InlineError } from '@/components/States';
 import { Text } from '@/components/Text';
+import { useLocale } from '@/lib/i18n';
 import { login, useSession } from '@/lib/session';
-import { colors, radius, space } from '@/theme';
+import { makeStyles, radius, space } from '@/theme';
 
 const icon = require('../../../assets/images/icon.png');
 
 function loginErrorMessage(error: unknown): string {
   if (error instanceof ApiError && (error.status === 401 || error.status === 400) && !error.code?.startsWith('validation')) {
-    return error.problem.detail ?? 'E-Mail-Adresse oder Passwort ist falsch.';
+    return error.problem.detail ?? tr('E-Mail-Adresse oder Passwort ist falsch.', 'Email address or password is incorrect.');
   }
   return errorMessage(error);
 }
@@ -28,6 +30,8 @@ function loginErrorMessage(error: unknown): string {
 export default function LoginScreen() {
   const router = useRouter();
   const { expired } = useSession();
+  const { tr } = useLocale();
+  const styles = useStyles();
   const passwordRef = useRef<TextInput>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginForm>({
@@ -53,28 +57,28 @@ export default function LoginScreen() {
             AngebotPilot
           </Text>
           <Text variant="body" tone="secondary" align="center">
-            Angebote erstellen, nachfassen, Aufträge gewinnen.
+            {tr('Angebote erstellen, nachfassen, Aufträge gewinnen.', 'Create quotations, follow up, win jobs.')}
           </Text>
         </View>
 
         {expired ? (
           <View style={styles.notice} accessibilityRole="alert" testID="session-expired">
             <Text variant="caption" tone="warning">
-              Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.
+              {tr('Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.', 'Your session has expired. Please sign in again.')}
             </Text>
           </View>
         ) : null}
 
         <Card style={styles.card}>
           <Text variant="heading" accessibilityRole="header">
-            Anmelden
+            {tr('Anmelden', 'Sign in')}
           </Text>
           <Controller
             control={control}
             name="email"
             render={({ field: { onChange, onBlur, value } }) => (
               <TextField
-                label="E-Mail-Adresse"
+                label={tr('E-Mail-Adresse', 'Email address')}
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
@@ -95,7 +99,7 @@ export default function LoginScreen() {
             render={({ field: { onChange, onBlur, value } }) => (
               <TextField
                 ref={passwordRef}
-                label="Passwort"
+                label={tr('Passwort', 'Password')}
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
@@ -111,26 +115,27 @@ export default function LoginScreen() {
             )}
           />
           <InlineError message={formError} />
-          <Button label="Anmelden" onPress={() => void onSubmit()} loading={isSubmitting} testID="login-submit" />
+          <Button label={tr('Anmelden', 'Sign in')} onPress={() => void onSubmit()} loading={isSubmitting} testID="login-submit" />
           <Link href="/forgot-password" asChild>
-            <Button label="Passwort vergessen?" variant="ghost" />
+            <Button label={tr('Passwort vergessen?', 'Forgot password?')} variant="ghost" />
           </Link>
         </Card>
 
         <View style={styles.registerBox}>
           <Text variant="body" tone="secondary">
-            Noch kein Konto?
+            {tr('Noch kein Konto?', 'No account yet?')}
           </Text>
-          <Button label="Kostenlos registrieren" variant="outline" onPress={() => router.push('/register')} testID="go-register" />
+          <Button label={tr('Kostenlos registrieren', 'Sign up for free')} variant="outline" onPress={() => router.push('/register')} testID="go-register" />
         </View>
 
+        <LanguageSwitcher />
         <LegalLinks />
       </FormScroll>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.background },
   content: { gap: space[5], paddingTop: space[8] },
   brand: { alignItems: 'center', gap: space[2] },
@@ -141,4 +146,4 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.palette.warning.border,
   },
   registerBox: { alignItems: 'center', gap: space[2] },
-});
+}));

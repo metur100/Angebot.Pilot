@@ -3,19 +3,28 @@ import { Tabs, useRouter } from 'expo-router';
 import { StyleSheet, View, type ColorValue } from 'react-native';
 
 import { IconButton, type IconName } from '@/components/Button';
+import { useLocale } from '@/lib/i18n';
 import { useUnreadCount } from '@/lib/queries';
-import { colors } from '@/theme';
+import { useTheme } from '@/theme';
 
 function HeaderActions() {
   const router = useRouter();
+  const { tr } = useLocale();
   const unread = useUnreadCount();
   const count = unread.data?.count ?? 0;
   return (
     <View style={styles.actions}>
-      <IconButton icon="qr-code-outline" accessibilityLabel="QR-Code eines Angebots scannen" onPress={() => router.push('/scanner')} testID="header-scan" />
+      <IconButton
+        icon="qr-code-outline"
+        accessibilityLabel={tr('QR-Code eines Angebots scannen', 'Scan a quotation QR code')}
+        onPress={() => router.push('/scanner')}
+        testID="header-scan"
+      />
       <IconButton
         icon="notifications-outline"
-        accessibilityLabel={count ? `Benachrichtigungen, ${count} ungelesen` : 'Benachrichtigungen'}
+        accessibilityLabel={
+          count ? tr(`Benachrichtigungen, ${count} ungelesen`, `Notifications, ${count} unread`) : tr('Benachrichtigungen', 'Notifications')
+        }
         onPress={() => router.push('/notifications')}
         badge={count}
         testID="header-notifications"
@@ -30,10 +39,17 @@ const tabIcon = (name: IconName, focusedName: IconName) =>
   };
 
 export default function TabsLayout() {
+  const { colors } = useTheme();
+  const { tr } = useLocale();
+  const tab = (title: string, icon: IconName, focusedIcon: IconName) => ({
+    title,
+    tabBarIcon: tabIcon(icon, focusedIcon),
+    tabBarAccessibilityLabel: title,
+  });
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.brand,
+        tabBarActiveTintColor: colors.brandText,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
         tabBarAllowFontScaling: true,
@@ -45,14 +61,11 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: colors.background },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Übersicht', tabBarIcon: tabIcon('home-outline', 'home'), tabBarAccessibilityLabel: 'Übersicht' }} />
-      <Tabs.Screen
-        name="quotations"
-        options={{ title: 'Angebote', tabBarIcon: tabIcon('document-text-outline', 'document-text'), tabBarAccessibilityLabel: 'Angebote' }}
-      />
-      <Tabs.Screen name="customers" options={{ title: 'Kunden', tabBarIcon: tabIcon('people-outline', 'people'), tabBarAccessibilityLabel: 'Kunden' }} />
-      <Tabs.Screen name="jobs" options={{ title: 'Aufträge', tabBarIcon: tabIcon('briefcase-outline', 'briefcase'), tabBarAccessibilityLabel: 'Aufträge' }} />
-      <Tabs.Screen name="more" options={{ title: 'Mehr', tabBarIcon: tabIcon('menu-outline', 'menu'), tabBarAccessibilityLabel: 'Mehr' }} />
+      <Tabs.Screen name="index" options={tab(tr('Übersicht', 'Overview'), 'home-outline', 'home')} />
+      <Tabs.Screen name="quotations" options={tab(tr('Angebote', 'Quotations'), 'document-text-outline', 'document-text')} />
+      <Tabs.Screen name="customers" options={tab(tr('Kunden', 'Customers'), 'people-outline', 'people')} />
+      <Tabs.Screen name="jobs" options={tab(tr('Aufträge', 'Jobs'), 'briefcase-outline', 'briefcase')} />
+      <Tabs.Screen name="more" options={tab(tr('Mehr', 'More'), 'menu-outline', 'menu')} />
     </Tabs>
   );
 }

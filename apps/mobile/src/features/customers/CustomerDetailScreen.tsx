@@ -1,4 +1,4 @@
-import { customerTypeLabel, errorMessage, formatDateTime, type CustomerDto } from '@angebotpilot/api-contracts';
+import { customerTypeLabel, errorMessage, formatDateTime, tr, type CustomerDto } from '@angebotpilot/api-contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Linking from 'expo-linking';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -14,6 +14,7 @@ import { Badge } from '@/components/StatusBadge';
 import { ErrorState, ListSkeleton } from '@/components/States';
 import { Text } from '@/components/Text';
 import { useToast } from '@/components/Toast';
+import { useLocale } from '@/lib/i18n';
 import { keys, useCustomer, useCustomerInvoices, useCustomerJobs, useCustomerQuotations } from '@/lib/queries';
 import { api, useCompanyId } from '@/lib/session';
 import { space } from '@/theme';
@@ -28,7 +29,7 @@ async function openUrl(url: string, failMessage: string) {
   try {
     await Linking.openURL(url);
   } catch {
-    Alert.alert('Nicht möglich', failMessage);
+    Alert.alert(tr('Nicht möglich', 'Not possible'), failMessage);
   }
 }
 
@@ -37,6 +38,7 @@ type MenuAction = 'edit' | 'archive' | 'unarchive' | 'delete';
 export default function CustomerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const companyId = useCompanyId();
+  const { tr } = useLocale();
   const router = useRouter();
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -57,30 +59,33 @@ export default function CustomerDetailScreen() {
     try {
       await fn();
     } catch (error) {
-      Alert.alert('Aktion fehlgeschlagen', errorMessage(error));
+      Alert.alert(tr('Aktion fehlgeschlagen', 'Action failed'), errorMessage(error));
     }
   };
 
   const onMenu = (action: MenuAction) => {
     if (!c) return;
     if (action === 'edit') router.push({ pathname: '/customer-form', params: { id: c.id } });
-    if (action === 'archive') void run(async () => { update(await api.customers.archive(companyId, c.id)); toast('Kunde archiviert'); });
-    if (action === 'unarchive') void run(async () => { update(await api.customers.unarchive(companyId, c.id)); toast('Kunde wiederhergestellt'); });
+    if (action === 'archive') void run(async () => { update(await api.customers.archive(companyId, c.id)); toast(tr('Kunde archiviert', 'Customer archived')); });
+    if (action === 'unarchive') void run(async () => { update(await api.customers.unarchive(companyId, c.id)); toast(tr('Kunde wiederhergestellt', 'Customer restored')); });
     if (action === 'delete') {
       Alert.alert(
-        'Kunde löschen?',
-        'Kunden ohne Angebote und Aufträge werden endgültig gelöscht. Bei vorhandenen Belegen werden die personenbezogenen Daten anonymisiert (Aufbewahrungspflichten).',
+        tr('Kunde löschen?', 'Delete customer?'),
+        tr(
+          'Kunden ohne Angebote und Aufträge werden endgültig gelöscht. Bei vorhandenen Belegen werden die personenbezogenen Daten anonymisiert (Aufbewahrungspflichten).',
+          'Customers without quotations and jobs are deleted permanently. If documents exist, the personal data is anonymised instead (retention obligations).',
+        ),
         [
-          { text: 'Abbrechen', style: 'cancel' },
+          { text: tr('Abbrechen', 'Cancel'), style: 'cancel' },
           {
-            text: 'Löschen',
+            text: tr('Löschen', 'Delete'),
             style: 'destructive',
             onPress: () =>
               void run(async () => {
                 const res = await api.customers.delete(companyId, c.id);
                 void queryClient.invalidateQueries({ queryKey: keys.customers(companyId) });
                 queryClient.removeQueries({ queryKey: keys.customer(companyId, c.id) });
-                toast(res.result === 'deleted' ? 'Kunde gelöscht' : 'Kundendaten anonymisiert');
+                toast(res.result === 'deleted' ? tr('Kunde gelöscht', 'Customer deleted') : tr('Kundendaten anonymisiert', 'Customer data anonymised'));
                 router.back();
               }),
           },
@@ -107,7 +112,7 @@ export default function CustomerDetailScreen() {
       <Stack.Screen
         options={{
           title: c.displayName,
-          headerRight: () => <IconButton icon="ellipsis-horizontal-circle-outline" accessibilityLabel="Kundenaktionen" onPress={() => setMenuOpen(true)} testID="customer-menu" />,
+          headerRight: () => <IconButton icon="ellipsis-horizontal-circle-outline" accessibilityLabel={tr('Kundenaktionen', 'Customer actions')} onPress={() => setMenuOpen(true)} testID="customer-menu" />,
         }}
       />
       <ContentScroll
@@ -123,8 +128,8 @@ export default function CustomerDetailScreen() {
         <Card style={styles.gap}>
           <View style={styles.badges}>
             <Badge label={customerTypeLabel[c.type]} tone="info" icon={c.type === 'Business' ? 'business-outline' : 'person-outline'} />
-            {c.isArchived ? <Badge label="Archiviert" tone="muted" icon="archive-outline" /> : null}
-            {c.followUpOptOut ? <Badge label="Keine Erinnerungen" tone="warning" icon="notifications-off-outline" /> : null}
+            {c.isArchived ? <Badge label={tr('Archiviert', 'Archived')} tone="muted" icon="archive-outline" /> : null}
+            {c.followUpOptOut ? <Badge label={tr('Keine Erinnerungen', 'No reminders')} tone="warning" icon="notifications-off-outline" /> : null}
           </View>
           <Text variant="title" accessibilityRole="header">
             {c.displayName}
@@ -132,84 +137,88 @@ export default function CustomerDetailScreen() {
           {contact && c.type === 'Business' ? <Text variant="body" tone="secondary">{contact}</Text> : null}
           <View style={styles.contactRow}>
             <Button
-              label="Anrufen"
+              label={tr('Anrufen', 'Call')}
               icon="call-outline"
               variant="secondary"
               disabled={!c.phone}
-              onPress={() => c.phone && void openUrl(`tel:${c.phone.replace(/[^\d+]/g, '')}`, 'Auf diesem Gerät können keine Anrufe gestartet werden.')}
+              onPress={() =>
+                c.phone && void openUrl(`tel:${c.phone.replace(/[^\d+]/g, '')}`, tr('Auf diesem Gerät können keine Anrufe gestartet werden.', 'This device cannot make calls.'))
+              }
               style={styles.flex}
-              accessibilityLabel={c.phone ? `${c.phone} anrufen` : 'Anrufen – keine Telefonnummer hinterlegt'}
+              accessibilityLabel={c.phone ? tr(`${c.phone} anrufen`, `Call ${c.phone}`) : tr('Anrufen – keine Telefonnummer hinterlegt', 'Call – no phone number on file')}
             />
             <Button
-              label="E-Mail"
+              label={tr('E-Mail', 'Email')}
               icon="mail-outline"
               variant="secondary"
               disabled={!c.email}
-              onPress={() => c.email && void openUrl(`mailto:${c.email}`, 'Keine E-Mail-App gefunden.')}
+              onPress={() => c.email && void openUrl(`mailto:${c.email}`, tr('Keine E-Mail-App gefunden.', 'No email app found.'))}
               style={styles.flex}
-              accessibilityLabel={c.email ? `E-Mail an ${c.email}` : 'E-Mail – keine Adresse hinterlegt'}
+              accessibilityLabel={c.email ? tr(`E-Mail an ${c.email}`, `Email ${c.email}`) : tr('E-Mail – keine Adresse hinterlegt', 'Email – no address on file')}
             />
           </View>
           {!c.phone || !c.email ? (
             <Text variant="small" tone="muted">
-              {!c.phone && !c.email ? 'Keine Telefonnummer und keine E-Mail hinterlegt.' : !c.phone ? 'Keine Telefonnummer hinterlegt.' : 'Keine E-Mail-Adresse hinterlegt.'}
+              {!c.phone && !c.email
+                ? tr('Keine Telefonnummer und keine E-Mail hinterlegt.', 'No phone number and no email on file.')
+                : !c.phone ? tr('Keine Telefonnummer hinterlegt.', 'No phone number on file.') : tr('Keine E-Mail-Adresse hinterlegt.', 'No email address on file.')}
             </Text>
           ) : null}
         </Card>
 
         <Button
-          label="Neues Angebot für diesen Kunden"
+          label={tr('Neues Angebot für diesen Kunden', 'New quotation for this customer')}
           icon="add"
           onPress={() => router.push({ pathname: '/quotation-editor', params: { customerId: c.id } })}
           disabled={c.isArchived || c.isAnonymized}
           testID="customer-new-quotation"
         />
 
-        <SectionHeader title="Kontakt & Adresse" />
+        <SectionHeader title={tr('Kontakt & Adresse', 'Contact & address')} />
         <Card>
-          {c.email ? <KeyValue label="E-Mail" value={c.email} /> : null}
-          {c.phone ? <KeyValue label="Telefon" value={c.phone} /> : null}
-          <KeyValue label="Rechnungsadresse" value={billing ?? '–'} />
-          {service ? <KeyValue label="Leistungsadresse" value={service} /> : null}
-          {c.vatId ? <KeyValue label="USt-IdNr." value={c.vatId} /> : null}
-          {c.notes ? <KeyValue label="Notizen" value={c.notes} /> : null}
-          <KeyValue label="Angelegt" value={formatDateTime(c.createdAt)} />
+          {c.email ? <KeyValue label={tr('E-Mail', 'Email')} value={c.email} /> : null}
+          {c.phone ? <KeyValue label={tr('Telefon', 'Phone')} value={c.phone} /> : null}
+          <KeyValue label={tr('Rechnungsadresse', 'Billing address')} value={billing ?? '–'} />
+          {service ? <KeyValue label={tr('Leistungsadresse', 'Service address')} value={service} /> : null}
+          {c.vatId ? <KeyValue label={tr('USt-IdNr.', 'VAT ID')} value={c.vatId} /> : null}
+          {c.notes ? <KeyValue label={tr('Notizen', 'Notes')} value={c.notes} /> : null}
+          <KeyValue label={tr('Angelegt', 'Created')} value={formatDateTime(c.createdAt)} />
         </Card>
 
-        <SectionHeader title={`Angebote${quotations.data ? ` (${quotations.data.length})` : ''}`} />
+        <SectionHeader title={`${tr('Angebote', 'Quotations')}${quotations.data ? ` (${quotations.data.length})` : ''}`} />
         {quotations.isPending ? <ListSkeleton rows={2} /> : null}
         {quotations.isError ? <ErrorState error={quotations.error} onRetry={() => void quotations.refetch()} compact /> : null}
-        {quotations.data?.length === 0 ? <Text variant="caption" tone="muted">Noch keine Angebote für diesen Kunden.</Text> : null}
+        {quotations.data?.length === 0 ? <Text variant="caption" tone="muted">{tr('Noch keine Angebote für diesen Kunden.', 'No quotations for this customer yet.')}</Text> : null}
         <View style={styles.list}>
           {quotations.data?.map((q) => <QuotationCard key={q.id} item={q} />)}
         </View>
 
-        <SectionHeader title={`Aufträge${jobs.data ? ` (${jobs.data.length})` : ''}`} />
+        <SectionHeader title={`${tr('Aufträge', 'Jobs')}${jobs.data ? ` (${jobs.data.length})` : ''}`} />
         {jobs.isError ? <ErrorState error={jobs.error} onRetry={() => void jobs.refetch()} compact /> : null}
-        {jobs.data?.length === 0 ? <Text variant="caption" tone="muted">Noch keine Aufträge.</Text> : null}
+        {jobs.data?.length === 0 ? <Text variant="caption" tone="muted">{tr('Noch keine Aufträge.', 'No jobs yet.')}</Text> : null}
         <View style={styles.list}>
           {jobs.data?.map((j) => <JobCard key={j.id} item={j} />)}
         </View>
 
         <SectionHeader
-          title={`Rechnungen${invoices.data ? ` (${invoices.data.length})` : ''}`}
+          title={`${tr('Rechnungen', 'Invoices')}${invoices.data ? ` (${invoices.data.length})` : ''}`}
           action={
             !c.isArchived && !c.isAnonymized ? (
               <Button
-                label="Neue Rechnung"
+                label={tr('Neue Rechnung', 'New invoice')}
                 icon="add"
                 variant="ghost"
                 size="sm"
                 fullWidth={false}
                 onPress={() => router.push({ pathname: '/invoice-editor', params: { customerId: c.id } })}
-                accessibilityLabel="Neue Rechnung für diesen Kunden"
+                accessibilityLabel={tr('Neue Rechnung für diesen Kunden', 'New invoice for this customer')}
                 testID="customer-new-invoice"
               />
             ) : null
           }
         />
         {invoices.isError ? <ErrorState error={invoices.error} onRetry={() => void invoices.refetch()} compact /> : null}
-        {invoices.data?.length === 0 ? <Text variant="caption" tone="muted">Noch keine Rechnungen.</Text> : null}
+        {invoices.data?.length === 0 ? <Text variant="caption" tone="muted">{tr('Noch keine Rechnungen.', 'No invoices yet.')}</Text> : null}
         <View style={styles.list} testID="customer-invoices">
           {invoices.data?.map((i) => <InvoiceCard key={i.id} item={i} />)}
         </View>
@@ -218,13 +227,13 @@ export default function CustomerDetailScreen() {
       <OptionSheet<MenuAction>
         visible={menuOpen}
         onClose={() => setMenuOpen(false)}
-        title="Kundenaktionen"
+        title={tr('Kundenaktionen', 'Customer actions')}
         options={[
-          { value: 'edit', label: 'Bearbeiten', icon: 'create-outline' },
+          { value: 'edit', label: tr('Bearbeiten', 'Edit'), icon: 'create-outline' },
           c.isArchived
-            ? { value: 'unarchive', label: 'Wiederherstellen', icon: 'arrow-undo-outline' }
-            : { value: 'archive', label: 'Archivieren', icon: 'archive-outline' },
-          { value: 'delete', label: 'Löschen / anonymisieren', icon: 'trash-outline', destructive: true },
+            ? { value: 'unarchive', label: tr('Wiederherstellen', 'Restore'), icon: 'arrow-undo-outline' }
+            : { value: 'archive', label: tr('Archivieren', 'Archive'), icon: 'archive-outline' },
+          { value: 'delete', label: tr('Löschen / anonymisieren', 'Delete / anonymise'), icon: 'trash-outline', destructive: true },
         ]}
         onSelect={(a) => setTimeout(() => onMenu(a), 250)}
       />

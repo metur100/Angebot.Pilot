@@ -1,18 +1,20 @@
-// Focused bottom-sheet editor for one quotation line. Numbers are typed in German notation ("1.234,56") and parsed
-// with parseGermanNumber; validation mirrors lineItemSchema.
+// Focused bottom-sheet editor for one quotation line. Numbers are typed in the notation of the UI language
+// ("1.234,56" / "1,234.56") and parsed with parseNumberInput; validation mirrors lineItemSchema.
+// Units are document content and therefore German ("Stk.", "Std.").
 import {
-  calculateLine, formatEur, formatPercent, lineItemSchema, unitSuggestions,
+  calculateLine, formatEur, formatPercent, lineItemSchema, tr, unitSuggestions,
   type LineItemForm, type TaxMode, type TaxRateDto,
 } from '@angebotpilot/api-contracts';
 import { useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, type TextInput } from 'react-native';
+import { Pressable, ScrollView, View, type TextInput } from 'react-native';
 
 import { Button } from '@/components/Button';
 import { SelectField, TextField } from '@/components/Field';
 import { Sheet } from '@/components/Sheet';
 import { Text } from '@/components/Text';
-import { fromInput, roundTo, toInput, toMoneyInput } from '@/lib/numbers';
-import { colors, radius, space } from '@/theme';
+import { useLocale } from '@/lib/i18n';
+import { exampleAmount, fromInput, roundTo, toInput, toMoneyInput } from '@/lib/numbers';
+import { makeStyles, radius, space } from '@/theme';
 
 interface Draft {
   title: string;
@@ -44,11 +46,11 @@ export function validateDraft(draft: Draft): { value?: LineItemForm; errors: Err
   const price = fromInput(draft.unitPriceNet);
   const discount = fromInput(draft.discountPercent) ?? 0;
   const tax = Number(draft.taxRatePercent);
-  if (quantity === null) errors.quantity = 'Bitte Menge angeben.';
-  else if (Number.isNaN(quantity)) errors.quantity = 'Bitte eine Zahl eingeben, z. B. 2,5.';
-  if (price === null) errors.unitPriceNet = 'Bitte Preis angeben.';
-  else if (Number.isNaN(price)) errors.unitPriceNet = 'Bitte einen Betrag eingeben, z. B. 1.234,56.';
-  if (Number.isNaN(discount)) errors.discountPercent = 'Bitte eine Zahl eingeben.';
+  if (quantity === null) errors.quantity = tr('Bitte Menge angeben.', 'Please enter a quantity.');
+  else if (Number.isNaN(quantity)) errors.quantity = tr('Bitte eine Zahl eingeben, z. B. 2,5.', 'Please enter a number, e.g. 2.5.');
+  if (price === null) errors.unitPriceNet = tr('Bitte Preis angeben.', 'Please enter a price.');
+  else if (Number.isNaN(price)) errors.unitPriceNet = tr(`Bitte einen Betrag eingeben, z. B. ${exampleAmount()}.`, `Please enter an amount, e.g. ${exampleAmount()}.`);
+  if (Number.isNaN(discount)) errors.discountPercent = tr('Bitte eine Zahl eingeben.', 'Please enter a number.');
   if (Object.keys(errors).length) return { errors };
 
   const candidate = {
@@ -88,6 +90,8 @@ export function LineItemEditor(props: LineItemEditorProps) {
 }
 
 function LineItemEditorContent({ visible, item, position, taxMode, taxRates, defaultTaxRate, onClose, onSave }: LineItemEditorProps) {
+  const { tr } = useLocale();
+  const styles = useStyles();
   const [draft, setDraft] = useState<Draft>(() => toDraft(item, defaultTaxRate));
   const [errors, setErrors] = useState<Errors>({});
   const quantityRef = useRef<TextInput>(null);
@@ -104,7 +108,7 @@ function LineItemEditorContent({ visible, item, position, taxMode, taxRates, def
     .filter((r) => !r.isArchived || String(r.ratePercent) === draft.taxRatePercent)
     .map((r) => ({ value: String(r.ratePercent), label: formatPercent(r.ratePercent), description: r.name }));
   if (!rateOptions.some((o) => o.value === draft.taxRatePercent)) {
-    rateOptions.push({ value: draft.taxRatePercent, label: formatPercent(Number(draft.taxRatePercent)), description: 'nicht mehr aktiver Satz' });
+    rateOptions.push({ value: draft.taxRatePercent, label: formatPercent(Number(draft.taxRatePercent)), description: tr('nicht mehr aktiver Satz', 'rate no longer active') });
   }
 
   const save = () => {
@@ -117,14 +121,15 @@ function LineItemEditorContent({ visible, item, position, taxMode, taxRates, def
     <Sheet
       visible={visible}
       onClose={onClose}
-      title={item ? `Position ${position} bearbeiten` : `Neue Position ${position}`}
+      title={item ? tr(`Position ${position} bearbeiten`, `Edit item ${position}`) : tr(`Neue Position ${position}`, `New item ${position}`)}
       testID="line-editor"
       footer={
         <View style={styles.footer}>
           {preview ? (
-            <View style={styles.preview} accessibilityLabel={`Positionsbetrag netto ${formatEur(preview.net)}`}>
+            <View style={styles.preview} accessibilityLabel={tr(`Positionsbetrag netto ${formatEur(preview.net)}`, `Line amount net ${formatEur(preview.net)}`)}>
               <Text variant="caption" tone="secondary">
-                Betrag netto{preview.discount > 0 ? ` (nach ${formatEur(preview.discount)} Rabatt)` : ''}
+                {tr('Betrag netto', 'Net amount')}
+                {preview.discount > 0 ? tr(` (nach ${formatEur(preview.discount)} Rabatt)`, ` (after ${formatEur(preview.discount)} discount)`) : ''}
               </Text>
               <Text variant="heading" testID="line-preview">
                 {formatEur(preview.net)}
@@ -132,14 +137,14 @@ function LineItemEditorContent({ visible, item, position, taxMode, taxRates, def
             </View>
           ) : null}
           <View style={styles.buttons}>
-            <Button label="Abbrechen" variant="outline" onPress={onClose} style={styles.flex} />
-            <Button label="Übernehmen" icon="checkmark" onPress={save} style={styles.flex} testID="line-save" />
+            <Button label={tr('Abbrechen', 'Cancel')} variant="outline" onPress={onClose} style={styles.flex} />
+            <Button label={tr('Übernehmen', 'Apply')} icon="checkmark" onPress={save} style={styles.flex} testID="line-save" />
           </View>
         </View>
       }
     >
       <TextField
-        label="Bezeichnung"
+        label={tr('Bezeichnung', 'Title')}
         value={draft.title}
         onChangeText={set('title')}
         error={errors.title}
@@ -149,7 +154,7 @@ function LineItemEditorContent({ visible, item, position, taxMode, taxRates, def
         testID="line-title"
       />
       <TextField
-        label="Beschreibung (optional)"
+        label={tr('Beschreibung (optional)', 'Description (optional)')}
         value={draft.description}
         onChangeText={set('description')}
         error={errors.description}
@@ -160,7 +165,7 @@ function LineItemEditorContent({ visible, item, position, taxMode, taxRates, def
         <View style={styles.flex}>
           <TextField
             ref={quantityRef}
-            label="Menge"
+            label={tr('Menge', 'Quantity')}
             value={draft.quantity}
             onChangeText={set('quantity')}
             error={errors.quantity}
@@ -170,7 +175,7 @@ function LineItemEditorContent({ visible, item, position, taxMode, taxRates, def
           />
         </View>
         <View style={styles.flex}>
-          <TextField label="Einheit" value={draft.unit} onChangeText={set('unit')} error={errors.unit} required testID="line-unit" />
+          <TextField label={tr('Einheit', 'Unit')} value={draft.unit} onChangeText={set('unit')} error={errors.unit} required testID="line-unit" />
         </View>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.units} keyboardShouldPersistTaps="handled">
@@ -178,7 +183,7 @@ function LineItemEditorContent({ visible, item, position, taxMode, taxRates, def
           <Pressable
             key={u}
             accessibilityRole="button"
-            accessibilityLabel={`Einheit ${u}`}
+            accessibilityLabel={tr(`Einheit ${u}`, `Unit ${u}`)}
             accessibilityState={{ selected: draft.unit === u }}
             onPress={() => set('unit')(u)}
             style={[styles.unit, draft.unit === u ? styles.unitActive : null]}
@@ -191,19 +196,19 @@ function LineItemEditorContent({ visible, item, position, taxMode, taxRates, def
       </ScrollView>
       <TextField
         ref={priceRef}
-        label="Einzelpreis netto (€)"
+        label={tr('Einzelpreis netto (€)', 'Unit price net (€)')}
         value={draft.unitPriceNet}
         onChangeText={set('unitPriceNet')}
         error={errors.unitPriceNet}
         keyboardType="decimal-pad"
-        placeholder="0,00"
+        placeholder={toMoneyInput(0)}
         required
         testID="line-price"
       />
       <View style={styles.row}>
         <View style={styles.flex}>
           <TextField
-            label="Rabatt (%)"
+            label={tr('Rabatt (%)', 'Discount (%)')}
             value={draft.discountPercent}
             onChangeText={set('discountPercent')}
             error={errors.discountPercent}
@@ -215,7 +220,7 @@ function LineItemEditorContent({ visible, item, position, taxMode, taxRates, def
         <View style={styles.flex}>
           {taxMode === 'Standard' ? (
             <SelectField
-              label="USt.-Satz"
+              label={tr('USt.-Satz', 'VAT rate')}
               value={draft.taxRatePercent}
               options={rateOptions}
               onChange={set('taxRatePercent')}
@@ -225,10 +230,10 @@ function LineItemEditorContent({ visible, item, position, taxMode, taxRates, def
           ) : (
             <View style={styles.noTax}>
               <Text variant="label" tone="secondary">
-                USt.-Satz
+                {tr('USt.-Satz', 'VAT rate')}
               </Text>
               <Text variant="caption" tone="muted">
-                {taxMode === 'SmallBusiness' ? 'entfällt (§ 19 UStG)' : 'entfällt (§ 13b UStG)'}
+                {taxMode === 'SmallBusiness' ? tr('entfällt (§ 19 UStG)', 'none (§ 19 UStG)') : tr('entfällt (§ 13b UStG)', 'none (§ 13b UStG)')}
               </Text>
             </View>
           )}
@@ -238,7 +243,7 @@ function LineItemEditorContent({ visible, item, position, taxMode, taxRates, def
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   flex: { flex: 1 },
   row: { flexDirection: 'row', gap: space[3] },
   units: { gap: space[2] },
@@ -251,4 +256,4 @@ const styles = StyleSheet.create({
   footer: { gap: space[2] },
   preview: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[2] },
   buttons: { flexDirection: 'row', gap: space[3] },
-});
+}));

@@ -2,11 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Network from 'expo-network';
 import { useState, type ReactNode } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View, type RefreshControlProps, type StyleProp, type ViewStyle,
+} from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, font, radius, space, touch } from '@/theme';
+import { useLocale } from '@/lib/i18n';
+import { font, makeStyles, radius, space, touch, useTheme } from '@/theme';
 
 import { Text } from './Text';
 
@@ -21,6 +24,7 @@ export function FormScroll({
   testID?: string;
   bottomInset?: boolean;
 }) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   return (
     <KeyboardAwareScrollView
@@ -29,7 +33,7 @@ export function FormScroll({
       keyboardShouldPersistTaps="handled"
       style={styles.flex}
       contentContainerStyle={[styles.content, bottomInset ? { paddingBottom: space[8] + insets.bottom } : null, contentStyle]}
-      refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} colors={[colors.brand]} tintColor={colors.brand} /> : undefined}
+      refreshControl={onRefresh ? <ThemedRefreshControl refreshing={!!refreshing} onRefresh={onRefresh} /> : undefined}
     >
       {children}
     </KeyboardAwareScrollView>
@@ -40,13 +44,14 @@ export function FormScroll({
 export function ContentScroll({
   children, refreshing, onRefresh, contentStyle, testID,
 }: { children: ReactNode; refreshing?: boolean; onRefresh?: () => void; contentStyle?: StyleProp<ViewStyle>; testID?: string }) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   return (
     <ScrollView
       testID={testID}
       style={styles.flex}
       contentContainerStyle={[styles.content, { paddingBottom: space[8] + insets.bottom }, contentStyle]}
-      refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} colors={[colors.brand]} tintColor={colors.brand} /> : undefined}
+      refreshControl={onRefresh ? <ThemedRefreshControl refreshing={!!refreshing} onRefresh={onRefresh} /> : undefined}
     >
       {children}
     </ScrollView>
@@ -55,12 +60,14 @@ export function ContentScroll({
 
 /** Bottom action bar that respects the home indicator / gesture bar. */
 export function BottomBar({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   return <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, space[3]) }, style]}>{children}</View>;
 }
 
 /** Screen container: background colour + offline banner on top. */
 export function Screen({ children, style, offlineBanner = true }: { children: ReactNode; style?: StyleProp<ViewStyle>; offlineBanner?: boolean }) {
+  const styles = useStyles();
   return (
     <View style={[styles.screen, style]}>
       {offlineBanner ? <OfflineBanner /> : null}
@@ -72,6 +79,9 @@ export function Screen({ children, style, offlineBanner = true }: { children: Re
 export function SearchBar({
   value, onChangeText, placeholder, testID,
 }: { value: string; onChangeText: (t: string) => void; placeholder: string; testID?: string }) {
+  const { colors, scheme } = useTheme();
+  const { tr } = useLocale();
+  const styles = useStyles();
   return (
     <View style={styles.search}>
       <Ionicons name="search" size={20} color={colors.textMuted} />
@@ -80,6 +90,8 @@ export function SearchBar({
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.placeholder}
+        keyboardAppearance={scheme}
+        selectionColor={colors.brandText}
         accessibilityLabel={placeholder}
         returnKeyType="search"
         autoCorrect={false}
@@ -87,7 +99,7 @@ export function SearchBar({
         testID={testID}
       />
       {value ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Suche leeren" onPress={() => onChangeText('')} style={styles.clear}>
+        <Pressable accessibilityRole="button" accessibilityLabel={tr('Suche leeren', 'Clear search')} onPress={() => onChangeText('')} style={styles.clear}>
           <Ionicons name="close-circle" size={20} color={colors.textMuted} />
         </Pressable>
       ) : null}
@@ -103,6 +115,9 @@ export interface ChipOption<T extends string> {
 export function FilterChips<T extends string>({
   options, value, onChange, accessibilityLabel,
 }: { options: ChipOption<T>[]; value: T; onChange: (v: T) => void; accessibilityLabel: string }) {
+  const { colors } = useTheme();
+  const { tr } = useLocale();
+  const styles = useStyles();
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityLabel={accessibilityLabel}>
       {options.map((o) => {
@@ -111,7 +126,7 @@ export function FilterChips<T extends string>({
           <Pressable
             key={o.value}
             accessibilityRole="radio"
-            accessibilityLabel={`Filter ${o.label}`}
+            accessibilityLabel={tr(`Filter ${o.label}`, `Filter: ${o.label}`)}
             accessibilityState={{ selected: active, checked: active }}
             onPress={() => onChange(o.value)}
             style={[styles.chip, active ? styles.chipActive : null]}
@@ -130,6 +145,9 @@ export function FilterChips<T extends string>({
 
 /** Banner shown while the device is offline, with a retry action that re-checks and refetches. */
 export function OfflineBanner() {
+  const { colors } = useTheme();
+  const { tr } = useLocale();
+  const styles = useStyles();
   const network = Network.useNetworkState();
   const queryClient = useQueryClient();
   const [checking, setChecking] = useState(false);
@@ -147,18 +165,27 @@ export function OfflineBanner() {
     <View style={styles.offline} accessibilityRole="alert" accessibilityLiveRegion="polite" testID="offline-banner">
       <Ionicons name="cloud-offline-outline" size={18} color={colors.palette.warning.text} />
       <Text variant="caption" style={styles.offlineText}>
-        Keine Internetverbindung. Anzeigen sind ggf. veraltet, Änderungen werden nicht gespeichert.
+        {tr(
+          'Keine Internetverbindung. Anzeigen sind ggf. veraltet, Änderungen werden nicht gespeichert.',
+          'No internet connection. Data may be out of date and changes are not saved.',
+        )}
       </Text>
-      <Pressable accessibilityRole="button" accessibilityLabel="Verbindung erneut prüfen" onPress={retry} disabled={checking} style={styles.offlineButton}>
+      <Pressable accessibilityRole="button" accessibilityLabel={tr('Verbindung erneut prüfen', 'Check connection again')} onPress={retry} disabled={checking} style={styles.offlineButton}>
         <Text variant="label" style={{ color: colors.palette.warning.text }}>
-          {checking ? '…' : 'Erneut'}
+          {checking ? '…' : tr('Erneut', 'Retry')}
         </Text>
       </Pressable>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+/** Pull-to-refresh control in the brand colour of the current theme. */
+export function ThemedRefreshControl(props: Omit<RefreshControlProps, 'colors' | 'tintColor'>) {
+  const { colors } = useTheme();
+  return <RefreshControl {...props} colors={[colors.brand]} tintColor={colors.brandText} progressBackgroundColor={colors.surface} />;
+}
+
+const useStyles = makeStyles(({ colors }) => ({
   flex: { flex: 1 },
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: space[4], gap: space[3] },
@@ -184,4 +211,4 @@ const styles = StyleSheet.create({
   },
   offlineText: { flex: 1, color: colors.palette.warning.text },
   offlineButton: { minHeight: touch, minWidth: touch, alignItems: 'center', justifyContent: 'center' },
-});
+}));

@@ -5,7 +5,8 @@ import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, radius, space } from '@/theme';
+import { useLocale } from '@/lib/i18n';
+import { makeStyles, radius, space, useTheme } from '@/theme';
 
 import { IconButton, type IconName } from './Button';
 import { Text } from './Text';
@@ -23,13 +24,15 @@ export interface SheetProps {
 }
 
 export function Sheet({ visible, onClose, title, children, footer, testID, tall, scroll = true }: SheetProps) {
+  const { tr } = useLocale();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} testID={testID}>
       {/* 'padding' pads by the measured overlap between sheet and keyboard, so it also works when Android does not resize the
           (edge-to-edge) dialog window – and adds nothing when it does. */}
       <KeyboardAvoidingView behavior="padding" style={styles.root}>
-        <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button" accessibilityLabel="Schließen" />
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button" accessibilityLabel={tr('Schließen', 'Close')} />
         <View
           style={[styles.sheet, tall ? styles.tall : null, { paddingBottom: Math.max(insets.bottom, space[3]) }]}
           accessibilityViewIsModal
@@ -39,7 +42,7 @@ export function Sheet({ visible, onClose, title, children, footer, testID, tall,
             <Text variant="heading" accessibilityRole="header" style={styles.title} numberOfLines={2}>
               {title}
             </Text>
-            <IconButton icon="close" accessibilityLabel="Schließen" onPress={onClose} testID="sheet-close" />
+            <IconButton icon="close" accessibilityLabel={tr('Schließen', 'Close')} onPress={onClose} testID="sheet-close" />
           </View>
           {scroll ? (
             <ScrollView
@@ -79,6 +82,8 @@ export function OptionSheet<T extends string>({
   selected?: T | null;
   onSelect: (value: T) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Sheet visible={visible} onClose={onClose} title={title}>
       <View style={styles.options}>
@@ -108,7 +113,7 @@ export function OptionSheet<T extends string>({
                   </Text>
                 ) : null}
               </View>
-              {isSelected ? <Ionicons name="checkmark" size={22} color={colors.brand} /> : null}
+              {isSelected ? <Ionicons name="checkmark" size={22} color={colors.brandText} /> : null}
             </Pressable>
           );
         })}
@@ -117,7 +122,7 @@ export function OptionSheet<T extends string>({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: colors.overlay },
   sheet: {
@@ -142,4 +147,4 @@ const styles = StyleSheet.create({
   },
   optionSelected: { backgroundColor: colors.brandSoft },
   optionPressed: { backgroundColor: colors.surfaceMuted },
-});
+}));

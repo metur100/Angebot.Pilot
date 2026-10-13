@@ -1,4 +1,4 @@
-import { errorMessage, formatDate, formatDateTime, formatEur, jobStatusLabel, type JobDto, type JobStatus } from '@angebotpilot/api-contracts';
+import { errorMessage, formatDate, formatDateTime, formatEur, jobStatusLabel, tr, type JobDto, type JobStatus } from '@angebotpilot/api-contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -14,16 +14,23 @@ import { ErrorState, InlineError, ListSkeleton } from '@/components/States';
 import { Text } from '@/components/Text';
 import { useToast } from '@/components/Toast';
 import { emptyToNull, isConflict } from '@/lib/forms';
+import { useLocale } from '@/lib/i18n';
 import { invalidateInvoiceData, keys, useJob } from '@/lib/queries';
 import { api, useCompanyId } from '@/lib/session';
 import { space, touch } from '@/theme';
 
-const statusAction: Record<JobStatus, { label: string; icon: IconName }> = {
-  Open: { label: 'Wieder öffnen', icon: 'refresh-outline' },
-  InProgress: { label: 'Arbeit beginnen', icon: 'construct-outline' },
-  Completed: { label: 'Abschließen', icon: 'checkmark-done-outline' },
-  Cancelled: { label: 'Stornieren', icon: 'ban-outline' },
-};
+function statusAction(status: JobStatus): { label: string; icon: IconName } {
+  switch (status) {
+    case 'Open':
+      return { label: tr('Wieder öffnen', 'Reopen'), icon: 'refresh-outline' };
+    case 'InProgress':
+      return { label: tr('Arbeit beginnen', 'Start work'), icon: 'construct-outline' };
+    case 'Completed':
+      return { label: tr('Abschließen', 'Complete'), icon: 'checkmark-done-outline' };
+    case 'Cancelled':
+      return { label: tr('Stornieren', 'Cancel job'), icon: 'ban-outline' };
+  }
+}
 
 interface Draft {
   title: string;
@@ -44,6 +51,7 @@ function toDraft(job: JobDto): Draft {
 export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const companyId = useCompanyId();
+  const { tr } = useLocale();
   const router = useRouter();
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -66,10 +74,10 @@ export default function JobDetailScreen() {
       const draft = await api.jobs.createInvoice(companyId, j.id);
       invalidateInvoiceData(queryClient, companyId, draft);
       void queryClient.invalidateQueries({ queryKey: keys.job(companyId, j.id) });
-      toast('Rechnungsentwurf angelegt');
+      toast(tr('Rechnungsentwurf angelegt', 'Draft invoice created'));
       router.push({ pathname: '/invoice-editor', params: { id: draft.id, created: '1' } });
     } catch (e) {
-      Alert.alert('Rechnung konnte nicht erstellt werden', errorMessage(e));
+      Alert.alert(tr('Rechnung konnte nicht erstellt werden', 'Invoice could not be created'), errorMessage(e));
     } finally {
       setCreatingInvoice(false);
     }
@@ -88,7 +96,7 @@ export default function JobDetailScreen() {
       apply(await api.jobs.changeStatus(companyId, j.id, { status }));
       toast(`Status: ${jobStatusLabel[status]}`);
     } catch (e) {
-      Alert.alert('Statuswechsel fehlgeschlagen', errorMessage(e));
+      Alert.alert(tr('Statuswechsel fehlgeschlagen', 'Status change failed'), errorMessage(e));
     } finally {
       setChanging(null);
     }
@@ -96,9 +104,9 @@ export default function JobDetailScreen() {
 
   const confirmStatus = (status: JobStatus) => {
     if (status === 'Cancelled') {
-      Alert.alert('Auftrag stornieren?', 'Der Auftrag kann später wieder geöffnet werden.', [
-        { text: 'Abbrechen', style: 'cancel' },
-        { text: 'Stornieren', style: 'destructive', onPress: () => void changeStatus(status) },
+      Alert.alert(tr('Auftrag stornieren?', 'Cancel job?'), tr('Der Auftrag kann später wieder geöffnet werden.', 'The job can be reopened later.'), [
+        { text: tr('Abbrechen', 'Back'), style: 'cancel' },
+        { text: tr('Stornieren', 'Cancel job'), style: 'destructive', onPress: () => void changeStatus(status) },
       ]);
     } else {
       void changeStatus(status);
@@ -108,11 +116,11 @@ export default function JobDetailScreen() {
   const save = async () => {
     if (!j || !draft) return;
     if (!draft.title.trim()) {
-      setError('Bitte einen Titel angeben.');
+      setError(tr('Bitte einen Titel angeben.', 'Please enter a title.'));
       return;
     }
     if (draft.plannedStartDate && draft.dueDate && draft.dueDate < draft.plannedStartDate) {
-      setError('Das Fälligkeitsdatum muss nach dem geplanten Start liegen.');
+      setError(tr('Das Fälligkeitsdatum muss nach dem geplanten Start liegen.', 'The due date must be after the planned start.'));
       return;
     }
     setSaving(true);
@@ -129,10 +137,15 @@ export default function JobDetailScreen() {
       });
       apply(updated);
       setEditing(false);
-      toast('Auftrag gespeichert');
+      toast(tr('Auftrag gespeichert', 'Job saved'));
     } catch (e) {
       if (isConflict(e)) {
-        setError('Der Auftrag wurde zwischenzeitlich geändert. Ihre Eingaben wurden verworfen und die aktuelle Fassung geladen.');
+        setError(
+          tr(
+            'Der Auftrag wurde zwischenzeitlich geändert. Ihre Eingaben wurden verworfen und die aktuelle Fassung geladen.',
+            'The job was changed in the meantime. Your entries were discarded and the current version has been loaded.',
+          ),
+        );
         setEditing(false);
         void job.refetch();
       } else {
@@ -154,7 +167,7 @@ export default function JobDetailScreen() {
 
   const set = (key: keyof Draft) => (value: string) => setDraft((d) => (d ? { ...d, [key]: value } : d));
   const memberOptions = [
-    { value: '', label: 'Niemand zugewiesen' },
+    { value: '', label: tr('Niemand zugewiesen', 'Unassigned') },
     ...(members.data ?? []).filter((m) => m.status === 'Active').map((m) => ({ value: m.userId, label: m.displayName, description: m.email })),
   ];
 
@@ -172,27 +185,30 @@ export default function JobDetailScreen() {
           <Text variant="title" accessibilityRole="header">
             {j.title}
           </Text>
-          <Pressable accessibilityRole="link" accessibilityLabel={`Kunde ${j.customerName} öffnen`} onPress={() => router.push(`/customer/${j.customerId}`)} style={styles.link}>
+          <Pressable accessibilityRole="link" accessibilityLabel={tr(`Kunde ${j.customerName} öffnen`, `Open customer ${j.customerName}`)} onPress={() => router.push(`/customer/${j.customerId}`)} style={styles.link}>
             <Text variant="bodyStrong" tone="brand">
               {j.customerName}
             </Text>
           </Pressable>
-          <Pressable accessibilityRole="link" accessibilityLabel={`Angebot ${j.quotationNumber} öffnen`} onPress={() => router.push(`/quotation/${j.quotationId}`)} style={styles.link}>
+          <Pressable accessibilityRole="link" accessibilityLabel={tr(`Angebot ${j.quotationNumber} öffnen`, `Open quotation ${j.quotationNumber}`)} onPress={() => router.push(`/quotation/${j.quotationId}`)} style={styles.link}>
             <Text variant="body" tone="brand">
-              aus Angebot {j.quotationNumber} · {formatEur(j.quotationNetTotal)} netto
+              {tr(
+                `aus Angebot ${j.quotationNumber} · ${formatEur(j.quotationNetTotal)} netto`,
+                `from quotation ${j.quotationNumber} · ${formatEur(j.quotationNetTotal)} net`,
+              )}
             </Text>
           </Pressable>
         </Card>
 
         {j.allowedTransitions.length > 0 ? (
           <>
-            <SectionHeader title="Status ändern" />
+            <SectionHeader title={tr('Status ändern', 'Change status')} />
             <View style={styles.statusButtons}>
               {j.allowedTransitions.map((s, i) => (
                 <Button
                   key={s}
-                  label={statusAction[s].label}
-                  icon={statusAction[s].icon}
+                  label={statusAction(s).label}
+                  icon={statusAction(s).icon}
                   variant={s === 'Cancelled' ? 'dangerOutline' : i === 0 ? 'primary' : 'outline'}
                   onPress={() => confirmStatus(s)}
                   loading={changing === s}
@@ -203,55 +219,55 @@ export default function JobDetailScreen() {
           </>
         ) : null}
 
-        <SectionHeader title={`Rechnungen (${j.invoices.length})`} />
+        <SectionHeader title={`${tr('Rechnungen', 'Invoices')} (${j.invoices.length})`} />
         <View style={styles.invoices} testID="job-invoices">
           {j.invoices.length === 0 ? (
             <Text variant="caption" tone="muted">
-              Noch keine Rechnung zu diesem Auftrag.
+              {tr('Noch keine Rechnung zu diesem Auftrag.', 'No invoice for this job yet.')}
             </Text>
           ) : null}
           {j.invoices.map((inv) => (
             <InvoiceLinkCard key={inv.id} item={inv} />
           ))}
           <Button
-            label="Rechnung erstellen"
+            label={tr('Rechnung erstellen', 'Create invoice')}
             icon="receipt-outline"
             variant={j.invoices.length === 0 && j.status === 'Completed' ? 'primary' : 'outline'}
             onPress={() => void createInvoice()}
             loading={creatingInvoice}
-            accessibilityHint="Legt einen Rechnungsentwurf mit den Positionen des Angebots an"
+            accessibilityHint={tr('Legt einen Rechnungsentwurf mit den Positionen des Angebots an', 'Creates a draft invoice with the line items of the quotation')}
             testID="job-create-invoice"
           />
         </View>
 
         <SectionHeader
-          title="Details"
+          title={tr('Details', 'Details')}
           action={
             !editing ? (
-              <Button label="Bearbeiten" icon="create-outline" variant="ghost" size="sm" fullWidth={false} onPress={() => { setDraft(toDraft(j)); setEditing(true); }} testID="job-edit" />
+              <Button label={tr('Bearbeiten', 'Edit')} icon="create-outline" variant="ghost" size="sm" fullWidth={false} onPress={() => { setDraft(toDraft(j)); setEditing(true); }} testID="job-edit" />
             ) : null
           }
         />
         <InlineError message={error} />
         {editing && draft ? (
           <Card style={styles.form}>
-            <TextField label="Titel" value={draft.title} onChangeText={set('title')} required testID="job-title" />
-            <TextField label="Beschreibung" value={draft.description} onChangeText={set('description')} multiline />
+            <TextField label={tr('Titel', 'Title')} value={draft.title} onChangeText={set('title')} required testID="job-title" />
+            <TextField label={tr('Beschreibung', 'Description')} value={draft.description} onChangeText={set('description')} multiline />
             <View style={styles.row}>
               <View style={styles.flex}>
-                <DateField label="Geplanter Start" value={draft.plannedStartDate} onChange={set('plannedStartDate')} onClear={() => set('plannedStartDate')('')} />
+                <DateField label={tr('Geplanter Start', 'Planned start')} value={draft.plannedStartDate} onChange={set('plannedStartDate')} onClear={() => set('plannedStartDate')('')} />
               </View>
               <View style={styles.flex}>
-                <DateField label="Fällig am" value={draft.dueDate} onChange={set('dueDate')} onClear={() => set('dueDate')('')} />
+                <DateField label={tr('Fällig am', 'Due on')} value={draft.dueDate} onChange={set('dueDate')} onClear={() => set('dueDate')('')} />
               </View>
             </View>
             {members.data ? (
-              <SelectField label="Zuständig" value={draft.assignedUserId} options={memberOptions} onChange={set('assignedUserId')} />
+              <SelectField label={tr('Zuständig', 'Assigned to')} value={draft.assignedUserId} options={memberOptions} onChange={set('assignedUserId')} />
             ) : null}
-            <TextField label="Notizen" value={draft.notes} onChangeText={set('notes')} multiline />
+            <TextField label={tr('Notizen', 'Notes')} value={draft.notes} onChangeText={set('notes')} multiline />
             <View style={styles.row}>
               <Button
-                label="Abbrechen"
+                label={tr('Abbrechen', 'Cancel')}
                 variant="outline"
                 onPress={() => {
                   setEditing(false);
@@ -260,21 +276,27 @@ export default function JobDetailScreen() {
                 }}
                 style={styles.flex}
               />
-              <Button label="Speichern" icon="save-outline" onPress={() => void save()} loading={saving} style={styles.flex} testID="job-save" />
+              <Button label={tr('Speichern', 'Save')} icon="save-outline" onPress={() => void save()} loading={saving} style={styles.flex} testID="job-save" />
             </View>
           </Card>
         ) : (
           <Card>
-            {j.description ? <KeyValue label="Beschreibung" value={j.description} /> : null}
-            <KeyValue label="Geplanter Start" value={formatDate(j.plannedStartDate)} />
-            <KeyValue label="Fällig am" value={formatDate(j.dueDate)} />
-            <KeyValue label="Zuständig" value={j.assignedUserName ?? '–'} />
-            <KeyValue label="Auftragswert" value={`${formatEur(j.quotationNetTotal)} netto · ${formatEur(j.quotationGrossTotal)} brutto`} />
-            {j.notes ? <KeyValue label="Notizen" value={j.notes} /> : null}
-            <KeyValue label="Angelegt" value={formatDateTime(j.createdAt)} />
-            {j.startedAt ? <KeyValue label="Begonnen" value={formatDateTime(j.startedAt)} /> : null}
-            {j.completedAt ? <KeyValue label="Abgeschlossen" value={formatDateTime(j.completedAt)} /> : null}
-            {j.cancelledAt ? <KeyValue label="Storniert" value={formatDateTime(j.cancelledAt)} /> : null}
+            {j.description ? <KeyValue label={tr('Beschreibung', 'Description')} value={j.description} /> : null}
+            <KeyValue label={tr('Geplanter Start', 'Planned start')} value={formatDate(j.plannedStartDate)} />
+            <KeyValue label={tr('Fällig am', 'Due on')} value={formatDate(j.dueDate)} />
+            <KeyValue label={tr('Zuständig', 'Assigned to')} value={j.assignedUserName ?? '–'} />
+            <KeyValue
+              label={tr('Auftragswert', 'Job value')}
+              value={tr(
+                `${formatEur(j.quotationNetTotal)} netto · ${formatEur(j.quotationGrossTotal)} brutto`,
+                `${formatEur(j.quotationNetTotal)} net · ${formatEur(j.quotationGrossTotal)} gross`,
+              )}
+            />
+            {j.notes ? <KeyValue label={tr('Notizen', 'Notes')} value={j.notes} /> : null}
+            <KeyValue label={tr('Angelegt', 'Created')} value={formatDateTime(j.createdAt)} />
+            {j.startedAt ? <KeyValue label={tr('Begonnen', 'Started')} value={formatDateTime(j.startedAt)} /> : null}
+            {j.completedAt ? <KeyValue label={tr('Abgeschlossen', 'Completed')} value={formatDateTime(j.completedAt)} /> : null}
+            {j.cancelledAt ? <KeyValue label={tr('Storniert', 'Cancelled')} value={formatDateTime(j.cancelledAt)} /> : null}
           </Card>
         )}
       </FormScroll>

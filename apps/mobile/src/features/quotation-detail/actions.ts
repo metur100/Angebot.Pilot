@@ -1,4 +1,4 @@
-import type { QuotationDto } from '@angebotpilot/api-contracts';
+import { tr, type QuotationDto } from '@angebotpilot/api-contracts';
 
 import type { IconName } from '@/components/Button';
 
@@ -13,23 +13,24 @@ export interface ActionDef {
   destructive?: boolean;
 }
 
-const defs: Record<QuotationAction, ActionDef> = {
-  edit: { action: 'edit', label: 'Bearbeiten', icon: 'create-outline' },
-  send: { action: 'send', label: 'Versenden', icon: 'paper-plane-outline' },
-  resend: { action: 'resend', label: 'Erneut senden', icon: 'paper-plane-outline' },
-  accept: { action: 'accept', label: 'Annahme erfassen', icon: 'checkmark-circle-outline' },
-  reject: { action: 'reject', label: 'Ablehnung erfassen', icon: 'close-circle-outline' },
-  cancel: { action: 'cancel', label: 'Stornieren', icon: 'ban-outline', destructive: true },
-  revise: { action: 'revise', label: 'Revision erstellen', icon: 'git-branch-outline' },
-  duplicate: { action: 'duplicate', label: 'Duplizieren', icon: 'copy-outline' },
-  convert: { action: 'convert', label: 'In Auftrag umwandeln', icon: 'briefcase-outline' },
-  openJob: { action: 'openJob', label: 'Auftrag öffnen', icon: 'briefcase-outline' },
-  pdf: { action: 'pdf', label: 'PDF öffnen / teilen', icon: 'document-attach-outline' },
-  publicLink: { action: 'publicLink', label: 'Kundenlink neu erzeugen & teilen', icon: 'link-outline' },
-  delete: { action: 'delete', label: 'Entwurf löschen', icon: 'trash-outline', destructive: true },
-  cancelFollowUps: { action: 'cancelFollowUps', label: 'Erinnerungen abbrechen', icon: 'alarm-outline' },
-  createInvoice: { action: 'createInvoice', label: 'Rechnung erstellen', icon: 'receipt-outline' },
-};
+/** Action definitions in the current UI language (built at call time). */
+const defs = (): Record<QuotationAction, ActionDef> => ({
+  edit: { action: 'edit', label: tr('Bearbeiten', 'Edit'), icon: 'create-outline' },
+  send: { action: 'send', label: tr('Versenden', 'Send'), icon: 'paper-plane-outline' },
+  resend: { action: 'resend', label: tr('Erneut senden', 'Send again'), icon: 'paper-plane-outline' },
+  accept: { action: 'accept', label: tr('Annahme erfassen', 'Record acceptance'), icon: 'checkmark-circle-outline' },
+  reject: { action: 'reject', label: tr('Ablehnung erfassen', 'Record rejection'), icon: 'close-circle-outline' },
+  cancel: { action: 'cancel', label: tr('Stornieren', 'Cancel quotation'), icon: 'ban-outline', destructive: true },
+  revise: { action: 'revise', label: tr('Revision erstellen', 'Create revision'), icon: 'git-branch-outline' },
+  duplicate: { action: 'duplicate', label: tr('Duplizieren', 'Duplicate'), icon: 'copy-outline' },
+  convert: { action: 'convert', label: tr('In Auftrag umwandeln', 'Convert to job'), icon: 'briefcase-outline' },
+  openJob: { action: 'openJob', label: tr('Auftrag öffnen', 'Open job'), icon: 'briefcase-outline' },
+  pdf: { action: 'pdf', label: tr('PDF öffnen / teilen', 'Open / share PDF'), icon: 'document-attach-outline' },
+  publicLink: { action: 'publicLink', label: tr('Kundenlink neu erzeugen & teilen', 'Regenerate & share customer link'), icon: 'link-outline' },
+  delete: { action: 'delete', label: tr('Entwurf löschen', 'Delete draft'), icon: 'trash-outline', destructive: true },
+  cancelFollowUps: { action: 'cancelFollowUps', label: tr('Erinnerungen abbrechen', 'Cancel reminders'), icon: 'alarm-outline' },
+  createInvoice: { action: 'createInvoice', label: tr('Rechnung erstellen', 'Create invoice'), icon: 'receipt-outline' },
+});
 
 /**
  * Actions available for a quotation, derived from its status and the server-provided allowedTransitions.
@@ -65,5 +66,6 @@ export function availableActions(q: QuotationDto, hasScheduledFollowUps = false)
   if (t.has('Cancelled')) more.push('cancel');
   if (q.status === 'Draft') more.push('delete');
 
-  return { primary: primary.map((a) => defs[a]), more: more.filter((a) => !primary.includes(a)).map((a) => defs[a]) };
+  const d = defs();
+  return { primary: primary.map((a) => d[a]), more: more.filter((a) => !primary.includes(a)).map((a) => d[a]) };
 }

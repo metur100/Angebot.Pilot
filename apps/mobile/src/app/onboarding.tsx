@@ -10,9 +10,10 @@ import { Card, SectionHeader } from '@/components/Card';
 import { SelectField, TextField } from '@/components/Field';
 import { FormScroll, Screen } from '@/components/Layout';
 import { InlineError } from '@/components/States';
-import { TAX_DISCLAIMER, taxModeOptions } from '@/components/TaxModeInfo';
+import { taxDisclaimer, taxModeOptions } from '@/components/TaxModeInfo';
 import { Text } from '@/components/Text';
 import { applyServerErrors, emptyToNull } from '@/lib/forms';
+import { useLocale } from '@/lib/i18n';
 import { api, logout, reloadUser, useSession } from '@/lib/session';
 import { space } from '@/theme';
 
@@ -20,6 +21,7 @@ const FIELDS = ['name', 'addressLine1', 'postalCode', 'city', 'email', 'phone', 
 
 export default function OnboardingScreen() {
   const { user } = useSession();
+  const { tr } = useLocale();
   const [formError, setFormError] = useState<string | null>(null);
   const { control, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<CompanyForm>({
     resolver: zodResolver(companySchema),
@@ -64,41 +66,45 @@ export default function OnboardingScreen() {
     <Screen>
       <Stack.Screen
         options={{
-          headerRight: () => <IconButton icon="log-out-outline" accessibilityLabel="Abmelden" onPress={() => void logout()} />,
+          headerRight: () => <IconButton icon="log-out-outline" accessibilityLabel={tr('Abmelden', 'Sign out')} onPress={() => void logout()} />,
         }}
       />
       <FormScroll>
         <Text variant="body" tone="secondary">
-          Willkommen{user?.displayName ? `, ${user.displayName}` : ''}! Legen Sie Ihr Unternehmen an. Diese Angaben erscheinen auf
-          Ihren Angeboten und lassen sich später ändern.
+          {tr(
+            `Willkommen${user?.displayName ? `, ${user.displayName}` : ''}! Legen Sie Ihr Unternehmen an. Diese Angaben erscheinen auf Ihren Angeboten und lassen sich später ändern.`,
+            `Welcome${user?.displayName ? `, ${user.displayName}` : ''}! Set up your company. These details appear on your quotations and can be changed later.`,
+          )}
         </Text>
         <Card style={styles.card}>
-          {text('name', 'Firmenname', { required: true, autoComplete: 'organization' })}
-          {text('addressLine1', 'Straße und Hausnummer', { autoComplete: 'street-address' })}
-          {text('postalCode', 'PLZ', { keyboardType: 'number-pad', autoComplete: 'postal-code', maxLength: 5 })}
-          {text('city', 'Ort')}
-          {text('email', 'E-Mail für Angebote', { keyboardType: 'email-address', autoCapitalize: 'none' })}
-          {text('phone', 'Telefon', { keyboardType: 'phone-pad', autoComplete: 'tel' })}
+          {text('name', tr('Firmenname', 'Company name'), { required: true, autoComplete: 'organization' })}
+          {text('addressLine1', tr('Straße und Hausnummer', 'Street and number'), { autoComplete: 'street-address' })}
+          {text('postalCode', tr('PLZ', 'Postcode'), { keyboardType: 'number-pad', autoComplete: 'postal-code', maxLength: 5 })}
+          {text('city', tr('Ort', 'City'))}
+          {text('email', tr('E-Mail für Angebote', 'Email for quotations'), { keyboardType: 'email-address', autoCapitalize: 'none' })}
+          {text('phone', tr('Telefon', 'Phone'), { keyboardType: 'phone-pad', autoComplete: 'tel' })}
         </Card>
 
-        <SectionHeader title="Steuern & Nummernkreis" />
+        <SectionHeader title={tr('Steuern & Nummernkreis', 'Taxes & numbering')} />
         <Card style={styles.card}>
           <Controller
             control={control}
             name="defaultTaxMode"
             render={({ field: { onChange, value } }) => (
-              <SelectField label="Standard-Besteuerung" value={value} options={taxModeOptions} onChange={onChange} testID="company-taxMode" />
+              <SelectField label={tr('Standard-Besteuerung', 'Default tax treatment')} value={value} options={taxModeOptions()} onChange={onChange} testID="company-taxMode" />
             )}
           />
           <Text variant="caption" tone="muted">
-            {TAX_DISCLAIMER}
+            {taxDisclaimer()}
           </Text>
-          {text('vatId', 'USt-IdNr. (optional)', { autoCapitalize: 'characters', hint: 'Format z. B. DE123456789' })}
-          {text('quotationPrefix', 'Präfix für Angebotsnummern (optional)', { autoCapitalize: 'characters', hint: 'z. B. AN → AN-2026-0001', maxLength: 8 })}
+          {text('vatId', tr('USt-IdNr. (optional)', 'VAT ID (optional)'), { autoCapitalize: 'characters', hint: tr('Format z. B. DE123456789', 'Format e.g. DE123456789') })}
+          {text('quotationPrefix', tr('Präfix für Angebotsnummern (optional)', 'Quotation number prefix (optional)'), {
+            autoCapitalize: 'characters', hint: tr('z. B. AN → AN-2026-0001', 'e.g. AN → AN-2026-0001'), maxLength: 8,
+          })}
         </Card>
 
         <InlineError message={formError} />
-        <Button label="Unternehmen anlegen" icon="business-outline" onPress={() => void onSubmit()} loading={isSubmitting} testID="company-submit" />
+        <Button label={tr('Unternehmen anlegen', 'Create company')} icon="business-outline" onPress={() => void onSubmit()} loading={isSubmitting} testID="company-submit" />
       </FormScroll>
     </Screen>
   );

@@ -1,4 +1,4 @@
-import { ApiError, errorMessage } from '@angebotpilot/api-contracts';
+import { ApiError, errorMessage, tr } from '@angebotpilot/api-contracts';
 import * as WebBrowser from 'expo-web-browser';
 import type { FieldValues, Path, UseFormSetError } from 'react-hook-form';
 
@@ -11,7 +11,7 @@ export function applyServerErrors<T extends FieldValues>(error: unknown, setErro
     const unmatched: string[] = [];
     for (const [key, messages] of Object.entries(error.fieldErrors)) {
       const field = fields.find((f) => f.toLowerCase() === key.toLowerCase());
-      const message = messages[0] ?? 'Ungültiger Wert.';
+      const message = messages[0] ?? tr('Ungültiger Wert.', 'Invalid value.');
       if (field) setError(field as Path<T>, { type: 'server', message });
       else unmatched.push(message);
     }

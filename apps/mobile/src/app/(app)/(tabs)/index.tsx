@@ -1,5 +1,5 @@
 import {
-  followUpKindLabel, formatDate, formatDateTime, formatEur, formatPercent,
+  followUpKindLabel, formatDate, formatDateTime, formatEur, formatPercent, tr,
   type ActivityDto, type DashboardDto, type QuotationStatus,
 } from '@angebotpilot/api-contracts';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,13 +12,16 @@ import { InvoiceCard, QuotationCard } from '@/components/EntityCards';
 import { ContentScroll, Screen } from '@/components/Layout';
 import { ErrorState, Skeleton } from '@/components/States';
 import { Text } from '@/components/Text';
+import { useLocale } from '@/lib/i18n';
 import { useDashboard } from '@/lib/queries';
 import { useMembership, useSession } from '@/lib/session';
-import { colors, radius, space, touch } from '@/theme';
+import { makeStyles, radius, space, touch, useTheme } from '@/theme';
 
 function Kpi({
   label, value, icon, hint, onPress, testID, danger,
 }: { label: string; value: string; icon: IconName; hint?: string; onPress?: () => void; testID?: string; danger?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole={onPress ? 'button' : 'text'}
@@ -29,7 +32,7 @@ function Kpi({
       testID={testID}
     >
       <View style={styles.kpiHeader}>
-        <Ionicons name={icon} size={18} color={danger ? colors.danger : colors.brand} />
+        <Ionicons name={icon} size={18} color={danger ? colors.danger : colors.brandText} />
         <Text variant="caption" tone={danger ? 'danger' : 'secondary'} style={styles.flex} numberOfLines={2}>
           {label}
         </Text>
@@ -46,6 +49,10 @@ function Kpi({
   );
 }
 
+function invoiceCount(count: number): string {
+  return `${count} ${count === 1 ? tr('Rechnung', 'invoice') : tr('Rechnungen', 'invoices')}`;
+}
+
 function isEmptyCompany(d: DashboardDto): boolean {
   return (
     d.draftCount + d.sentCount + d.acceptedCount + d.rejectedCount + d.expiredCount === 0 &&
@@ -56,23 +63,35 @@ function isEmptyCompany(d: DashboardDto): boolean {
 
 function FirstSteps() {
   const router = useRouter();
-  const steps: { icon: IconName; title: string; text: string; action: () => void; label: string }[] = [
-    { icon: 'person-add-outline', title: '1. Kunden anlegen', text: 'Firmen- oder Privatkunden mit Kontaktdaten.', action: () => router.push('/customer-form'), label: 'Kunde anlegen' },
-    { icon: 'document-text-outline', title: '2. Angebot erstellen', text: 'Positionen erfassen, Summen werden live berechnet.', action: () => router.push('/quotation-editor'), label: 'Angebot erstellen' },
-    { icon: 'paper-plane-outline', title: '3. Versenden & nachfassen', text: 'Per E-Mail oder Kundenlink; Erinnerungen laufen automatisch.', action: () => router.push('/quotations'), label: 'Zu den Angeboten' },
+  const { tr } = useLocale();
+  const { colors } = useTheme();
+  const styles = useStyles();
+  const steps: { key: string; icon: IconName; title: string; text: string; action: () => void }[] = [
+    {
+      key: 'customer', icon: 'person-add-outline', title: tr('1. Kunden anlegen', '1. Add customers'),
+      text: tr('Firmen- oder Privatkunden mit Kontaktdaten.', 'Business or private customers with contact details.'), action: () => router.push('/customer-form'),
+    },
+    {
+      key: 'quotation', icon: 'document-text-outline', title: tr('2. Angebot erstellen', '2. Create a quotation'),
+      text: tr('Positionen erfassen, Summen werden live berechnet.', 'Enter line items; totals are calculated live.'), action: () => router.push('/quotation-editor'),
+    },
+    {
+      key: 'send', icon: 'paper-plane-outline', title: tr('3. Versenden & nachfassen', '3. Send & follow up'),
+      text: tr('Per E-Mail oder Kundenlink; Erinnerungen laufen automatisch.', 'By email or customer link; reminders run automatically.'), action: () => router.push('/quotations'),
+    },
   ];
   return (
     <Card style={styles.firstSteps} testID="first-steps">
       <Text variant="heading" accessibilityRole="header">
-        Erste Schritte
+        {tr('Erste Schritte', 'Getting started')}
       </Text>
       <Text variant="body" tone="secondary">
-        Noch keine Angebote in diesem Zeitraum. So starten Sie:
+        {tr('Noch keine Angebote in diesem Zeitraum. So starten Sie:', 'No quotations in this period yet. Here is how to start:')}
       </Text>
       {steps.map((s) => (
-        <Pressable key={s.title} accessibilityRole="button" accessibilityLabel={`${s.title}. ${s.text}`} onPress={s.action} style={styles.step}>
+        <Pressable key={s.key} accessibilityRole="button" accessibilityLabel={`${s.title}. ${s.text}`} onPress={s.action} style={styles.step}>
           <View style={styles.stepIcon}>
-            <Ionicons name={s.icon} size={20} color={colors.brand} />
+            <Ionicons name={s.icon} size={20} color={colors.brandText} />
           </View>
           <View style={styles.flex}>
             <Text variant="bodyStrong">{s.title}</Text>
@@ -89,6 +108,7 @@ function FirstSteps() {
 
 function ActivityRow({ item }: { item: ActivityDto }) {
   const router = useRouter();
+  const styles = useStyles();
   const target =
     item.entityId && item.entityType === 'Quotation' ? `/quotation/${item.entityId}`
       : item.entityId && item.entityType === 'Job' ? `/job/${item.entityId}`
@@ -116,6 +136,7 @@ function ActivityRow({ item }: { item: ActivityDto }) {
 }
 
 function DashboardSkeleton() {
+  const styles = useStyles();
   return (
     <View style={styles.grid} testID="dashboard-skeleton">
       {Array.from({ length: 6 }, (_, i) => (
@@ -130,6 +151,8 @@ function DashboardSkeleton() {
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const { tr } = useLocale();
+  const styles = useStyles();
   const { user } = useSession();
   const membership = useMembership();
   const dashboard = useDashboard();
@@ -141,17 +164,20 @@ export default function DashboardScreen() {
     <Screen>
       <ContentScroll refreshing={dashboard.isRefetching} onRefresh={() => void dashboard.refetch()} testID="dashboard">
         <View style={styles.greeting}>
-          <Text variant="heading">Hallo{user?.displayName ? `, ${user.displayName.split(' ')[0]}` : ''}</Text>
+          <Text variant="heading">
+            {tr('Hallo', 'Hello')}
+            {user?.displayName ? `, ${user.displayName.split(' ')[0]}` : ''}
+          </Text>
           <Text variant="caption" tone="secondary">
             {membership?.companyName}
-            {membership?.isDemo ? ' · Demo-Daten' : ''}
+            {membership?.isDemo ? tr(' · Demo-Daten', ' · Demo data') : ''}
             {d ? ` · ${formatDate(d.from)} – ${formatDate(d.to)}` : ''}
           </Text>
         </View>
 
         <View style={styles.quick}>
-          <Button label="Neues Angebot" icon="add" onPress={() => router.push('/quotation-editor')} style={styles.flex} testID="dashboard-new-quotation" />
-          <Button label="Neuer Kunde" icon="person-add-outline" variant="outline" onPress={() => router.push('/customer-form')} style={styles.flex} />
+          <Button label={tr('Neues Angebot', 'New quotation')} icon="add" onPress={() => router.push('/quotation-editor')} style={styles.flex} testID="dashboard-new-quotation" />
+          <Button label={tr('Neuer Kunde', 'New customer')} icon="person-add-outline" variant="outline" onPress={() => router.push('/customer-form')} style={styles.flex} />
         </View>
 
         {dashboard.isPending ? <DashboardSkeleton /> : null}
@@ -161,33 +187,33 @@ export default function DashboardScreen() {
           <>
             {isEmptyCompany(d) ? <FirstSteps /> : null}
             <View style={styles.grid}>
-              <Kpi label="Versendet / offen" value={String(d.sentCount)} icon="paper-plane-outline" onPress={() => goToStatus('Sent')} testID="kpi-sent" />
-              <Kpi label="Angenommen" value={String(d.acceptedCount)} icon="checkmark-circle-outline" onPress={() => goToStatus('Accepted')} testID="kpi-accepted" />
-              <Kpi label="Entwürfe" value={String(d.draftCount)} icon="create-outline" onPress={() => goToStatus('Draft')} testID="kpi-drafts" />
+              <Kpi label={tr('Versendet / offen', 'Sent / open')} value={String(d.sentCount)} icon="paper-plane-outline" onPress={() => goToStatus('Sent')} testID="kpi-sent" />
+              <Kpi label={tr('Angenommen', 'Accepted')} value={String(d.acceptedCount)} icon="checkmark-circle-outline" onPress={() => goToStatus('Accepted')} testID="kpi-accepted" />
+              <Kpi label={tr('Entwürfe', 'Drafts')} value={String(d.draftCount)} icon="create-outline" onPress={() => goToStatus('Draft')} testID="kpi-drafts" />
               <Kpi
-                label="Abschlussquote"
+                label={tr('Abschlussquote', 'Conversion rate')}
                 value={d.conversionRatePercent === null ? '–' : formatPercent(d.conversionRatePercent)}
                 icon="trending-up-outline"
-                hint={d.conversionRatePercent === null ? 'Noch keine Entscheidungen' : 'Definition antippen'}
-                onPress={() => Alert.alert('Abschlussquote', d.conversionRateDefinition)}
+                hint={d.conversionRatePercent === null ? tr('Noch keine Entscheidungen', 'No decisions yet') : tr('Definition antippen', 'Tap for definition')}
+                onPress={() => Alert.alert(tr('Abschlussquote', 'Conversion rate'), d.conversionRateDefinition)}
                 testID="kpi-conversion"
               />
-              <Kpi label="Angebotsvolumen (netto)" value={formatEur(d.quotedValueNet)} icon="cash-outline" testID="kpi-quoted" />
-              <Kpi label="Gewonnen (netto)" value={formatEur(d.acceptedValueNet)} icon="trophy-outline" testID="kpi-won" />
-              <Kpi label="Offene Aufträge" value={String(d.openJobsCount)} icon="briefcase-outline" onPress={() => router.push('/jobs')} testID="kpi-jobs" />
-              <Kpi label="Fällige Erinnerungen" value={String(d.followUpsDueCount)} icon="alarm-outline" testID="kpi-followups" />
+              <Kpi label={tr('Angebotsvolumen (netto)', 'Quoted value (net)')} value={formatEur(d.quotedValueNet)} icon="cash-outline" testID="kpi-quoted" />
+              <Kpi label={tr('Gewonnen (netto)', 'Won (net)')} value={formatEur(d.acceptedValueNet)} icon="trophy-outline" testID="kpi-won" />
+              <Kpi label={tr('Offene Aufträge', 'Open jobs')} value={String(d.openJobsCount)} icon="briefcase-outline" onPress={() => router.push('/jobs')} testID="kpi-jobs" />
+              <Kpi label={tr('Fällige Erinnerungen', 'Follow-ups due')} value={String(d.followUpsDueCount)} icon="alarm-outline" testID="kpi-followups" />
               <Kpi
-                label="Offene Rechnungen"
+                label={tr('Offene Rechnungen', 'Open invoices')}
                 value={formatEur(d.openInvoicesAmount)}
-                hint={`${d.openInvoicesCount} ${d.openInvoicesCount === 1 ? 'Rechnung' : 'Rechnungen'}`}
+                hint={invoiceCount(d.openInvoicesCount)}
                 icon="receipt-outline"
                 onPress={() => goToInvoices('open')}
                 testID="kpi-open-invoices"
               />
               <Kpi
-                label="Überfällig"
+                label={tr('Überfällig', 'Overdue')}
                 value={formatEur(d.overdueInvoicesAmount)}
-                hint={`${d.overdueInvoicesCount} ${d.overdueInvoicesCount === 1 ? 'Rechnung' : 'Rechnungen'}`}
+                hint={invoiceCount(d.overdueInvoicesCount)}
                 icon="alert-circle-outline"
                 onPress={() => goToInvoices('overdue')}
                 danger={d.overdueInvoicesCount > 0}
@@ -200,7 +226,7 @@ export default function DashboardScreen() {
 
             {d.overdueInvoices.length > 0 ? (
               <>
-                <SectionHeader title={`Überfällige Rechnungen (${d.overdueInvoicesCount})`} />
+                <SectionHeader title={`${tr('Überfällige Rechnungen', 'Overdue invoices')} (${d.overdueInvoicesCount})`} />
                 <View style={styles.list}>
                   {d.overdueInvoices.slice(0, 5).map((i) => (
                     <InvoiceCard key={i.id} item={i} />
@@ -211,7 +237,7 @@ export default function DashboardScreen() {
 
             {d.awaitingDecision.length > 0 ? (
               <>
-                <SectionHeader title={`Warten auf Entscheidung (${d.awaitingDecision.length})`} />
+                <SectionHeader title={`${tr('Warten auf Entscheidung', 'Awaiting decision')} (${d.awaitingDecision.length})`} />
                 <View style={styles.list}>
                   {d.awaitingDecision.slice(0, 5).map((q) => (
                     <QuotationCard key={q.id} item={q} />
@@ -222,7 +248,7 @@ export default function DashboardScreen() {
 
             {d.expiringSoon.length > 0 ? (
               <>
-                <SectionHeader title={`Läuft bald ab (${d.expiringSoonCount})`} />
+                <SectionHeader title={`${tr('Läuft bald ab', 'Expiring soon')} (${d.expiringSoonCount})`} />
                 <View style={styles.list}>
                   {d.expiringSoon.slice(0, 5).map((q) => (
                     <QuotationCard key={q.id} item={q} />
@@ -233,13 +259,16 @@ export default function DashboardScreen() {
 
             {d.upcomingFollowUps.length > 0 ? (
               <>
-                <SectionHeader title="Anstehende Erinnerungen" />
+                <SectionHeader title={tr('Anstehende Erinnerungen', 'Upcoming follow-ups')} />
                 <View style={styles.list}>
                   {d.upcomingFollowUps.slice(0, 5).map((f) => (
                     <PressableCard
                       key={`${f.quotationId}-${f.kind}`}
                       onPress={() => router.push(`/quotation/${f.quotationId}`)}
-                      accessibilityLabel={`${followUpKindLabel[f.kind]} für ${f.quotationNumber}, ${f.customerName}, am ${formatDateTime(f.dueAt)}`}
+                      accessibilityLabel={tr(
+                        `${followUpKindLabel[f.kind]} für ${f.quotationNumber}, ${f.customerName}, am ${formatDateTime(f.dueAt)}`,
+                        `${followUpKindLabel[f.kind]} for ${f.quotationNumber}, ${f.customerName}, on ${formatDateTime(f.dueAt)}`,
+                      )}
                     >
                       <Text variant="bodyStrong">
                         {followUpKindLabel[f.kind]} · {f.quotationNumber}
@@ -255,7 +284,7 @@ export default function DashboardScreen() {
 
             {d.recentActivity.length > 0 ? (
               <>
-                <SectionHeader title="Letzte Aktivitäten" />
+                <SectionHeader title={tr('Letzte Aktivitäten', 'Recent activity')} />
                 <Card style={styles.activityCard}>
                   {d.recentActivity.slice(0, 8).map((a) => (
                     <ActivityRow key={a.id} item={a} />
@@ -270,7 +299,7 @@ export default function DashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   flex: { flex: 1, minWidth: 0 },
   greeting: { gap: 2 },
   quick: { flexDirection: 'row', gap: space[3] },
@@ -287,5 +316,5 @@ const styles = StyleSheet.create({
   stepIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
   activityCard: { paddingVertical: space[1] },
   activity: { flexDirection: 'row', gap: space[3], paddingVertical: space[2], minHeight: touch },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brand, marginTop: 8 },
-});
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brandText, marginTop: 8 },
+}));

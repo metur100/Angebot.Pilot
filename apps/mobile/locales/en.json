@@ -1,0 +1,6 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "AngebotPilot",
+    "NSCameraUsageDescription": "The camera is only used to scan quotation QR codes."
+  }
+}
