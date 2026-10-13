@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 using AngebotPilot.Domain;
 using AngebotPilot.Domain.Invoices;
 using AngebotPilot.Domain.Quotations;
@@ -26,14 +27,36 @@ public static class EmailTemplates
     public static string Salutation(string? contactName) =>
         string.IsNullOrWhiteSpace(contactName) ? "Guten Tag," : $"Guten Tag {contactName},";
 
+    private static readonly Regex SalutationLine = new(
+        @"^(guten\s+(tag|morgen|abend)|hallo|hi|moin|servus|grüß\s+gott|sehr\s+geehrte[rs]?|liebe[rs]?)\b[^.?]*[,!]?$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Splits a custom message into greeting and body. When the message starts with its own salutation
+    /// ("Guten Tag Frau Meier,"), that line replaces the default greeting instead of appearing twice.
+    /// Body is null when the message is empty or consists of the salutation only.
+    /// </summary>
+    public static (string Greeting, string? Body) GreetingAndBody(string? message, string? contactName)
+    {
+        var trimmed = message?.Trim() ?? string.Empty;
+        var lineEnd = trimmed.IndexOf('\n');
+        var firstLine = (lineEnd < 0 ? trimmed : trimmed[..lineEnd]).Trim();
+        if (firstLine.Length is > 0 and <= 100 && SalutationLine.IsMatch(firstLine))
+        {
+            var rest = lineEnd < 0 ? string.Empty : trimmed[(lineEnd + 1)..].Trim();
+            return (firstLine, rest.Length == 0 ? null : rest);
+        }
+
+        return (Salutation(contactName), trimmed.Length == 0 ? null : trimmed);
+    }
+
     public static ComposedEmail QuotationSent(Quotation q, string companyName, string? subject, string? message, string? publicUrl, bool pdfAttached, string? signature, string? optOutUrl, string brandColor)
     {
-        var intro = string.IsNullOrWhiteSpace(message)
-            ? $"vielen Dank für Ihre Anfrage. Anbei erhalten Sie unser Angebot {q.Number} „{q.Title}“."
-            : message.Trim();
+        var (greeting, body) = GreetingAndBody(message, q.RecipientContact);
+        var intro = body ?? $"vielen Dank für Ihre Anfrage. Anbei erhalten Sie unser Angebot {q.Number} „{q.Title}“.";
         return Compose(
             subject ?? DefaultSubject(q, companyName),
-            Salutation(q.RecipientContact),
+            greeting,
             [intro, Summary(q)],
             publicUrl,
             publicUrl is null ? null : "Angebot ansehen und annehmen",
@@ -67,28 +90,26 @@ public static class EmailTemplates
 
     public static ComposedEmail InvoiceSent(Invoice invoice, string companyName, string? subject, string? message, string? signature, string brandColor)
     {
-        var intro = string.IsNullOrWhiteSpace(message)
-            ? invoice.IsCancellation
-                ? $"anbei erhalten Sie die Stornorechnung {invoice.Number} zu unserer Rechnung {invoice.CancelledInvoiceNumber}."
-                : $"vielen Dank für Ihren Auftrag. Anbei erhalten Sie unsere Rechnung {invoice.Number} „{invoice.Title}“."
-            : message.Trim();
+        var (greeting, body) = GreetingAndBody(message, invoice.RecipientContact);
+        var intro = body ?? (invoice.IsCancellation
+            ? $"anbei erhalten Sie die Stornorechnung {invoice.Number} zu unserer Rechnung {invoice.CancelledInvoiceNumber}."
+            : $"vielen Dank für Ihren Auftrag. Anbei erhalten Sie unsere Rechnung {invoice.Number} „{invoice.Title}“.");
         var summary = invoice.IsCancellation
             ? $"Stornorechnung: {invoice.Number}\nStorniert: Rechnung {invoice.CancelledInvoiceNumber}\nBetrag: −{Eur(invoice.GrossTotal)}"
             : $"Rechnungsnummer: {invoice.Number}\nRechnungsbetrag: {Eur(invoice.GrossTotal)}{(invoice.TaxMode == TaxMode.Standard ? " inkl. USt." : string.Empty)}\nZahlbar bis: {Date(invoice.DueDate)}";
         var after = invoice.IsCancellation
             ? "Die Rechnung finden Sie im Anhang als PDF. Sie enthält zusätzlich die strukturierten Rechnungsdaten (E-Rechnung im ZUGFeRD-Format)."
             : "Die Rechnung finden Sie im Anhang als PDF. Sie enthält zusätzlich die strukturierten Rechnungsdaten (E-Rechnung im ZUGFeRD-Format), die Ihre Buchhaltungssoftware direkt einlesen kann.";
-        return Compose(subject ?? DefaultSubject(invoice, companyName), Salutation(invoice.RecipientContact), [intro, summary], null, null, after,
+        return Compose(subject ?? DefaultSubject(invoice, companyName), greeting, [intro, summary], null, null, after,
             signature ?? $"Mit freundlichen Grüßen\n{companyName}", companyName, null, brandColor);
     }
 
     public static ComposedEmail PaymentReminder(Invoice invoice, string companyName, string? message, string? signature, string brandColor)
     {
-        var intro = string.IsNullOrWhiteSpace(message)
-            ? $"sicher ist es Ihrer Aufmerksamkeit entgangen: Unsere Rechnung {invoice.Number} „{invoice.Title}“ vom {Date(invoice.IssueDate)} war am {Date(invoice.DueDate)} fällig. Bis heute konnten wir noch keinen vollständigen Zahlungseingang feststellen."
-            : message.Trim();
+        var (greeting, body) = GreetingAndBody(message, invoice.RecipientContact);
+        var intro = body ?? $"sicher ist es Ihrer Aufmerksamkeit entgangen: Unsere Rechnung {invoice.Number} „{invoice.Title}“ vom {Date(invoice.IssueDate)} war am {Date(invoice.DueDate)} fällig. Bis heute konnten wir noch keinen vollständigen Zahlungseingang feststellen.";
         var summary = $"Rechnungsnummer: {invoice.Number}\nRechnungsbetrag: {Eur(invoice.GrossTotal)}\nNoch offen: {Eur(invoice.OpenAmount)}\nFällig seit: {Date(invoice.DueDate)}";
-        return Compose($"Zahlungserinnerung zu Rechnung {invoice.Number}", Salutation(invoice.RecipientContact), [intro, summary], null, null,
+        return Compose($"Zahlungserinnerung zu Rechnung {invoice.Number}", greeting, [intro, summary], null, null,
             $"Bitte überweisen Sie den offenen Betrag in den nächsten Tagen unter Angabe der Rechnungsnummer. Die Rechnung finden Sie zur Sicherheit noch einmal im Anhang. Sollte sich Ihre Zahlung mit dieser E-Mail überschnitten haben, betrachten Sie sie bitte als gegenstandslos.",
             signature ?? $"Mit freundlichen Grüßen\n{companyName}", companyName, null, brandColor);
     }

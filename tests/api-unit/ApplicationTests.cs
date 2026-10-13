@@ -159,6 +159,34 @@ public class EmailTemplateTests
         Assert.DoesNotContain("<img", mail.BodyHtml, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Custom_message_with_own_salutation_is_greeted_only_once()
+    {
+        var q = QuotationCalculatorTests.NewQuotation();
+        q.ReplaceLineItems([QuotationCalculatorTests.Item(1, 100m, 0, 19)]);
+        q.RecipientContact = "Medo Ledo";
+        var mail = EmailTemplates.QuotationSent(q, "Muster & Co", null, "Guten Tag Medo Ledo,\n\nvielen Dank für Ihre Anfrage.", null, true, null, null, "#2F45D8");
+
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(mail.BodyText, "Guten Tag"));
+        Assert.StartsWith("Guten Tag Medo Ledo,", mail.BodyText);
+        Assert.Contains("vielen Dank für Ihre Anfrage.", mail.BodyText);
+    }
+
+    [Theory]
+    [InlineData("Sehr geehrter Herr Ledo,\n\nanbei", "Sehr geehrter Herr Ledo,", "anbei")]
+    [InlineData("Hallo Medo!\nanbei", "Hallo Medo!", "anbei")]
+    [InlineData("anbei unser Angebot.", "Guten Tag Medo Ledo,", "anbei unser Angebot.")]
+    [InlineData("Guten Tag. Anbei unser Angebot.", "Guten Tag Medo Ledo,", "Guten Tag. Anbei unser Angebot.")]
+    [InlineData("Guten Tag,", "Guten Tag,", null)]
+    [InlineData(null, "Guten Tag Medo Ledo,", null)]
+    public void Greeting_is_taken_from_the_message_when_present(string? message, string greeting, string? body)
+    {
+        var (actualGreeting, actualBody) = EmailTemplates.GreetingAndBody(message, "Medo Ledo");
+
+        Assert.Equal(greeting, actualGreeting);
+        Assert.Equal(body, actualBody);
+    }
+
     [Theory]
     [InlineData(FollowUpKind.FirstReminder, "Kurze Nachfrage")]
     [InlineData(FollowUpKind.SecondReminder, "Nachfrage")]
