@@ -91,7 +91,7 @@ export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const useMocks = command === 'serve' && (mode === 'mock' || env.VITE_USE_MOCKS === 'true');
   return {
-    base: command === 'build' ? (env.VITE_BASE_PATH ?? '/Angebot.Pilot.App/') : '/',
+    base: command === 'build' ? (env.VITE_BASE_PATH ?? '/') : '/',
     plugins: [react(), tailwindcss(), contentSecurityPolicy(env.VITE_API_BASE_URL), mockServiceWorker()],
     resolve: {
       alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },

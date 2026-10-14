@@ -8,8 +8,8 @@ export MSYS2_ENV_CONV_EXCL="VITE_BASE_PATH;VITE_API_BASE_URL;VITE_LANDING_URL"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PAGES_REPO="${PAGES_REPO:-https://github.com/metur100/Angebot.Pilot.App.git}"
 export VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://angebotpilot.runasp.net}"
-export VITE_BASE_PATH="${VITE_BASE_PATH:-/Angebot.Pilot.App/}"
-export VITE_LANDING_URL="${VITE_LANDING_URL:-https://metur100.github.io/Angebot.Pilot.Landing/}"
+export VITE_BASE_PATH="${VITE_BASE_PATH:-/}"
+export VITE_LANDING_URL="${VITE_LANDING_URL:-https://angebot.gentlegroup.de/}"
 
 cd "$ROOT"
 npm run build --workspace apps/web
@@ -30,4 +30,4 @@ git add -A
 if git diff --cached --quiet; then echo "No changes to publish."; exit 0; fi
 git commit -m "Publish web app build $(cd "$ROOT" && git rev-parse --short HEAD)"
 git push origin HEAD
-echo "Published. Pages URL: https://metur100.github.io/Angebot.Pilot.App/"
+echo "Published. Pages URL: https://angebot-app.gentlegroup.de/"

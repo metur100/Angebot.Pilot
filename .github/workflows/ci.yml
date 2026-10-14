@@ -61,7 +61,7 @@ jobs:
       - run: npm run build --workspace apps/web
         env:
           VITE_API_BASE_URL: https://angebotpilot.runasp.net
-          VITE_BASE_PATH: /Angebot.Pilot.App/
+          VITE_BASE_PATH: /
       - run: npx -y npm@11 audit --omit=dev --audit-level=high
 
   mobile:
