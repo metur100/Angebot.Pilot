@@ -277,7 +277,7 @@ https://angebot.gentlegroup.de/datenschutz.html
 |---|---|
 | Name | `Demo-Unternehmen / Demo company` |
 | Username | `berkcan@gentlegroup.de` |
-| Password | `Runderbaum12` |
+| Password | (see GentleHub → project → Testfirma-Login) |
 | Any other information | see text below |
 
 ```text
