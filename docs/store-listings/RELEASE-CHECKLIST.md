@@ -37,7 +37,7 @@ Related: [STORE-READINESS.md](STORE-READINESS.md) · [MONSTERASP-DEPLOYMENT.md](
 ### 4.1 Version
 
 - [ ] Increase `version` (versionName) and `android.versionCode` in `apps/mobile/app.config.ts`
-      (current release artefact: `1.0.0` / `1`). Every Play upload needs a higher `versionCode`.
+      (current release artefact: `1.0.0` / `2`). Every Play upload needs a higher `versionCode`.
 
 ### 4.2 Build (Windows, local)
 

@@ -109,9 +109,9 @@ Accuracy notes for the owner before publishing:
 - Target API: new apps and updates must target **Android 16 (API 36)** since 31 Aug 2026
   (<https://developer.android.com/google/play/requirements/target-sdk>). Expo SDK 57 uses compileSdk/targetSdk 36
   (<https://docs.expo.dev/versions/latest/>) – verify in the built bundle's manifest.
-- Current artefact: `artifacts/android/angebotpilot-1.0.0-1-release.aab` (outside Git), versionName `1.0.0`,
-  versionCode `1`, signed with the owner's upload key (alias `angebotpilot-upload`, certificate SHA-256 starting
-  `DB:CC:77:22…`). Not uploaded.
+- Current artefact: `artifacts/android/angebotpilot-1.0.0-2-release.aab` (outside Git), versionName `1.0.0`,
+  versionCode `2` (2026-10-29, current `main`), signed with the owner's upload key (alias `angebotpilot-upload`, certificate SHA-256 starting
+  `DB:CC:77:22…`). Not uploaded. Copy-paste checklist for every Console field: `store-assets/android/GOOGLE-PLAY-CONSOLE.md`.
 - **Play App Signing:** new apps are enrolled automatically; Google holds the app signing key, the owner keeps the
   upload key (<https://support.google.com/googleplay/android-developer/answer/9842756>).
 - New personal developer accounts (created after 13 Nov 2023) need a **closed test with ≥ 12 testers opted in for
