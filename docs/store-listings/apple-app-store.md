@@ -31,7 +31,7 @@ Related: [STORE-READINESS.md](STORE-READINESS.md) · [PRIVACY-QUESTIONNAIRE.md](
 | Category | Primary **Business**, secondary **Productivity** |
 | Content rights | "Does your app contain, show, or access third-party content?" → **No** |
 | Age rating | see section 6 (expected result **4+**) |
-| EU Digital Services Act | **Trader** – name, address, email, phone are shown on the EU storefronts. Use the same address as the Impressum once its placeholder is filled in |
+| EU Digital Services Act | **Trader** – name, address, email, phone are shown on the EU storefronts. Contact details must match the developer account; the Impressum (https://angebot.gentlegroup.de/impressum.html) names Berk-Can Atesoglu (Gentle Group Studios), Girardetstraße 17, 42109 Wuppertal – owner to align |
 | License agreement | Apple standard EULA |
 
 ### de-DE

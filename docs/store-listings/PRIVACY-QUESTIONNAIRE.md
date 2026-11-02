@@ -1,7 +1,7 @@
 # Privacy Questionnaires – Drafts (Google Play Data safety, Apple App Privacy)
 
 Status: **draft for owner and legal review.** Answers are derived from the code (re-checked 2026-11-02 against `main`, versionCode 3). They must
-match the privacy policy (`datenschutz.html` on the landing site; only the operator address is still a placeholder). Nothing has
+match the privacy policy (`datenschutz.html` on the landing site; complete as of 2026-11-02). Nothing has
 been submitted.
 
 Related: [google-play.md](google-play.md) · [apple-app-store.md](apple-app-store.md) ·

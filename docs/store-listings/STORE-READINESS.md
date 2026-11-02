@@ -12,7 +12,7 @@ Related: [google-play.md](google-play.md) · [apple-app-store.md](apple-app-stor
 
 | Item | Why it matters for review | Owner action |
 |---|---|---|
-| Legal pages still contain `[PLATZHALTER: …]` for operator identity (address, phone, VAT ID, legal form, jurisdiction) and two contract periods (AGB §13, AVV §6/§9); hosting/email providers and retention periods filled in 2026-11-02 | Privacy policy URL is reviewed by both stores; Impressum required in Germany | **Owner:** fill placeholders, legal review |
+| Legal pages: operator identity (Berk-Can Atesoglu, Gentle Group Studios, Wuppertal), hosting/email providers and retention periods filled in 2026-11-02; `[PLATZHALTER: …]` remains only for three contract periods (AGB §13 deletion period, AVV sub-processor notice and deletion periods) | Privacy policy URL is reviewed by both stores; Impressum required in Germany | **Owner:** fill placeholders, legal review |
 | MonsterASP Free plan forbids commercial use | A store app for a paid B2B service needs a production-grade backend | **Owner:** upgrade before taking paying customers |
 | Review account trial ends **2026-11-28** | After expiry the company is read-only (reviewers can sign in but not edit) | **Owner:** extend the trial of "Berkcan Malerbetrieb GmbH" before then – no admin endpoint exists; needs an operator endpoint + deploy or a manual SQL update (see GOOGLE-PLAY-CONSOLE.md section 7) |
 | Review account password | Kept in GentleHub only (this repository is public) | **Owner:** paste it into Play Console (App access) and App Store Connect (Sign-in information) |
@@ -58,7 +58,7 @@ against production (checked 2026-11-02).
 
 | Requirement | Status |
 |---|---|
-| Privacy policy URL | `https://angebot.gentlegroup.de/datenschutz.html` (200), only operator-identity placeholders open |
+| Privacy policy URL | `https://angebot.gentlegroup.de/datenschutz.html` (200), operator data filled in; no placeholders on this page |
 | Support URL | `https://angebot.gentlegroup.de/support.html` (200) |
 | Account deletion in app + web | implemented; web page `konto-loeschen.html` / `en/delete-account.html` (200) |
 | No ads / no tracking SDKs | true for `apps/mobile/package.json` on 2026-11-02 |

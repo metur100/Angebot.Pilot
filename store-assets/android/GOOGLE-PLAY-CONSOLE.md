@@ -18,9 +18,9 @@ Related docs: [docs/store-listings/google-play.md](../../docs/store-listings/goo
 [RELEASE-CHECKLIST.md](../../docs/store-listings/RELEASE-CHECKLIST.md)
 
 > **Before you submit to production:** the legal pages on angebot.gentlegroup.de still contain
-> `[PLATZHALTER: …]` markers for the operator's identity (address, phone, VAT ID, legal form, place of jurisdiction)
-> and two contract periods in AGB/AVV. Hosting provider, email provider and retention periods were filled in on
-> 2026-11-02. Google reviews the privacy policy URL; fill the rest first. Internal and closed testing can start before that.
+> `[PLATZHALTER: …]` markers only for three contract periods (AGB §13 deletion period, AVV sub-processor notice
+> and deletion periods). Operator identity, hosting/email providers and retention periods were filled in on 2026-11-02.
+> Google reviews the privacy policy URL; decide those periods first. Internal and closed testing can start before that.
 
 ---
 
@@ -371,8 +371,9 @@ Not applicable – the app requests none of these (storage/media permissions are
 for QR scanning only, which needs no extra declaration).
 
 ### EU Digital Services Act – trader status
-**I'm a trader** (business). The trader contact details (name, address, email, phone) will be shown publicly – enter
-the same address as in the Impressum once the placeholder there is filled in.
+**I'm a trader** (business). The trader contact details (name, address, email, phone) will be shown publicly – they must match the
+developer account. The Impressum now names Berk-Can Atesoglu (Gentle Group Studios), Girardetstraße 17, 42109 Wuppertal,
++49 175 4701892, office@gentlegroup.de – owner to align with the Play developer account.
 
 ## 6. Pricing and distribution
 - Free. Countries: start with **Germany, Austria, Switzerland** (German-language business documents); add more later.
