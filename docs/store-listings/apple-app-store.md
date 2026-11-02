@@ -355,15 +355,14 @@ user: Yes · Used for tracking: No · Purpose: App Functionality** only.
 | User Content | Emails or Text Messages | Yes (message text when sending a quotation/invoice by email) |
 | User Content | Other User Content | Yes (quotations, invoices, jobs, templates, notes) |
 | Identifiers | User ID | Yes (internal account id) |
-| Usage Data | Product Interaction | **Owner decision** – server-side activity history of business actions, no UI analytics. Conservative: Yes |
+| Usage Data | Product Interaction | Yes (declared conservatively: server-side activity history of business actions, no UI analytics) |
 
 Not collected: Health & Fitness, Location, Sensitive Info, Contacts, Browsing/Search History, Purchases, Diagnostics,
 Device ID, Advertising Data, Photos or Videos (camera frames stay on the device), Audio, Other Data. Tracking: **No**.
 
-The privacy manifest in `apps/mobile/app.config.ts` (`ios.privacyManifests.NSPrivacyCollectedDataTypes`) currently
-lists Email, Name, Phone, Physical Address, User ID and Other User Content. **Before the first iOS build add**
-`NSPrivacyCollectedDataTypeOtherFinancialInfo` and `NSPrivacyCollectedDataTypeEmailsOrTextMessages` (and
-`NSPrivacyCollectedDataTypeProductInteraction` if declared above) so the manifest matches these answers.
+The privacy manifest in `apps/mobile/app.config.ts` (`ios.privacyManifests.NSPrivacyCollectedDataTypes`) lists
+exactly these types: Email Address, Name, Phone Number, Physical Address, User ID, Other Financial Info, Emails or
+Text Messages, Other User Content and Product Interaction (linked, not tracking, App Functionality).
 
 ## 8. Compliance items
 

@@ -1,7 +1,7 @@
 # Privacy Questionnaires – Drafts (Google Play Data safety, Apple App Privacy)
 
 Status: **draft for owner and legal review.** Answers are derived from the code (re-checked 2026-11-02 against `main`, versionCode 3). They must
-match the privacy policy (`datenschutz.html` on the landing site, which still contains placeholders). Nothing has
+match the privacy policy (`datenschutz.html` on the landing site; only the operator address is still a placeholder). Nothing has
 been submitted.
 
 Related: [google-play.md](google-play.md) · [apple-app-store.md](apple-app-store.md) ·
@@ -21,7 +21,7 @@ Related: [google-play.md](google-play.md) · [apple-app-store.md](apple-app-stor
 | Emails sent through the platform (recipient, subject, body, attachment reference) | generated from user input | DB outbox → SMTP provider (netcup, configured in production) | delivery, retries | when sending by email |
 | Customer interaction on the public page: open timestamps/count, decision, typed name, note, opt-out flag | the user's customer (web, not the app) | DB | inform the company | – |
 | Camera images | device camera | **processed on the device only** for QR decoding (`expo-camera` barcode scanner); not uploaded | open a quotation from a printed QR code | optional feature |
-| IP address, user agent | network | transient: hosting web server, in-memory rate limiter. **Not stored by the application** (hosting access-log retention UNVERIFIED) | security | automatic |
+| IP address, user agent | network | transient: hosting web server, in-memory rate limiter. **Not stored by the application** (hosting provider: server logs max. 6 months, security logs max. 12 months per <https://www.monsterasp.net/Privacy/>) | security | automatic |
 
 Not present (verified in `apps/mobile/package.json` and `app.config.ts` at the time of writing): advertising SDKs,
 analytics SDKs, crash-reporting SDKs, attribution/fingerprinting, location access, contacts access, photo library
@@ -38,7 +38,7 @@ certidevelopment@gmail.com). Deleting the account removes the user, sessions, me
 and invitations, and every company in which the user is the only active member, including all its customers,
 quotations, jobs, files and email records. Retained: audit events (with the deleted user's internal id, company
 reference removed), records inside companies that continue to exist with other members, backups and hosting logs for
-their retention period (**[PLATZHALTER: Dauer]** – owner to fill).
+their retention period (hosting logs max. 6 months, security logs 12 months – <https://www.monsterasp.net/Privacy/>; host backups 21 days, paid plans only – <https://www.monsterasp.net/Terms/>).
 
 ## Google Play Data safety
 
@@ -90,24 +90,24 @@ Answers for App Store Connect → App Privacy (<https://developer.apple.com/app-
 | User Content → Emails or Text Messages | Yes (message text when sending a quotation) | Yes | No | App Functionality |
 | User Content → Other User Content | Yes (quotations, notes, jobs, templates) | Yes | No | App Functionality |
 | Identifiers → User ID | Yes (internal account id) | Yes | No | App Functionality |
-| Usage Data → Product Interaction | **Owner to decide** (server-side audit/activity history of business actions; no UI analytics) | Yes | No | App Functionality |
+| Usage Data → Product Interaction | Yes (declared conservatively: server-side audit/activity history of business actions; no UI analytics) | Yes | No | App Functionality |
 | Location, Health & Fitness, Sensitive Info, Contacts, Browsing/Search History, Purchases, Diagnostics, Device ID, Advertising Data, Photos or Videos, Audio | No | – | – | – |
 
 Tracking: **No** (`NSPrivacyTracking: false`). Third-party SDKs: Expo/React Native modules only; no analytics or
 advertising SDKs.
 
 Privacy manifest (`ios.privacyManifests` in `apps/mobile/app.config.ts`): `NSPrivacyCollectedDataTypes` lists Email
-Address, Name, Phone Number, Physical Address, User ID and Other User Content (linked, not tracking, App
-Functionality). **Still missing before the first iOS build:** Other Financial Info and Emails or Text Messages (and
-Product Interaction if declared) – add them so the manifest matches the answers above
+Address, Name, Phone Number, Physical Address, User ID, Other Financial Info, Emails or Text Messages, Other User
+Content and Product Interaction (linked, not tracking, App Functionality) – matching the answers above
 (<https://developer.apple.com/tutorials/data/documentation/bundleresources/privacy-manifest-files.json>).
 
 ## Open questions for the owner / legal review
 
-- [ ] **Owner/legal:** confirm that processors (MonsterASP, email provider, Cloudflare if used) do not count as
+- [ ] **Owner/legal:** confirm that processors (MonsterASP.NET s.r.o., netcup GmbH; Cloudflare R2 is not in use – `Storage:Provider=Local`) do not count as
       "sharing" and that user-initiated sending to customers is exempt.
 - [ ] **Owner/legal:** whether customer data entered by users (third-party personal data) must be declared per type
       as done above (conservative choice).
-- [ ] **Owner:** "App interactions"/"Product Interaction" for the audit history – declare or not.
-- [ ] **Owner:** fill retention periods for backups and logs on `konto-loeschen.html` and `datenschutz.html`.
+- [ ] **Owner:** "App interactions"/"Product Interaction" is declared conservatively (Apple sheet + privacy manifest);
+      if you decide not to declare it, remove `NSPrivacyCollectedDataTypeProductInteraction` from `app.config.ts` too.
+- [x] Retention periods for backups and logs filled in on `konto-loeschen.html` and `datenschutz.html` (2026-11-02).
 - [ ] **Owner:** keep these answers in sync with every release (re-check `apps/mobile/package.json` for new SDKs).

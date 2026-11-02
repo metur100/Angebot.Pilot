@@ -12,9 +12,9 @@ Related: [google-play.md](google-play.md) · [apple-app-store.md](apple-app-stor
 
 | Item | Why it matters for review | Owner action |
 |---|---|---|
-| Legal pages contain `[PLATZHALTER: …]` (address, hosting provider, retention periods) on `datenschutz.html` | Privacy policy URL is reviewed by both stores; Impressum required in Germany | **Owner:** fill placeholders, legal review |
+| Legal pages still contain `[PLATZHALTER: …]` for operator identity (address, phone, VAT ID, legal form, jurisdiction) and two contract periods (AGB §13, AVV §6/§9); hosting/email providers and retention periods filled in 2026-11-02 | Privacy policy URL is reviewed by both stores; Impressum required in Germany | **Owner:** fill placeholders, legal review |
 | MonsterASP Free plan forbids commercial use | A store app for a paid B2B service needs a production-grade backend | **Owner:** upgrade before taking paying customers |
-| Review account trial ends **2026-11-28** | Reviewers / closed testers lose access when the trial expires | **Owner:** extend the trial of "Berkcan Malerbetrieb GmbH" before then |
+| Review account trial ends **2026-11-28** | After expiry the company is read-only (reviewers can sign in but not edit) | **Owner:** extend the trial of "Berkcan Malerbetrieb GmbH" before then – no admin endpoint exists; needs an operator endpoint + deploy or a manual SQL update (see GOOGLE-PLAY-CONSOLE.md section 7) |
 | Review account password | Kept in GentleHub only (this repository is public) | **Owner:** paste it into Play Console (App access) and App Store Connect (Sign-in information) |
 
 Resolved since the first draft: production database migrated, email delivery via SMTP works, legal/landing site on
@@ -43,9 +43,9 @@ against production (checked 2026-11-02).
 ## 3. Apple App Store
 
 - [x] Bundle id configured, `supportsTablet: false`, camera usage text (de/en), `ITSAppUsesNonExemptEncryption=false`
-- [x] Privacy manifest in `app.config.ts` (tracking false, required-reason APIs, collected data types)
-- [ ] Add `OtherFinancialInfo` and `EmailsOrTextMessages` (and `ProductInteraction` if declared) to
-      `NSPrivacyCollectedDataTypes` so the manifest matches the App Privacy answers ([apple-app-store.md](apple-app-store.md#7-app-privacy-app-store-connect--app-privacy))
+- [x] Privacy manifest in `app.config.ts` (tracking false, required-reason APIs, collected data types incl. Other
+      Financial Info, Emails or Text Messages, Product Interaction – matches the App Privacy answers in
+      [apple-app-store.md](apple-app-store.md#7-app-privacy-app-store-connect--app-privacy))
 - [x] App Store icon 1024 × 1024 without alpha
 - [x] Screenshots: iPhone 6.9" (8 × 1320 × 2868), iPhone 6.3" (8 × 1206 × 2622), iPad 13" (5 × 2064 × 2752 – only
       needed if iPad support is enabled), no Android system bars
@@ -58,7 +58,7 @@ against production (checked 2026-11-02).
 
 | Requirement | Status |
 |---|---|
-| Privacy policy URL | `https://angebot.gentlegroup.de/datenschutz.html` (200), **placeholders open** |
+| Privacy policy URL | `https://angebot.gentlegroup.de/datenschutz.html` (200), only operator-identity placeholders open |
 | Support URL | `https://angebot.gentlegroup.de/support.html` (200) |
 | Account deletion in app + web | implemented; web page `konto-loeschen.html` / `en/delete-account.html` (200) |
 | No ads / no tracking SDKs | true for `apps/mobile/package.json` on 2026-11-02 |

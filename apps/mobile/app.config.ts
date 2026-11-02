@@ -49,13 +49,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       NSPrivacyTracking: false,
       NSPrivacyTrackingDomains: [],
       // Data the user enters and the app sends to the AngebotPilot API (no tracking, no third-party SDKs).
+      // Must match the App Store Connect "App Privacy" answers (docs/store-listings/apple-app-store.md, section 7).
       NSPrivacyCollectedDataTypes: [
         'NSPrivacyCollectedDataTypeEmailAddress',
         'NSPrivacyCollectedDataTypeName',
         'NSPrivacyCollectedDataTypePhoneNumber',
         'NSPrivacyCollectedDataTypePhysicalAddress',
         'NSPrivacyCollectedDataTypeUserID',
+        // Amounts on quotations/invoices, recorded payments, optional bank details.
+        'NSPrivacyCollectedDataTypeOtherFinancialInfo',
+        // Subject/message text the user writes when sending a quotation or invoice by email.
+        'NSPrivacyCollectedDataTypeEmailsOrTextMessages',
         'NSPrivacyCollectedDataTypeOtherUserContent',
+        // Server-side activity history of business actions (no UI analytics), declared conservatively.
+        'NSPrivacyCollectedDataTypeProductInteraction',
       ].map((type) => ({
         NSPrivacyCollectedDataType: type,
         NSPrivacyCollectedDataTypeLinked: true,

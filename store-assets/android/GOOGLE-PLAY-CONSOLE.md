@@ -18,8 +18,9 @@ Related docs: [docs/store-listings/google-play.md](../../docs/store-listings/goo
 [RELEASE-CHECKLIST.md](../../docs/store-listings/RELEASE-CHECKLIST.md)
 
 > **Before you submit to production:** the legal pages on angebot.gentlegroup.de still contain
-> `[PLATZHALTER: …]` markers (address, hosting provider, retention periods). Google reviews the privacy policy URL;
-> fill those in first. Internal and closed testing can start before that.
+> `[PLATZHALTER: …]` markers for the operator's identity (address, phone, VAT ID, legal form, place of jurisdiction)
+> and two contract periods in AGB/AVV. Hosting provider, email provider and retention periods were filled in on
+> 2026-11-02. Google reviews the privacy policy URL; fill the rest first. Internal and closed testing can start before that.
 
 ---
 
@@ -383,7 +384,11 @@ The review account was created through the normal register flow on 2026-10-29 (e
 Company “Berkcan Malerbetrieb GmbH”, Köln: 10 customers, 12 quotations (draft, sent, viewed, accepted, declined,
 expired, cancelled), 6 jobs (open, in progress, completed), 5 invoices (paid, partially paid, open, overdue, draft),
 5 templates, 4 tax rates, scheduled follow-ups. Do not use it for real customer data. The subscription is a 30-day
-trial that ends **2026-11-28** – extend it (DB/billing) before then if review or the closed test runs longer.
+trial that ends **2026-11-28**. The product has **no supported way to extend a trial** (no admin/back-office endpoint
+or UI; `TrialEndsAt` is only set when a company is created, and billing state only changes through verified provider
+webhooks). Extending it needs either a small operator endpoint (e.g. `POST /api/internal/subscriptions/{companyId}/extend-trial`,
+protected like `/api/internal/jobs/run`) plus a deploy, or a manual owner-run SQL update of
+`Subscriptions.TrialEndsAt` for that company (after a backup). After expiry the company becomes read-only, not locked out.
 
 On 2026-11-02 four more quotations were added through the normal app actions (duplicate → hand over / mark as sent →
 record decision; no emails): AN-2026-0013 (draft), -0014 (sent), -0015 (accepted), -0016 (rejected), so the dashboard
