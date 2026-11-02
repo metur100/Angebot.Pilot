@@ -81,17 +81,20 @@ or environment variables – nothing secret is stored in the repo. Put them into
 ```properties
 ANGEBOTPILOT_UPLOAD_STORE_FILE=C:/Users/<you>/keystore/angebotpilot
 ANGEBOTPILOT_UPLOAD_STORE_PASSWORD=...
-ANGEBOTPILOT_UPLOAD_KEY_ALIAS=angebotpilot.key
+ANGEBOTPILOT_UPLOAD_KEY_ALIAS=angebotpilot-upload
 ANGEBOTPILOT_UPLOAD_KEY_PASSWORD=...
 ```
-(or pass them as environment variables / `-P` flags). Then, with the production API (the default):
+(or pass them as environment variables / `-P` flags – on the owner's machine they are passed per build, see
+[RELEASE-CHECKLIST.md §4.2](../../docs/store-listings/RELEASE-CHECKLIST.md#42-build-windows-local)). Then, with the
+production API (the default):
 
 ```sh
 set EXPO_PUBLIC_API_BASE_URL=
 npx expo prebuild --platform android --clean --no-install
 cd android
-gradlew bundleRelease
-# → android/app/build/outputs/bundle/release/app-release.aab
+gradlew app:bundleRelease app:assembleRelease
+# → android/app/build/outputs/bundle/release/app-release.aab  (upload to Play)
+# → android/app/build/outputs/apk/release/app-release.apk     (universal APK, same key – install for testing)
 ```
 Verify the signer before uploading: `keytool -printcert -jarfile app\build\outputs\bundle\release\app-release.aab`
 (must show the upload certificate, not `CN=Android Debug`). Bump `version` / `android.versionCode` in `app.config.ts`

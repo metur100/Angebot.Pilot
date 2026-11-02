@@ -46,11 +46,11 @@ on the same API.
 
 | Artifact | Location | Notes |
 |---|---|---|
-| Android App Bundle 1.0.0 (versionCode 1) | `artifacts/android/angebotpilot-1.0.0-1-release.aab` (git-ignored, local) | signed with the upload key `C:\Users\TurkesMedin\keystore\angebotpilot` (alias `angebotpilot-upload`, cert SHA-256 `DB:CC:77:22:…:AF:F9`); SHA-256 of file `e677e632…1f55`; built against the production API; **not uploaded** |
+| Android App Bundle 1.0.0 (versionCode 3, 2026-11-02 – current) | `artifacts/android/angebotpilot-1.0.0-3-release.aab` and `C:\Users\TurkesMedin\keystore\angebotpilot-1.0.0-3-release.aab` (git-ignored, local) | signed with the upload key `C:\Users\TurkesMedin\keystore\angebotpilot` (alias `angebotpilot-upload`, cert SHA-256 `DB:CC:77:22:…:AF:F9`), `jarsigner -verify` OK; SHA-256 of file `46cf1b4d…72df`; targetSdk 36; production API; **not uploaded**. Superseded and never uploaded: versionCode 1 (2026-10-13) and 2 (2026-10-29) |
 | iOS build | – | not built (blocked) |
-| Screenshots | `screenshots/web/` (11), `screenshots/android/` (6) | genuine, see [inventory](docs/testing/SCREENSHOT-INVENTORY.md) |
-| Store artwork | `store-assets/` | Play icon, feature graphic, 6 Play screenshots; iOS icon |
-| Store texts & questionnaires | `docs/store-listings/` | prepared, **not submitted** |
+| Screenshots | `screenshots/web/` (11), `screenshots/android/` (phone 8, tablet-7 5, tablet-10 5), `screenshots/ios/` (iPhone 8, iPad 5 – Android release build at iOS screen sizes) | genuine, see [inventory](docs/testing/SCREENSHOT-INVENTORY.md) |
+| Store artwork | `store-assets/` | Play: icon 512, feature graphic, 8 phone + 5 + 5 tablet screenshots; App Store: icon 1024, iPhone 6.9" (8), 6.3" (8), iPad 13" (5) screenshots |
+| Store texts & questionnaires | `store-assets/android/GOOGLE-PLAY-CONSOLE.md`, `docs/store-listings/` | prepared for both stores (de-DE, en-US), limits checked with `scripts/check-store-texts.mjs`; **not submitted** |
 
 ## Security
 

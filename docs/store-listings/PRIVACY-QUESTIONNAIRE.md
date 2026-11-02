@@ -1,6 +1,6 @@
 # Privacy Questionnaires – Drafts (Google Play Data safety, Apple App Privacy)
 
-Status: **draft for owner and legal review.** Answers are derived from the code at the time of writing. They must
+Status: **draft for owner and legal review.** Answers are derived from the code (re-checked 2026-11-02 against `main`, versionCode 3). They must
 match the privacy policy (`datenschutz.html` on the landing site, which still contains placeholders). Nothing has
 been submitted.
 
@@ -14,11 +14,11 @@ Related: [google-play.md](google-play.md) · [apple-app-store.md](apple-app-stor
 | Account: email, display name, password (hashed server-side) | user | AngebotPilot API → SQL Server (MonsterASP, EU/Germany per provider) | account, login, notifications | required |
 | Company data: name, address, email, phone, website, VAT id, tax number, brand colour, bank details (IBAN/BIC, optional), logo (web app only) | user | API → DB; logo/PDFs → `App_Data` storage (or R2 if enabled) | quotation documents | name required, rest optional |
 | Customer data entered by the user: names, salutation, email, phone, billing/service address, VAT id, notes | user (about third parties) | API → DB, PDFs, emails to the customer | quotations, reminders | optional per field (company name or last name required) |
-| Quotations, line items, texts, internal notes, jobs, templates | user | API → DB, PDFs | core function | – |
+| Quotations, line items, texts, internal notes, jobs, templates, invoices, recorded payments, e-invoice XML | user | API → DB, PDFs | core function | – |
 | Activity/audit records (who created/sent/changed what, timestamps), quotation events | generated | DB | history, security, accountability | automatic |
 | Session data: refresh token (hash server-side; raw token in the device keystore), session list (client type, timestamps) | generated | DB; device secure storage | authentication | automatic |
 | Notifications | generated | DB | in-app notifications | automatic |
-| Emails sent through the platform (recipient, subject, body, attachment reference) | generated from user input | DB outbox → SMTP provider (not configured yet) | delivery, retries | when sending by email |
+| Emails sent through the platform (recipient, subject, body, attachment reference) | generated from user input | DB outbox → SMTP provider (netcup, configured in production) | delivery, retries | when sending by email |
 | Customer interaction on the public page: open timestamps/count, decision, typed name, note, opt-out flag | the user's customer (web, not the app) | DB | inform the company | – |
 | Camera images | device camera | **processed on the device only** for QR decoding (`expo-camera` barcode scanner); not uploaded | open a quotation from a printed QR code | optional feature |
 | IP address, user agent | network | transient: hosting web server, in-memory rate limiter. **Not stored by the application** (hosting access-log retention UNVERIFIED) | security | automatic |
@@ -33,7 +33,7 @@ Security: all traffic uses HTTPS (cleartext only in local emulator builds); the 
 Keystore/Keychain on the device.
 
 Deletion: in the app (Mehr → Mein Konto → Konto löschen, password confirmation) and in the web app (Einstellungen →
-Konto). Web request page: <https://metur100.github.io/Angebot.Pilot.Landing/konto-loeschen.html> (also by email to
+Konto). Web request page: <https://angebot.gentlegroup.de/konto-loeschen.html> (also by email to
 certidevelopment@gmail.com). Deleting the account removes the user, sessions, memberships, the user's notifications
 and invitations, and every company in which the user is the only active member, including all its customers,
 quotations, jobs, files and email records. Retained: audit events (with the deleted user's internal id, company
@@ -63,7 +63,7 @@ user-initiated transfer. **Owner/legal to confirm this interpretation.**
 | Personal info → Phone number | Yes (company and customer phone numbers, optional) | No | No | Optional | App functionality |
 | Personal info → Address | Yes (company and customer addresses) | No | No | Optional | App functionality |
 | Personal info → Other info | Yes (VAT ids, tax number, salutation, notes) | No | No | Optional | App functionality |
-| Financial info → Other financial info | Yes (company bank details for PDFs, optional; quotation amounts) | No | No | Optional | App functionality |
+| Financial info → Other financial info | Yes (company bank details for PDFs, optional; quotation/invoice amounts, recorded payments) | No | No | Optional | App functionality |
 | Messages → Emails | Yes (email subject/message the user writes when sending a quotation) | No | No | Optional | App functionality |
 | App activity → Other user-generated content | Yes (quotations, line items, texts, jobs, templates, notes) | No | No | Required for core use | App functionality |
 | App activity → App interactions | Yes (audit/activity history of business actions) – **owner to decide** whether this counts | No | No | Required | App functionality, Fraud prevention/security |
@@ -86,7 +86,7 @@ Answers for App Store Connect → App Privacy (<https://developer.apple.com/app-
 | Contact Info → Email Address | Yes | Yes | No | App Functionality |
 | Contact Info → Phone Number | Yes (optional) | Yes | No | App Functionality |
 | Contact Info → Physical Address | Yes (optional) | Yes | No | App Functionality |
-| Financial Info → Other Financial Info | Yes (optional bank details, quotation amounts) | Yes | No | App Functionality |
+| Financial Info → Other Financial Info | Yes (optional bank details, quotation/invoice amounts, recorded payments) | Yes | No | App Functionality |
 | User Content → Emails or Text Messages | Yes (message text when sending a quotation) | Yes | No | App Functionality |
 | User Content → Other User Content | Yes (quotations, notes, jobs, templates) | Yes | No | App Functionality |
 | Identifiers → User ID | Yes (internal account id) | Yes | No | App Functionality |
@@ -96,9 +96,10 @@ Answers for App Store Connect → App Privacy (<https://developer.apple.com/app-
 Tracking: **No** (`NSPrivacyTracking: false`). Third-party SDKs: Expo/React Native modules only; no analytics or
 advertising SDKs.
 
-Discrepancy to resolve before the first iOS upload: `apps/mobile/app.config.ts` declares
-`NSPrivacyCollectedDataTypes: []` in the privacy manifest, while the app does collect the data types above. The
-manifest's collected-data list should be consistent with the App Privacy answers
+Privacy manifest (`ios.privacyManifests` in `apps/mobile/app.config.ts`): `NSPrivacyCollectedDataTypes` lists Email
+Address, Name, Phone Number, Physical Address, User ID and Other User Content (linked, not tracking, App
+Functionality). **Still missing before the first iOS build:** Other Financial Info and Emails or Text Messages (and
+Product Interaction if declared) – add them so the manifest matches the answers above
 (<https://developer.apple.com/tutorials/data/documentation/bundleresources/privacy-manifest-files.json>).
 
 ## Open questions for the owner / legal review

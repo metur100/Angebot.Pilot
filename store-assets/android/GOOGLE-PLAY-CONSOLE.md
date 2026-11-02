@@ -1,13 +1,15 @@
-# Google Play Console – copy-paste checklist (AngebotPilot 1.0.0, versionCode 2)
+# Google Play Console – copy-paste checklist (AngebotPilot 1.0.0, versionCode 3)
 
 Everything needed to create the app in Play Console and submit the first release. Go top to bottom; each block
-says which Console page it belongs to. Status as of 2026-10-29. Nothing has been uploaded yet.
+says which Console page it belongs to. Status as of 2026-11-02. Nothing has been uploaded yet.
+Character limits are checked with `node scripts/check-store-texts.mjs` (counts every `(max N)` block in this file;
+results at the end). The App Store counterpart is [apple-app-store.md](../../docs/store-listings/apple-app-store.md).
 
 | | |
 |---|---|
 | Package name | `com.certidevelopment.angebotpilot` |
 | Developer | Medin Turkes · Certi Development |
-| Version | versionName `1.0.0`, versionCode `2` (built from `main` with the English UI and dark mode) |
+| Version | versionName `1.0.0`, versionCode `3` (built from `main` on 2026-11-02) |
 | Default language | German – de-DE (add English – en-US as a second listing language) |
 | App or game | App · Free · no in-app purchases (the subscription is handled outside Google Play; none is sold yet) |
 
@@ -35,43 +37,48 @@ Related docs: [docs/store-listings/google-play.md](../../docs/store-listings/goo
 
 | Item | Path |
 |---|---|
-| Signed AAB (upload this) | `C:\Users\TurkesMedin\repos\Medin\Angebot.Pilot\artifacts\android\angebotpilot-1.0.0-2-release.aab` (git-ignored) |
-| Copy next to the key | `C:\Users\TurkesMedin\keystore\angebotpilot-1.0.0-2-release.aab` |
+| Signed AAB (upload this) | `C:\Users\TurkesMedin\repos\Medin\Angebot.Pilot\artifacts\android\angebotpilot-1.0.0-3-release.aab` (git-ignored) |
+| Copy next to the key | `C:\Users\TurkesMedin\keystore\angebotpilot-1.0.0-3-release.aab` |
 | Upload keystore | `C:\Users\TurkesMedin\keystore\angebotpilot` (a file, not a folder) · alias `angebotpilot-upload` |
 | Keystore password | in `C:\Users\TurkesMedin\keystore\angebotpilot-password.txt` – never commit, never paste anywhere |
 | Upload certificate SHA-256 | `DB:CC:77:22:0A:19:D4:87:47:27:02:37:E0:8C:B9:A4:00:68:50:6C:CC:4A:D2:1A:F6:51:56:E7:90:8B:AF:F9` |
-| AAB SHA-256 | `db5c7b061ae8f38bc66481d9101f8cc9439310e7255667f7c79c34a0b594ba6a` |
-| Manifest | minSdk 24 · targetSdk 36 · permissions: INTERNET, CAMERA (QR scanner), ACCESS_NETWORK_STATE · no AD_ID |
+| AAB SHA-256 | `46cf1b4d0bb9df02b5d000f962bddbe3ad1ff6c2cc2411372cdad7dd6b9e72df` |
+| Manifest | minSdk 24 · targetSdk 36 · compileSdk 36 · permissions: INTERNET, CAMERA (QR scanner), ACCESS_NETWORK_STATE · no AD_ID · no cleartext traffic (checked with aapt2 on the universal APK of the same build) |
+| API | `https://angebotpilot.runasp.net` (production; verified in the bundled JavaScript) |
 
 - **Play App Signing:** accept the default (Google manages the app signing key; you keep the upload key above).
 - New personal developer accounts: a **closed test with at least 12 testers opted in for 14 consecutive days** is
   required before production access.
-- The older `angebotpilot-1.0.0-1-release.aab` (versionCode 1, Oct 13) is outdated; do not upload it. Because it was
-  never uploaded, versionCode 1 is simply skipped.
+- Older bundles `angebotpilot-1.0.0-1-release.aab` (versionCode 1, Oct 13) and `-2-release.aab` (versionCode 2,
+  Oct 29) are outdated; do not upload them. They were never uploaded, so versionCodes 1 and 2 are simply skipped.
 
 ### Release name and notes
 
-Release name: `1.0.0 (2)`
+Release name: `1.0.0 (3)`
 
+Release notes – paste both into the release notes field, each wrapped in its language tag
+(`<de-DE>` … `</de-DE>`, `<en-US>` … `</en-US>`).
+
+Release notes de-DE (max 500):
 ```text
-<de-DE>
 Erste Version von AngebotPilot:
 • Angebote mit Positionen, Rabatten und Umsatzsteuer erstellen
 • PDF und persönlicher Kundenlink mit Online-Annahme
 • Automatische Erinnerungen an offene Angebote
 • Aus Zusagen Aufträge machen
-• Rechnungen mit E-Rechnung (ZUGFeRD/Factur-X) und Zahlungseingängen
+• Rechnungen mit E-Rechnung (ZUGFeRD/Factur-X), Zahlungseingängen und Zahlungserinnerungen
 • Deutsch und Englisch, heller und dunkler Modus
-</de-DE>
-<en-US>
+```
+
+Release notes en-US (max 500):
+```text
 First release of AngebotPilot:
 • Create quotations with line items, discounts and VAT
 • PDF and personal customer link with online acceptance
 • Automatic reminders for open quotations
 • Turn accepted quotations into jobs
-• Invoices with e-invoice (ZUGFeRD/Factur-X) and payments
+• Invoices with e-invoice (ZUGFeRD/Factur-X), payments and payment reminders
 • German and English, light and dark mode
-</en-US>
 ```
 
 ## 3. Main store listing (Grow users → Store presence → Main store listing)
@@ -85,7 +92,7 @@ AngebotPilot
 
 Short description (max 80):
 ```text
-Angebote erstellen, als PDF senden, automatisch nachfassen, Aufträge gewinnen.
+Angebote & Rechnungen erstellen, als PDF senden, automatisch nachfassen.
 ```
 
 Full description (max 4000):
@@ -97,7 +104,7 @@ ANGEBOTE ERSTELLEN
 • Exakte Berechnung: Umsatzsteuer je Steuersatz, kaufmännisch gerundet
 • Regelbesteuerung, Kleinunternehmerregelung (§ 19 UStG) oder Steuerschuldnerschaft des Leistungsempfängers (§ 13b UStG) – Sie wählen und bestätigen die steuerliche Behandlung selbst
 • Fortlaufende Angebotsnummern, die nie doppelt vergeben werden
-• Vorlagen für wiederkehrende Leistungen
+• Vorlagen für wiederkehrende Leistungen, Angebote duplizieren
 • Revisionen: Ein versendetes Angebot überarbeiten, die alte Fassung wird automatisch ersetzt
 
 PROFESSIONELLES PDF
@@ -126,6 +133,7 @@ RECHNUNGEN
 • Fortlaufende Rechnungsnummern, Leistungszeitraum und Zahlungsziel
 • E-Rechnung im Format ZUGFeRD/Factur-X (PDF mit eingebettetem XML)
 • Zahlungseingänge und Teilzahlungen erfassen, überfällige Rechnungen sofort erkennen
+• Zahlungserinnerung per E-Mail senden
 • Stornorechnung mit einem Tipp
 
 KUNDEN
@@ -155,17 +163,17 @@ Für die Nutzung ist ein AngebotPilot-Konto erforderlich. Neue Unternehmen start
 
 ### en-US (Add translation → English (United States) – en-US)
 
-App name:
+App name (max 30):
 ```text
 AngebotPilot
 ```
 
 Short description (max 80):
 ```text
-Create quotations, send them as PDF, follow up automatically and win jobs.
+Create quotes and invoices, send them as PDF and follow up automatically.
 ```
 
-Full description:
+Full description (max 4000):
 ```text
 AngebotPilot helps small trade and service businesses create quotations quickly, send them professionally, follow up reliably, turn accepted quotations into jobs and invoice them.
 
@@ -174,7 +182,7 @@ CREATE QUOTATIONS
 • Exact calculation: VAT per rate, commercially rounded
 • Standard VAT, German small-business scheme (§ 19 UStG) or reverse charge (§ 13b UStG) – you choose and confirm the tax treatment yourself
 • Sequential quotation numbers that are never assigned twice
-• Templates for recurring work
+• Templates for recurring work, duplicate quotations
 • Revisions: rework a sent quotation, the old version is replaced automatically
 
 PROFESSIONAL PDF
@@ -203,6 +211,7 @@ INVOICES
 • Sequential invoice numbers, service period and payment terms
 • E-invoice in ZUGFeRD/Factur-X format (PDF with embedded XML)
 • Record payments and partial payments, spot overdue invoices instantly
+• Send payment reminders by email
 • Cancellation invoice with one tap
 
 CUSTOMERS
@@ -234,7 +243,7 @@ An AngebotPilot account is required. New companies start with a free 30-day tria
 
 | Console field | File (repo-relative) | Spec |
 |---|---|---|
-| App icon | `store-assets/android/icon-512.png` | 512×512 PNG, 32-bit |
+| App icon | `store-assets/android/icon-512.png` | 512×512 PNG, opaque (24-bit, no alpha) |
 | Feature graphic | `store-assets/android/feature-graphic-1024x500.png` | 1024×500 PNG, no alpha |
 | Phone screenshots (8) | `store-assets/android/phone-screenshots/phone-01-dashboard.jpg` … `phone-08-dashboard-dark.jpg` | 1080×1920 JPEG |
 | 7-inch tablet screenshots (5) | `store-assets/android/tablet-7-screenshots/tablet-7-01-dashboard.jpg` … `tablet-7-05-customers.jpg` | 1200×2134 JPEG |
@@ -242,10 +251,11 @@ An AngebotPilot account is required. New companies start with a free 30-day tria
 | Video | – | none |
 
 Phone order: 01 Übersicht · 02 Angebotsliste · 03 Angebotsdetails · 04 Angebotseditor · 05 Aufträge ·
-06 Rechnungen · 07 Kunden · 08 Übersicht im Dunkelmodus. All screenshots show the release build (versionCode 2)
-against the live API with the demo company “Berkcan Malerbetrieb GmbH” (fictitious customers, `@example.com`
-addresses). Tablet screenshots are real renders of the app at tablet screen metrics. Raw captures are in
-`screenshots/android/`; regenerate with `scripts/store-screenshots.mjs`. The captions are German; for the en-US
+06 Rechnungen · 07 Kunden · 08 Übersicht im Dunkelmodus. All screenshots were captured on 2026-11-02 from the
+release build (versionCode 3, the universal APK signed with the upload key) against the live API with the demo
+company “Berkcan Malerbetrieb GmbH” (fictitious customers, `@example.com` addresses). Tablet screenshots are real
+renders of the app at tablet screen metrics (7": 1200×1920 px at 600 dp width, 10": 1600×2560 px at 800 dp width).
+Raw captures are in `screenshots/android/`; regenerate with `scripts/store-screenshots.mjs`. The captions are German; for the en-US
 listing you can reuse them or skip localized screenshots (Play falls back to the default language).
 
 ## 4. Store settings (Grow users → Store presence → Store settings)
@@ -374,3 +384,17 @@ Company “Berkcan Malerbetrieb GmbH”, Köln: 10 customers, 12 quotations (dra
 expired, cancelled), 6 jobs (open, in progress, completed), 5 invoices (paid, partially paid, open, overdue, draft),
 5 templates, 4 tax rates, scheduled follow-ups. Do not use it for real customer data. The subscription is a 30-day
 trial that ends **2026-11-28** – extend it (DB/billing) before then if review or the closed test runs longer.
+
+On 2026-11-02 four more quotations were added through the normal app actions (duplicate → hand over / mark as sent →
+record decision; no emails): AN-2026-0013 (draft), -0014 (sent), -0015 (accepted), -0016 (rejected), so the dashboard
+for November shows live figures. The dashboard always covers the current month; add a few quotations the same way at
+the start of each month in which the account is reviewed. Login checked on 2026-11-02 against production.
+
+## 8. Character counts (`node scripts/check-store-texts.mjs`, 2026-11-02)
+
+| Field | Limit | de-DE | en-US |
+|---|---|---|---|
+| App name | 30 | 12 | 12 |
+| Short description | 80 | 72 | 73 |
+| Full description | 4000 | 3219 | 2891 |
+| Release notes 1.0.0 (3) | 500 | 364 | 339 |

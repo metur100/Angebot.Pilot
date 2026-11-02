@@ -37,33 +37,38 @@ Related: [STORE-READINESS.md](STORE-READINESS.md) · [MONSTERASP-DEPLOYMENT.md](
 ### 4.1 Version
 
 - [ ] Increase `version` (versionName) and `android.versionCode` in `apps/mobile/app.config.ts`
-      (current release artefact: `1.0.0` / `2`). Every Play upload needs a higher `versionCode`.
+      (current release artefact: `1.0.0` / `3`, built 2026-11-02). Every Play upload needs a higher `versionCode`.
 
 ### 4.2 Build (Windows, local)
 
 Signing values come from Gradle properties or environment variables – never from the repo
-(`apps/mobile/plugins/withAndroidReleaseSigning.js`). Example `%USERPROFILE%\.gradle\gradle.properties`:
+(`apps/mobile/plugins/withAndroidReleaseSigning.js`). The shared `%USERPROFILE%\.gradle\gradle.properties` holds
+other apps' keys, so pass this app's values per build as environment variables (Git Bash; the password is read from
+the file next to the key and never echoed):
 
-```properties
-ANGEBOTPILOT_UPLOAD_STORE_FILE=C:/Users/TurkesMedin/keystore/angebotpilot
-ANGEBOTPILOT_UPLOAD_KEY_ALIAS=angebotpilot-upload
-ANGEBOTPILOT_UPLOAD_STORE_PASSWORD=<from password manager>
-ANGEBOTPILOT_UPLOAD_KEY_PASSWORD=<from password manager>
-```
-
-```bat
-cd apps\mobile
-set ANDROID_CMAKE_DIR=%ANDROID_HOME%\cmake\3.31.6
-rem EXPO_PUBLIC_API_BASE_URL must be unset or https://angebotpilot.runasp.net for store builds
+```bash
+cd apps/mobile
+export ANDROID_CMAKE_DIR="$ANDROID_HOME/cmake/3.31.6"
+unset EXPO_PUBLIC_API_BASE_URL APP_ID          # store builds use the production API default
 npm run prebuild:android
 cd android
-gradlew.bat app:bundleRelease
+PW=$(grep '^storePassword/keyPassword:' ~/keystore/angebotpilot-password.txt | sed -E 's/^[^:]*:[[:space:]]*//' | tr -d '\r\n')
+export ANGEBOTPILOT_UPLOAD_STORE_FILE=C:/Users/TurkesMedin/keystore/angebotpilot ANGEBOTPILOT_UPLOAD_KEY_ALIAS=angebotpilot-upload \
+       ANGEBOTPILOT_UPLOAD_STORE_PASSWORD="$PW" ANGEBOTPILOT_UPLOAD_KEY_PASSWORD="$PW"; unset PW
+./gradlew.bat app:bundleRelease app:assembleRelease   # AAB for Play + universal APK (same key) for testing/screenshots
 ```
+
+- [ ] Build log must not contain `signed with the DEBUG key`
 
 - [ ] `ANDROID_CMAKE_DIR` set (required on Windows: the default CMake 3.22.1/ninja fails on paths > 260 characters;
       `plugins/withLocalCmakeDir.js` writes `cmake.dir` into `android/local.properties`)
 - [ ] Output `android/app/build/outputs/bundle/release/app-release.aab` copied to
-      `artifacts/android/angebotpilot-<versionName>-<versionCode>-release.aab` (git-ignored)
+      `artifacts/android/angebotpilot-<versionName>-<versionCode>-release.aab` (git-ignored) and next to the key
+      (`C:\Users\TurkesMedin\keystore\angebotpilot-<versionName>-<versionCode>-release.aab`)
+- [ ] `jarsigner -verify <aab>` → `jar verified.`
+- [ ] API URL: `unzip -p <aab> base/assets/app.config` shows `"apiBaseUrl":"https://angebotpilot.runasp.net"`
+- [ ] Store texts within limits: `node scripts/check-store-texts.mjs`; screenshots refreshed if the UI changed
+      ([SCREENSHOT-INVENTORY.md](../testing/SCREENSHOT-INVENTORY.md))
 - [ ] **Verify the signature** – if the `ANGEBOTPILOT_UPLOAD_*` values are missing, the plugin silently falls back to
       the **debug** key:
       `keytool -printcert -jarfile artifacts\android\angebotpilot-<v>-<code>-release.aab`
@@ -108,7 +113,7 @@ gradlew.bat app:bundleRelease
 - [ ] Increase `ios.buildNumber`
 - [ ] `eas build -p ios --profile production` (cloud), then `eas submit -p ios` → TestFlight
 - [ ] Verify privacy manifest and `ITSAppUsesNonExemptEncryption=false` in the built app
-- [ ] App Privacy answers, screenshots (6.3" set), review account, review notes ([apple-app-store.md](apple-app-store.md))
+- [ ] App Privacy answers, screenshots (`store-assets/ios/iphone-6.9`, optional `iphone-6.3`; `ipad-13` only with iPad support), review account, review notes ([apple-app-store.md](apple-app-store.md))
 
 ## 6. After release
 

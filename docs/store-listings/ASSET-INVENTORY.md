@@ -1,45 +1,38 @@
 # Store Asset Inventory
 
-Measured from the files in the repository at the time of writing (PNG header: width, height, colour type).
-`screenshots/android/` was added by the mobile workstream while this document was written (see below); `screenshots/web/`
-and iOS screenshots do not exist yet.
+Measured with `ffprobe` on 2026-11-02 (width × height, pixel format; JPEG files never carry alpha).
 
-Related: [google-play.md](google-play.md) · [apple-app-store.md](apple-app-store.md) · [STORE-READINESS.md](STORE-READINESS.md)
+Related: [google-play.md](google-play.md) · [apple-app-store.md](apple-app-store.md) · [STORE-READINESS.md](STORE-READINESS.md) ·
+[SCREENSHOT-INVENTORY.md](../testing/SCREENSHOT-INVENTORY.md)
 
-## Existing assets
+## Google Play
 
-| File | Dimensions | Format | Alpha | Size | Use | Meets spec? |
+| Asset | File(s) | Count | Pixels | Format | Rule (Play Console) | OK |
 |---|---|---|---|---|---|---|
-| `store-assets/android/icon-512.png` | 512 × 512 | PNG (RGBA) | yes | 5,985 B | Play hi-res icon | ✔ Play requires 512×512, 32-bit PNG with alpha, ≤ 1024 KB |
-| `store-assets/android/feature-graphic-1024x500.png` | 1024 × 500 | PNG (RGB) | no | 36,661 B | Play feature graphic | ✔ Play requires 1024×500, JPEG or 24-bit PNG without alpha |
-| `store-assets/ios/app-icon-1024.png` | 1024 × 1024 | PNG (RGB) | no | 14,021 B | App Store icon | ✔ 1024×1024 opaque (size per Apple HIG: UNVERIFIED on official text; "no alpha" confirmed via Apple forum) |
-| `apps/mobile/assets/images/icon.png` | 1024 × 1024 | PNG (RGB) | no | 14,021 B | Expo app icon (iOS/Android legacy) | ✔ |
-| `apps/mobile/assets/images/adaptive-icon.png` | 1024 × 1024 | PNG (RGBA) | yes | 10,243 B | Android adaptive icon foreground (background `#2F45D8`) | ✔ |
-| `apps/mobile/assets/images/adaptive-icon-monochrome.png` | 1024 × 1024 | PNG (RGBA) | yes | 7,892 B | Android 13+ themed icon | ✔ |
-| `apps/mobile/assets/images/splash-icon.png` | 1024 × 1024 | PNG (RGBA) | yes | 10,243 B | Splash screen (rendered at 180 px width) | ✔ |
-| `packages/brand/assets/icon.svg`, `icon-foreground.svg`, `logo.svg` | vector | SVG | – | 353 / 338 / 487 B | Source artwork | – |
-| `screenshots/android/dashboard.png`, `quotation-list.png`, `quotation-editor.png`, `quotation-details.png`, `customers.png`, `jobs.png` | 1344 × 2992 each | PNG (RGBA) | **yes** | – | Play phone screenshots (candidates) | ✘ **not uploadable as-is**: Play requires no alpha channel, and the long side (2992) exceeds 2 × the short side (2688) |
+| App icon | `store-assets/android/icon-512.png` | 1 | 512 × 512 | PNG RGB (no alpha), 7.6 KB | 512 × 512, PNG, ≤ 1 MB | ✔ |
+| Feature graphic | `store-assets/android/feature-graphic-1024x500.png` | 1 | 1024 × 500 | PNG RGB (no alpha), 37 KB | 1024 × 500, JPEG or 24-bit PNG, no alpha | ✔ |
+| Phone screenshots | `store-assets/android/phone-screenshots/phone-0[1-8]-*.jpg` | 8 | 1080 × 1920 | JPEG, ≤ 226 KB | 2–8; sides 320–3840 px; long side ≤ 2 × short side; ≥ 4 at ≥ 1080 px for promotion | ✔ |
+| 7" tablet screenshots | `store-assets/android/tablet-7-screenshots/tablet-7-0[1-5]-*.jpg` | 5 | 1200 × 2134 (9:16) | JPEG, ≤ 254 KB | up to 8; 9:16 or 16:9; sides 320–3840 px | ✔ |
+| 10" tablet screenshots | `store-assets/android/tablet-10-screenshots/tablet-10-0[1-5]-*.jpg` | 5 | 1620 × 2880 (9:16) | JPEG, ≤ 365 KB | up to 8; 9:16 or 16:9; sides 1080–7680 px | ✔ |
 
-The icon PNGs are rendered from the SVG sources by `apps/mobile/scripts/render-assets.mjs` (`npm run assets` in
-`apps/mobile`).
+## Apple App Store
 
-## Missing assets
+| Asset | File(s) | Count | Pixels | Format | Rule (App Store Connect) | OK |
+|---|---|---|---|---|---|---|
+| App icon | `store-assets/ios/app-icon-1024.png` (= `apps/mobile/assets/images/icon.png`) | 1 | 1024 × 1024 | PNG RGB (no alpha) | 1024 × 1024, opaque; delivered with the build | ✔ |
+| iPhone 6.9" | `store-assets/ios/iphone-6.9/iphone-6.9-0[1-8]-*.jpg` | 8 | 1320 × 2868 | JPEG, ≤ 374 KB | 1–10, portrait 1320 × 2868 (or 1290 × 2796 / 1260 × 2736), no alpha | ✔ |
+| iPhone 6.3" | `store-assets/ios/iphone-6.3/iphone-6.3-0[1-8]-*.jpg` | 8 | 1206 × 2622 | JPEG, ≤ 337 KB | 1–10, portrait 1206 × 2622 (or 1179 × 2556), no alpha; optional when 6.9" is provided | ✔ |
+| iPad 13" | `store-assets/ios/ipad-13/ipad-13-0[1-5]-*.jpg` | 5 | 2064 × 2752 | JPEG, ≤ 387 KB | 1–10, portrait 2064 × 2752 (or 2048 × 2732); **only used if iPad support is enabled** (`supportsTablet` is `false` today) | ✔ |
 
-| Asset | Requirement | Source of requirement | Status |
-|---|---|---|---|
-| Google Play phone screenshots | min. **2**, up to 8 per device type; JPEG or 24-bit PNG (no alpha); each side 320–3840 px; long side ≤ 2 × short side; for promotion eligibility ≥ **4** at **1080×1920** portrait | <https://support.google.com/googleplay/android-developer/answer/9866151> (verified 2026-10-12) | six candidates exist in `screenshots/android/` but must be **flattened (remove alpha) and cropped/resized to ≤ 2:1** (e.g. 1080×1920 or 1344×2688) |
-| Apple iPhone screenshots | 1–10 per size, PNG/JPEG, no alpha; required: iPhone with Dynamic Island (medium, 6.3"): **1206×2622 or 1179×2556** portrait. Optional 6.9": 1320×2868 / 1290×2796 / 1260×2736; 6.5" (1284×2778 / 1242×2688) required only if no 6.9" set is provided | <https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/> (no page date; © 2026) – rule changed recently, re-check at upload | **missing**; blocked until an iOS build exists |
-| iPad screenshots | only if the app supports iPad | same | not needed (`supportsTablet: false`) |
-| Web app screenshots | none required by stores; useful for README/landing | – | planned in `screenshots/web/` |
-| Play promo video | optional | – | not planned |
-| Apple app preview video | optional | – | not planned |
+No Android status or navigation bar is visible in the App Store sets: the raw captures are cropped (iPhone: 156 px top /
+72 px bottom, iPad: 146 px / 64 px – the Android system-bar insets reported by `dumpsys window` at those sizes) before
+composition.
 
-## Screenshot guidance
+## Sources
 
-- Use the demo company (fictitious data, `*.example` addresses) – never real customer data.
-- Android: capture at 1080×1920 (9:16) portrait against the production or a local API with demo data. Modern
-  emulator profiles such as 1080×2400 violate the "long side ≤ 2 × short side" rule (2400 > 2160) and must be
-  cropped or resized.
-- Suggested set (both stores): Dashboard, quotation list, quotation editor with line items and totals, quotation
-  detail with send options, customer acceptance page / PDF, jobs list.
-- Store files without alpha channel (flatten on white/brand background).
+| Asset | Generated by |
+|---|---|
+| Icons, splash, feature graphic, App Store icon | `apps/mobile/scripts/render-assets.mjs` (`npm run assets` in `apps/mobile`) from `packages/brand/assets/*.svg`; it now writes `icon-512.png` without alpha and verifies it |
+| All screenshots | `scripts/store-screenshots.mjs` (profiles `phone`, `tablet-7`, `tablet-10`, `iphone-6.9`, `iphone-6.3`, `ipad-13`) from the raw captures in `screenshots/android/` and `screenshots/ios/`, see [SCREENSHOT-INVENTORY.md](../testing/SCREENSHOT-INVENTORY.md) |
+
+Not planned: Play promo video, App Store app preview video.

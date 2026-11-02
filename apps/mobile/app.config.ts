@@ -72,7 +72,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: APP_ID,
-    versionCode: 2,
+    versionCode: 3,
     adaptiveIcon: {
       foregroundImage: './assets/images/adaptive-icon.png',
       monochromeImage: './assets/images/adaptive-icon-monochrome.png',

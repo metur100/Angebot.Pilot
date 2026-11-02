@@ -6,7 +6,7 @@
 //   apps/mobile/assets/images/adaptive-icon.png            1024×1024, transparent foreground (Android adaptive icon)
 //   apps/mobile/assets/images/adaptive-icon-monochrome.png 1024×1024, single-colour foreground (Android 13 themed icon)
 //   apps/mobile/assets/images/splash-icon.png              1024×1024, transparent (splash on brand background)
-//   store-assets/android/icon-512.png                      512×512, 32-bit PNG (Google Play)
+//   store-assets/android/icon-512.png                      512×512, opaque, no alpha channel (Google Play)
 //   store-assets/android/feature-graphic-1024x500.png      1024×500, 24-bit PNG without alpha (Google Play)
 //   store-assets/ios/app-icon-1024.png                     1024×1024, opaque, no alpha channel (App Store)
 import { mkdirSync, readFileSync } from 'node:fs';
@@ -82,7 +82,7 @@ results.push(['icon.png', await write(join(imagesDir, 'icon.png'), render(square
 results.push(['adaptive-icon.png', await write(join(imagesDir, 'adaptive-icon.png'), render(foregroundSvg, 1024), { alpha: true }), 1024, 1024]);
 results.push(['adaptive-icon-monochrome.png', await write(join(imagesDir, 'adaptive-icon-monochrome.png'), render(monochromeSvg, 1024), { alpha: true }), 1024, 1024]);
 results.push(['splash-icon.png', await write(join(imagesDir, 'splash-icon.png'), render(foregroundSvg, 1024), { alpha: true }), 1024, 1024]);
-results.push(['icon-512.png', await write(join(androidStoreDir, 'icon-512.png'), render(squareIconSvg, 512), { alpha: true }), 512, 512]);
+results.push(['icon-512.png', await write(join(androidStoreDir, 'icon-512.png'), render(squareIconSvg, 512), { opaque: true }), 512, 512]);
 results.push(['feature-graphic-1024x500.png', await write(join(androidStoreDir, 'feature-graphic-1024x500.png'), render(featureSvg, 1024), { opaque: true }), 1024, 500]);
 results.push(['app-icon-1024.png', await write(join(iosStoreDir, 'app-icon-1024.png'), render(squareIconSvg, 1024), { opaque: true }), 1024, 1024]);
 
@@ -95,7 +95,7 @@ const byName = Object.fromEntries(results.map(([n, m]) => [n, m]));
 if (byName['app-icon-1024.png'].hasAlpha) failures.push('app-icon-1024.png must not have an alpha channel');
 if (byName['icon.png'].hasAlpha) failures.push('icon.png must be opaque');
 if (byName['feature-graphic-1024x500.png'].hasAlpha) failures.push('feature graphic must be 24-bit without alpha');
-if (byName['icon-512.png'].channels !== 4) failures.push('icon-512.png must be a 32-bit PNG');
+if (byName['icon-512.png'].hasAlpha) failures.push('icon-512.png must not have an alpha channel');
 if (failures.length) {
   console.error(failures.join('\n'));
   process.exit(1);
